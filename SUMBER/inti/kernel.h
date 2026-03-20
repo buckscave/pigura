@@ -47,6 +47,17 @@
 
 /*
  * ============================================================================
+ * FORWARD DECLARATIONS (FORWARD DECLARATIONS)
+ * ============================================================================
+ */
+
+/* Forward declarations untuk menghindari circular dependency */
+struct proses;
+struct vm_descriptor;
+struct page_directory;
+
+/*
+ * ============================================================================
  * STRUKTUR DATA GLOBAL (GLOBAL DATA STRUCTURES)
  * ============================================================================
  */
@@ -118,6 +129,30 @@ typedef struct {
 
 /*
  * ============================================================================
+ * TIPE STATUS PROSES (PROCESS STATUS TYPES)
+ * ============================================================================
+ */
+
+/* Status proses */
+typedef enum {
+    PROSES_STATUS_BELUM = 0,        /* Belum diinisialisasi */
+    PROSES_STATUS_SIAP,            /* Ready to run */
+    PROSES_STATUS_JALAN,           /* Currently running */
+    PROSES_STATUS_TUNGGU,          /* Waiting for event */
+    PROSES_STATUS_ZOMBIE,          /* Terminated, not reaped */
+    PROSES_STATUS_STOP             /* Stopped by signal */
+} proses_status_t;
+
+/* Prioritas proses */
+typedef enum {
+    PRIORITAS_RENDAH = 0,
+    PRIORITAS_NORMAL = 1,
+    PRIORITAS_TINGGI = 2,
+    PRIORITAS_REALTIME = 3
+} prioritas_t;
+
+/*
+ * ============================================================================
  * VARIABEL GLOBAL KERNEL (KERNEL GLOBAL VARIABLES)
  * ============================================================================
  */
@@ -138,7 +173,7 @@ extern volatile tak_bertanda64_t g_uptime_ticks;
 extern tak_bertanda64_t g_boot_time;
 
 /* Pointer ke proses saat ini */
-extern struct pcb *g_proses_sekarang;
+extern proses_t *g_proses_sekarang;
 
 /* Jumlah CPU aktif */
 extern tak_bertanda32_t g_cpu_count;
@@ -280,6 +315,21 @@ void kernel_clear_screen(void);
 void kernel_set_color(tak_bertanda8_t fg, tak_bertanda8_t bg);
 
 /*
+ * kernel_snprintf
+ * ---------------
+ * Format string ke buffer dengan batas ukuran.
+ *
+ * Parameter:
+ *   str    - Buffer output
+ *   size   - Ukuran buffer
+ *   format - Format string
+ *   ...    - Argumen format
+ *
+ * Return: Jumlah karakter yang diformat
+ */
+int kernel_snprintf(char *str, ukuran_t size, const char *format, ...);
+
+/*
  * ============================================================================
  * DEKLARASI FUNGSI LOGGING (LOGGING FUNCTIONS)
  * ============================================================================
@@ -290,6 +340,9 @@ void kernel_set_color(tak_bertanda8_t fg, tak_bertanda8_t bg);
 #define LOG_WARN    2
 #define LOG_INFO    3
 #define LOG_DEBUG   4
+
+/* Log level maksimum */
+#define LOG_LEVEL   LOG_DEBUG
 
 /*
  * log_error
@@ -518,6 +571,517 @@ int kernel_strcmp(const char *s1, const char *s2);
  * Return: <0, 0, >0 jika s1 < s2, s1 == s2, s1 > s2
  */
 int kernel_strncmp(const char *s1, const char *s2, ukuran_t n);
+
+/*
+ * ============================================================================
+ * DEKLARASI FUNGSI PMM (PHYSICAL MEMORY MANAGER)
+ * ============================================================================
+ */
+
+/*
+ * pmm_init
+ * --------
+ * Inisialisasi physical memory manager.
+ */
+status_t pmm_init(tak_bertanda64_t mem_size, void *bitmap_addr);
+
+/*
+ * pmm_add_region
+ * --------------
+ * Tambah region memori.
+ */
+status_t pmm_add_region(alamat_fisik_t mulai, alamat_fisik_t akhir,
+                        tak_bertanda32_t tipe);
+
+/*
+ * pmm_reserve
+ * -----------
+ * Reserve region memori.
+ */
+status_t pmm_reserve(alamat_fisik_t mulai, tak_bertanda64_t ukuran);
+
+/*
+ * pmm_alloc_page
+ * --------------
+ * Alokasikan satu halaman fisik.
+ */
+alamat_fisik_t pmm_alloc_page(void);
+
+/*
+ * pmm_free_page
+ * -------------
+ * Bebaskan satu halaman fisik.
+ */
+status_t pmm_free_page(alamat_fisik_t addr);
+
+/*
+ * pmm_alloc_pages
+ * ---------------
+ * Alokasikan multiple halaman.
+ */
+alamat_fisik_t pmm_alloc_pages(tak_bertanda32_t count);
+
+/*
+ * pmm_free_pages
+ * --------------
+ * Bebaskan multiple halaman.
+ */
+status_t pmm_free_pages(alamat_fisik_t addr, tak_bertanda32_t count);
+
+/*
+ * pmm_get_stats
+ * -------------
+ * Dapatkan statistik PMM.
+ */
+void pmm_get_stats(tak_bertanda64_t *total, tak_bertanda64_t *free,
+                   tak_bertanda64_t *used);
+
+/*
+ * pmm_print_stats
+ * ---------------
+ * Print statistik PMM.
+ */
+void pmm_print_stats(void);
+
+/*
+ * ============================================================================
+ * DEKLARASI FUNGSI PAGING (PAGING FUNCTIONS)
+ * ============================================================================
+ */
+
+/*
+ * paging_init
+ * -----------
+ * Inisialisasi sistem paging.
+ */
+status_t paging_init(tak_bertanda64_t mem_size);
+
+/*
+ * paging_map_page
+ * ---------------
+ * Map satu halaman.
+ */
+status_t paging_map_page(alamat_virtual_t vaddr, alamat_fisik_t paddr,
+                         tak_bertanda32_t flags);
+
+/*
+ * paging_unmap_page
+ * -----------------
+ * Unmap satu halaman.
+ */
+status_t paging_unmap_page(alamat_virtual_t vaddr);
+
+/*
+ * paging_get_physical
+ * -------------------
+ * Dapatkan alamat fisik dari virtual.
+ */
+alamat_fisik_t paging_get_physical(alamat_virtual_t vaddr);
+
+/*
+ * paging_is_mapped
+ * ----------------
+ * Cek apakah halaman sudah di-map.
+ */
+bool_t paging_is_mapped(alamat_virtual_t vaddr);
+
+/*
+ * paging_create_address_space
+ * ---------------------------
+ * Buat address space baru.
+ */
+struct page_directory *paging_create_address_space(void);
+
+/*
+ * paging_destroy_address_space
+ * ----------------------------
+ * Hancurkan address space.
+ */
+status_t paging_destroy_address_space(struct page_directory *dir);
+
+/*
+ * paging_switch_directory
+ * -----------------------
+ * Switch ke page directory lain.
+ */
+status_t paging_switch_directory(struct page_directory *dir);
+
+/*
+ * ============================================================================
+ * DEKLARASI FUNGSI HEAP (HEAP FUNCTIONS)
+ * ============================================================================
+ */
+
+/*
+ * heap_init
+ * ---------
+ * Inisialisasi heap.
+ */
+status_t heap_init(void *start_addr, ukuran_t size);
+
+/*
+ * kmalloc
+ * -------
+ * Alokasikan memori dari heap.
+ */
+void *kmalloc(ukuran_t size);
+
+/*
+ * kfree
+ * -----
+ * Bebaskan memori.
+ */
+void kfree(void *ptr);
+
+/*
+ * krealloc
+ * --------
+ * Realokasi memori.
+ */
+void *krealloc(void *ptr, ukuran_t size);
+
+/*
+ * kcalloc
+ * -------
+ * Alokasi memori dan clear.
+ */
+void *kcalloc(ukuran_t num, ukuran_t size);
+
+/*
+ * heap_validate
+ * -------------
+ * Validasi heap.
+ */
+bool_t heap_validate(void);
+
+/*
+ * heap_print_stats
+ * ----------------
+ * Print statistik heap.
+ */
+void heap_print_stats(void);
+
+/*
+ * ============================================================================
+ * DEKLARASI FUNGSI VIRTUAL MEMORY (VIRTUAL MEMORY FUNCTIONS)
+ * ============================================================================
+ */
+
+/* VMA flags */
+#define VMA_FLAG_NONE           0x00
+#define VMA_FLAG_READ           0x01
+#define VMA_FLAG_WRITE          0x02
+#define VMA_FLAG_EXEC           0x04
+#define VMA_FLAG_STACK          0x08
+#define VMA_FLAG_HEAP           0x10
+#define VMA_FLAG_SHARED         0x20
+#define VMA_FLAG_FIXED          0x40
+
+/* VM descriptor type */
+typedef struct vm_descriptor vm_descriptor_t;
+
+/*
+ * virtual_init
+ * ------------
+ * Inisialisasi virtual memory manager.
+ */
+status_t virtual_init(void);
+
+/*
+ * vm_create_address_space
+ * -----------------------
+ * Buat address space baru.
+ */
+vm_descriptor_t *vm_create_address_space(void);
+
+/*
+ * vm_destroy_address_space
+ * ------------------------
+ * Hancurkan address space.
+ */
+status_t vm_destroy_address_space(vm_descriptor_t *vm);
+
+/*
+ * vm_map
+ * ------
+ * Map region memori.
+ */
+alamat_virtual_t vm_map(vm_descriptor_t *vm, alamat_virtual_t start,
+                        ukuran_t size, tak_bertanda32_t prot,
+                        tak_bertanda32_t flags);
+
+/*
+ * vm_unmap
+ * --------
+ * Unmap region memori.
+ */
+status_t vm_unmap(vm_descriptor_t *vm, alamat_virtual_t start,
+                  ukuran_t size);
+
+/*
+ * vm_brk
+ * ------
+ * Ubah break address.
+ */
+alamat_virtual_t vm_brk(vm_descriptor_t *vm, alamat_virtual_t addr);
+
+/*
+ * vm_handle_page_fault
+ * --------------------
+ * Handler page fault.
+ */
+bool_t vm_handle_page_fault(alamat_virtual_t addr,
+                            tak_bertanda32_t error,
+                            vm_descriptor_t *vm);
+
+/*
+ * vm_print_stats
+ * --------------
+ * Print statistik VM.
+ */
+void vm_print_stats(void);
+
+/*
+ * ============================================================================
+ * DEKLARASI FUNGSI KMAP (KERNEL MAPPING FUNCTIONS)
+ * ============================================================================
+ */
+
+/*
+ * kmap_init
+ * ---------
+ * Inisialisasi kmap.
+ */
+status_t kmap_init(void);
+
+/*
+ * kmap
+ * ----
+ * Map halaman fisik ke virtual.
+ */
+void *kmap(alamat_fisik_t phys);
+
+/*
+ * kunmap
+ * ------
+ * Unmap alamat virtual.
+ */
+status_t kunmap(void *vaddr);
+
+/*
+ * kmap_print_stats
+ * ----------------
+ * Print statistik kmap.
+ */
+void kmap_print_stats(void);
+
+/*
+ * ============================================================================
+ * DEKLARASI FUNGSI DMA (DMA BUFFER FUNCTIONS)
+ * ============================================================================
+ */
+
+/* DMA buffer type */
+typedef struct dma_buffer dma_buffer_t;
+
+/*
+ * dma_init
+ * --------
+ * Inisialisasi DMA buffer manager.
+ */
+status_t dma_init(void);
+
+/*
+ * dma_alloc_coherent
+ * ------------------
+ * Alokasikan DMA buffer coherent.
+ */
+dma_buffer_t *dma_alloc_coherent(ukuran_t size, tak_bertanda32_t align,
+                                 const char *nama);
+
+/*
+ * dma_free_coherent
+ * -----------------
+ * Bebaskan DMA buffer.
+ */
+void dma_free_coherent(dma_buffer_t *buf);
+
+/*
+ * dma_print_stats
+ * ---------------
+ * Print statistik DMA.
+ */
+void dma_print_stats(void);
+
+/*
+ * ============================================================================
+ * DEKLARASI FUNGSI ALLOCATOR (SLAB ALLOCATOR FUNCTIONS)
+ * ============================================================================
+ */
+
+/*
+ * allocator_init
+ * --------------
+ * Inisialisasi slab allocator.
+ */
+status_t allocator_init(void);
+
+/*
+ * allocator_print_stats
+ * ---------------------
+ * Print statistik allocator.
+ */
+void allocator_print_stats(void);
+
+/*
+ * ============================================================================
+ * DEKLARASI FUNGSI MEMORI UTAMA (MAIN MEMORY FUNCTIONS)
+ * ============================================================================
+ */
+
+/*
+ * memori_init
+ * -----------
+ * Inisialisasi subsistem memori lengkap.
+ */
+status_t memori_init(multiboot_info_t *bootinfo);
+
+/*
+ * memori_get_total
+ * ----------------
+ * Dapatkan total memori fisik.
+ */
+tak_bertanda64_t memori_get_total(void);
+
+/*
+ * memori_get_available
+ * --------------------
+ * Dapatkan memori tersedia.
+ */
+tak_bertanda64_t memori_get_available(void);
+
+/*
+ * memori_print_info
+ * -----------------
+ * Print informasi memori.
+ */
+void memori_print_info(void);
+
+/*
+ * ============================================================================
+ * DEKLARASI FUNGSI PROSES (PROCESS FUNCTIONS)
+ * ============================================================================
+ */
+
+/* Process type */
+typedef struct proses proses_t;
+
+/* Invalid PID */
+#define PID_INVALID             ((pid_t)-1)
+
+/*
+ * proses_init
+ * -----------
+ * Inisialisasi subsistem proses.
+ */
+status_t proses_init(void);
+
+/*
+ * proses_create
+ * -------------
+ * Buat proses baru.
+ */
+pid_t proses_create(const char *nama, pid_t ppid, tak_bertanda32_t flags);
+
+/*
+ * proses_exit
+ * -----------
+ * Exit proses.
+ */
+status_t proses_exit(pid_t pid, tanda32_t exit_code);
+
+/*
+ * proses_cari
+ * -----------
+ * Cari proses berdasarkan PID.
+ */
+proses_t *proses_cari(pid_t pid);
+
+/*
+ * proses_get_current
+ * ------------------
+ * Dapatkan proses saat ini.
+ */
+proses_t *proses_get_current(void);
+
+/*
+ * proses_set_current
+ * ------------------
+ * Set proses saat ini.
+ */
+void proses_set_current(proses_t *proses);
+
+/*
+ * proses_get_kernel
+ * -----------------
+ * Dapatkan kernel process.
+ */
+proses_t *proses_get_kernel(void);
+
+/*
+ * proses_get_count
+ * ----------------
+ * Dapatkan jumlah proses.
+ */
+tak_bertanda32_t proses_get_count(void);
+
+/*
+ * proses_wait
+ * -----------
+ * Wait untuk proses child.
+ */
+pid_t proses_wait(pid_t pid, tanda32_t *status);
+
+/*
+ * proses_kill
+ * -----------
+ * Kill proses.
+ */
+status_t proses_kill(pid_t pid, tak_bertanda32_t signal);
+
+/*
+ * proses_print_list
+ * -----------------
+ * Print list proses.
+ */
+void proses_print_list(void);
+
+/*
+ * ============================================================================
+ * DEKLARASI FUNGSI INTERUPSI (INTERRUPT FUNCTIONS)
+ * ============================================================================
+ */
+
+/*
+ * interupsi_init
+ * --------------
+ * Inisialisasi sistem interupsi.
+ */
+status_t interupsi_init(void);
+
+/*
+ * interupsi_enable
+ * ----------------
+ * Aktifkan interupsi.
+ */
+void interupsi_enable(void);
+
+/*
+ * interupsi_disable
+ * -----------------
+ * Nonaktifkan interupsi.
+ */
+void interupsi_disable(void);
 
 /*
  * ============================================================================

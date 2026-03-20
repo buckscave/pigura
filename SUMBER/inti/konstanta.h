@@ -543,4 +543,39 @@
 /* Signature ELF */
 #define ELF_MAGIC               0x464C457F  /* 0x7F 'E' 'L' 'F' */
 
+/*
+ * ============================================================================
+ * KONSTANTA PROSES (PROCESS CONSTANTS)
+ * ============================================================================
+ */
+
+/* PID khusus */
+#define PID_KERNEL              0
+#define PID_IDLE                1
+#define PID_INIT                2
+
+/* Process name max length */
+#define MAKS_NAMA_PROSES        64
+
+/* Quantum default */
+#define QUANTUM_DEFAULT         CONFIG_SCHEDULER_QUANTUM
+
+/* Thread constants */
+#define CONFIG_MAKS_THREAD_PER_PROSES    CONFIG_MAKS_THREAD
+
+/* User stack address */
+#define ALAMAT_STACK_USER       0xBFFF0000UL
+
+/*
+ * ============================================================================
+ * KONSTANTA SIGNAL (SIGNAL CONSTANTS)
+ * ============================================================================
+ */
+
+/* Signal numbers */
+#define SIGNAL_KILL             9
+#define SIGNAL_TERM             15
+#define SIGNAL_STOP             19
+#define SIGNAL_CONT             18
+
 #endif /* INTI_KONSTANTA_H */

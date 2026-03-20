@@ -36,7 +36,7 @@ volatile tak_bertanda64_t g_uptime_ticks = 0;
 tak_bertanda64_t g_boot_time = 0;
 
 /* Pointer ke proses saat ini */
-struct pcb *g_proses_sekarang = NULL;
+proses_t *g_proses_sekarang = NULL;
 
 /* Jumlah CPU aktif */
 tak_bertanda32_t g_cpu_count = 1;

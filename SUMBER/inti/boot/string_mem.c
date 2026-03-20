@@ -638,3 +638,126 @@ void kernel_set_color(tak_bertanda8_t fg, tak_bertanda8_t bg)
 {
     hal_console_set_color(fg, bg);
 }
+
+/*
+ * kernel_snprintf
+ * ---------------
+ * Format string ke buffer dengan batas ukuran.
+ *
+ * Parameter:
+ *   str    - Buffer output
+ *   size   - Ukuran buffer
+ *   format - Format string
+ *   ...    - Argumen format
+ *
+ * Return: Jumlah karakter yang diformat
+ */
+int kernel_snprintf(char *str, ukuran_t size, const char *format, ...)
+{
+    va_list ap;
+    int ret;
+
+    if (str == NULL || size == 0) {
+        return 0;
+    }
+
+    va_start(ap, format);
+    ret = vsnprintf(str, size, format, ap);
+    va_end(ap);
+
+    return ret;
+}
+
+/*
+ * kernel_delay
+ * ------------
+ * Delay sederhana (busy wait).
+ *
+ * Parameter:
+ *   ms - Jumlah milidetik delay
+ */
+void kernel_delay(tak_bertanda32_t ms)
+{
+    tak_bertanda32_t i;
+    tak_bertanda32_t iterations;
+
+    /* Estimasi kasar: ~1000 iterasi per mikrodetik pada CPU 1 GHz */
+    iterations = ms * 1000;
+
+    for (i = 0; i < iterations; i++) {
+        __asm__ __volatile__("nop");
+    }
+}
+
+/*
+ * kernel_sleep
+ * ------------
+ * Sleep kernel untuk durasi tertentu.
+ *
+ * Parameter:
+ *   ms - Jumlah milidetik sleep
+ */
+void kernel_sleep(tak_bertanda32_t ms)
+{
+    hal_timer_sleep(ms);
+}
+
+/*
+ * kernel_get_uptime
+ * -----------------
+ * Dapatkan uptime sistem.
+ *
+ * Return: Uptime dalam detik
+ */
+tak_bertanda64_t kernel_get_uptime(void)
+{
+    return hal_timer_get_uptime();
+}
+
+/*
+ * kernel_get_ticks
+ * ----------------
+ * Dapatkan jumlah timer ticks.
+ *
+ * Return: Jumlah ticks sejak boot
+ */
+tak_bertanda64_t kernel_get_ticks(void)
+{
+    return hal_timer_get_ticks();
+}
+
+/*
+ * kernel_get_info
+ * ---------------
+ * Dapatkan informasi sistem.
+ *
+ * Return: Pointer ke struktur info_sistem_t
+ */
+const info_sistem_t *kernel_get_info(void)
+{
+    return &g_info_sistem;
+}
+
+/*
+ * kernel_get_arch
+ * ---------------
+ * Dapatkan nama arsitektur.
+ *
+ * Return: String nama arsitektur
+ */
+const char *kernel_get_arch(void)
+{
+    return "x86";
+}
+
+/*
+ * kernel_get_version
+ * ------------------
+ * Dapatkan versi kernel.
+ *
+ * Return: String versi kernel
+ */
+const char *kernel_get_version(void)
+{
+    return PIGURA_VERSI_STRING;
+}
