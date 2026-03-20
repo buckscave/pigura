@@ -10,7 +10,7 @@
  * Tanggal: 2025
  */
 
-#include "../kernel.h"
+#include "kernel.h"
 
 /*
  * ============================================================================
@@ -73,9 +73,6 @@ static void stack_fill_magic(void)
  * setup_kernel_stack
  * ------------------
  * Setup stack kernel.
- * Fungsi ini menginisialisasi stack kernel dan mengatur stack pointer.
- *
- * Return: Status operasi
  */
 status_t setup_kernel_stack(void)
 {
@@ -83,15 +80,11 @@ status_t setup_kernel_stack(void)
         return STATUS_SUDAH_ADA;
     }
 
-    /* Isi stack dengan magic untuk deteksi overflow */
     stack_fill_magic();
 
-    /* Set stack pointer ke alamat tertinggi dalam array */
-    /* Stack tumbuh ke bawah, jadi ESP = base + size */
-    kernel_esp = (void *)((alamat_ptr_t)kernel_stack + STACK_KERNEL_SIZE);
+    kernel_esp = (void *)((ukuran_t)kernel_stack + STACK_KERNEL_SIZE);
 
-    /* Load stack pointer */
-    /* Ini dilakukan dalam assembly untuk keamanan */
+#if defined(ARSITEKTUR_X86) || defined(ARSITEKTUR_X86_64)
     __asm__ __volatile__(
         "mov %0, %%esp\n\t"
         "mov %0, %%ebp\n\t"
@@ -99,6 +92,15 @@ status_t setup_kernel_stack(void)
         : "r"(kernel_esp)
         : "esp", "ebp"
     );
+#elif defined(ARSITEKTUR_ARM32) || defined(ARSITEKTUR_ARM64)
+    __asm__ __volatile__(
+        "mov sp, %0\n\t"
+        "mov fp, %0\n\t"
+        :
+        : "r"(kernel_esp)
+        : "sp", "fp"
+    );
+#endif
 
     stack_initialized = BENAR;
 
@@ -108,14 +110,7 @@ status_t setup_kernel_stack(void)
 /*
  * setup_kernel_stack_early
  * ------------------------
- * Setup stack kernel awal (untuk penggunaan sangat awal).
- * Dipanggil sebelum subsistem lain diinisialisasi.
- *
- * Parameter:
- *   stack_top - Alamat top stack
- *   size      - Ukuran stack
- *
- * Return: Status operasi
+ * Setup stack kernel awal.
  */
 status_t setup_kernel_stack_early(void *stack_top, ukuran_t size)
 {
@@ -123,10 +118,9 @@ status_t setup_kernel_stack_early(void *stack_top, ukuran_t size)
         return STATUS_PARAM_INVALID;
     }
 
-    /* Set stack pointer */
     kernel_esp = stack_top;
 
-    /* Load stack pointer */
+#if defined(ARSITEKTUR_X86) || defined(ARSITEKTUR_X86_64)
     __asm__ __volatile__(
         "mov %0, %%esp\n\t"
         "mov %0, %%ebp\n\t"
@@ -134,6 +128,15 @@ status_t setup_kernel_stack_early(void *stack_top, ukuran_t size)
         : "r"(kernel_esp)
         : "esp", "ebp"
     );
+#elif defined(ARSITEKTUR_ARM32) || defined(ARSITEKTUR_ARM64)
+    __asm__ __volatile__(
+        "mov sp, %0\n\t"
+        "mov fp, %0\n\t"
+        :
+        : "r"(kernel_esp)
+        : "sp", "fp"
+    );
+#endif
 
     stack_initialized = BENAR;
 
@@ -144,8 +147,6 @@ status_t setup_kernel_stack_early(void *stack_top, ukuran_t size)
  * get_kernel_stack_top
  * --------------------
  * Dapatkan alamat top stack kernel.
- *
- * Return: Alamat top stack
  */
 void *get_kernel_stack_top(void)
 {
@@ -156,8 +157,6 @@ void *get_kernel_stack_top(void)
  * get_kernel_stack_bottom
  * -----------------------
  * Dapatkan alamat bottom stack kernel.
- *
- * Return: Alamat bottom stack
  */
 void *get_kernel_stack_bottom(void)
 {
@@ -168,8 +167,6 @@ void *get_kernel_stack_bottom(void)
  * get_kernel_stack_size
  * ---------------------
  * Dapatkan ukuran stack kernel.
- *
- * Return: Ukuran stack dalam byte
  */
 ukuran_t get_kernel_stack_size(void)
 {
@@ -180,15 +177,12 @@ ukuran_t get_kernel_stack_size(void)
  * check_stack_overflow
  * --------------------
  * Cek apakah stack overflow terjadi.
- *
- * Return: BENAR jika overflow terdeteksi
  */
 bool_t check_stack_overflow(void)
 {
     tak_bertanda32_t *ptr;
     tak_bertanda32_t i;
 
-    /* Cek magic value di awal stack */
     ptr = (tak_bertanda32_t *)kernel_stack;
 
     for (i = 0; i < 4; i++) {
@@ -204,8 +198,6 @@ bool_t check_stack_overflow(void)
  * get_stack_usage
  * ---------------
  * Dapatkan penggunaan stack.
- *
- * Return: Jumlah byte yang digunakan
  */
 ukuran_t get_stack_usage(void)
 {
@@ -216,7 +208,6 @@ ukuran_t get_stack_usage(void)
     ptr = (tak_bertanda32_t *)kernel_stack;
     used = 0;
 
-    /* Hitung berapa banyak magic yang tertimpa */
     for (i = 0; i < STACK_KERNEL_SIZE / sizeof(tak_bertanda32_t); i++) {
         if (ptr[i] != STACK_MAGIC) {
             used++;
@@ -230,8 +221,6 @@ ukuran_t get_stack_usage(void)
  * get_stack_free
  * --------------
  * Dapatkan sisa stack yang tersedia.
- *
- * Return: Jumlah byte yang masih tersedia
  */
 ukuran_t get_stack_free(void)
 {
@@ -247,9 +236,10 @@ void print_stack_info(void)
 {
     kernel_printf("\n[STACK] Informasi Stack Kernel:\n");
     kernel_printf("========================================\n");
-    kernel_printf("  Top:    0x%08lX\n", (alamat_ptr_t)kernel_esp);
-    kernel_printf("  Bottom: 0x%08lX\n", (alamat_ptr_t)kernel_stack);
-    kernel_printf("  Size:   %lu bytes\n", (tak_bertanda64_t)STACK_KERNEL_SIZE);
+    kernel_printf("  Top:    0x%p\n", kernel_esp);
+    kernel_printf("  Bottom: 0x%p\n", (void *)kernel_stack);
+    kernel_printf("  Size:   %lu bytes\n", 
+                  (tak_bertanda64_t)STACK_KERNEL_SIZE);
     kernel_printf("  Used:   %lu bytes\n",
                   (tak_bertanda64_t)get_stack_usage());
     kernel_printf("  Free:   %lu bytes\n",
@@ -272,13 +262,8 @@ void print_stack_info(void)
  * stack_guard_check
  * -----------------
  * Cek stack guard page.
- * Digunakan untuk proteksi stack overflow.
- *
- * Return: BENAR jika guard page terinjak
  */
 bool_t stack_guard_check(void)
 {
-    /* Untuk implementasi dengan paging, cek guard page */
-    /* Untuk sekarang, gunakan magic value check */
     return check_stack_overflow();
 }

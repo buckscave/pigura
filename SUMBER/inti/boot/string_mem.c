@@ -10,7 +10,7 @@
  * Tanggal: 2025
  */
 
-#include "../kernel.h"
+#include "kernel.h"
 
 /*
  * ============================================================================
@@ -22,6 +22,13 @@
  * kernel_memcpy
  * -------------
  * Copy memory block.
+ *
+ * Parameter:
+ *   dest - Buffer tujuan
+ *   src  - Buffer sumber
+ *   n    - Jumlah byte
+ *
+ * Return: Pointer ke dest
  */
 void *kernel_memcpy(void *dest, const void *src, ukuran_t n)
 {
@@ -36,7 +43,6 @@ void *kernel_memcpy(void *dest, const void *src, ukuran_t n)
     d = (tak_bertanda8_t *)dest;
     s = (const tak_bertanda8_t *)src;
 
-    /* Copy byte per byte */
     for (i = 0; i < n; i++) {
         d[i] = s[i];
     }
@@ -48,6 +54,13 @@ void *kernel_memcpy(void *dest, const void *src, ukuran_t n)
  * kernel_memset
  * -------------
  * Set memory block dengan nilai.
+ *
+ * Parameter:
+ *   s - Buffer
+ *   c - Nilai byte
+ *   n - Jumlah byte
+ *
+ * Return: Pointer ke s
  */
 void *kernel_memset(void *s, int c, ukuran_t n)
 {
@@ -71,6 +84,13 @@ void *kernel_memset(void *s, int c, ukuran_t n)
  * kernel_memmove
  * --------------
  * Move memory block (handles overlap).
+ *
+ * Parameter:
+ *   dest - Buffer tujuan
+ *   src  - Buffer sumber
+ *   n    - Jumlah byte
+ *
+ * Return: Pointer ke dest
  */
 void *kernel_memmove(void *dest, const void *src, ukuran_t n)
 {
@@ -85,13 +105,11 @@ void *kernel_memmove(void *dest, const void *src, ukuran_t n)
     s = (const tak_bertanda8_t *)src;
 
     if (d < s) {
-        /* Copy forward */
         ukuran_t i;
         for (i = 0; i < n; i++) {
             d[i] = s[i];
         }
     } else if (d > s) {
-        /* Copy backward */
         while (n > 0) {
             n--;
             d[n] = s[n];
@@ -105,6 +123,13 @@ void *kernel_memmove(void *dest, const void *src, ukuran_t n)
  * kernel_memcmp
  * -------------
  * Compare memory blocks.
+ *
+ * Parameter:
+ *   s1 - Block pertama
+ *   s2 - Block kedua
+ *   n  - Jumlah byte
+ *
+ * Return: <0, 0, >0 jika s1 < s2, s1 == s2, s1 > s2
  */
 int kernel_memcmp(const void *s1, const void *s2, ukuran_t n)
 {
@@ -141,6 +166,11 @@ int kernel_memcmp(const void *s1, const void *s2, ukuran_t n)
  * kernel_strlen
  * -------------
  * Hitung panjang string.
+ *
+ * Parameter:
+ *   s - String
+ *
+ * Return: Panjang string
  */
 ukuran_t kernel_strlen(const char *s)
 {
@@ -162,6 +192,13 @@ ukuran_t kernel_strlen(const char *s)
  * kernel_strncpy
  * --------------
  * Copy string dengan batas.
+ *
+ * Parameter:
+ *   dest - Buffer tujuan
+ *   src  - String sumber
+ *   n    - Ukuran buffer
+ *
+ * Return: Pointer ke dest
  */
 char *kernel_strncpy(char *dest, const char *src, ukuran_t n)
 {
@@ -175,7 +212,6 @@ char *kernel_strncpy(char *dest, const char *src, ukuran_t n)
         dest[i] = src[i];
     }
 
-    /* Pad dengan null jika ada ruang */
     for (; i < n; i++) {
         dest[i] = '\0';
     }
@@ -187,6 +223,12 @@ char *kernel_strncpy(char *dest, const char *src, ukuran_t n)
  * kernel_strcmp
  * -------------
  * Compare dua string.
+ *
+ * Parameter:
+ *   s1 - String pertama
+ *   s2 - String kedua
+ *
+ * Return: <0, 0, >0 jika s1 < s2, s1 == s2, s1 > s2
  */
 int kernel_strcmp(const char *s1, const char *s2)
 {
@@ -209,6 +251,13 @@ int kernel_strcmp(const char *s1, const char *s2)
  * kernel_strncmp
  * --------------
  * Compare dua string dengan batas.
+ *
+ * Parameter:
+ *   s1 - String pertama
+ *   s2 - String kedua
+ *   n  - Jumlah karakter maksimum
+ *
+ * Return: <0, 0, >0 jika s1 < s2, s1 == s2, s1 > s2
  */
 int kernel_strncmp(const char *s1, const char *s2, ukuran_t n)
 {
@@ -297,12 +346,10 @@ static void printf_print_num(printf_state_t *state,
 
     digits = uppercase ? "0123456789ABCDEF" : "0123456789abcdef";
 
-    /* Handle angka 0 */
     if (value == 0 && !is_negative) {
         buffer[0] = '0';
         len = 1;
     } else {
-        /* Konversi ke string (dari belakang) */
         i = 23;
         buffer[i] = '\0';
         len = 0;
@@ -314,14 +361,12 @@ static void printf_print_num(printf_state_t *state,
             len++;
         }
 
-        /* Tambah tanda negatif */
         if (is_negative) {
             i--;
             buffer[i] = '-';
             len++;
         }
 
-        /* Geser ke depan */
         {
             int j;
             for (j = 0; j <= len; j++) {
@@ -330,7 +375,6 @@ static void printf_print_num(printf_state_t *state,
         }
     }
 
-    /* Padding */
     if (width > len) {
         int pad_len = width - len;
         while (pad_len > 0) {
@@ -339,18 +383,19 @@ static void printf_print_num(printf_state_t *state,
         }
     }
 
-    /* Print angka */
     for (i = 0; i < len; i++) {
         printf_putchar(state, buffer[i]);
     }
 }
 
 /*
- * vsnprintf
- * ---------
+ * internal_vsnprintf
+ * ------------------
  * Format string ke buffer dengan ukuran terbatas.
+ * Fungsi internal, tidak diekspor.
  */
-int vsnprintf(char *str, ukuran_t size, const char *format, va_list ap)
+static int internal_vsnprintf(char *str, ukuran_t size,
+                              const char *format, va_list ap)
 {
     printf_state_t state;
     char c;
@@ -373,157 +418,140 @@ int vsnprintf(char *str, ukuran_t size, const char *format, va_list ap)
             continue;
         }
 
-        /* Parse format specifier */
         c = *format++;
         if (c == '\0') {
             break;
         }
 
-        /* Flags */
-        char pad = ' ';
-        if (c == '0') {
-            pad = '0';
-            c = *format++;
-            if (c == '\0') break;
-        }
+        {
+            char pad = ' ';
+            if (c == '0') {
+                pad = '0';
+                c = *format++;
+                if (c == '\0') break;
+            }
 
-        /* Width */
-        int width = 0;
-        while (c >= '0' && c <= '9') {
-            width = width * 10 + (c - '0');
-            c = *format++;
-            if (c == '\0') break;
-        }
-        if (c == '\0') break;
-
-        /* Length modifier */
-        int is_long = 0;
-        if (c == 'l') {
-            is_long = 1;
-            c = *format++;
-            if (c == '\0') break;
-        }
-
-        /* Conversion specifier */
-        switch (c) {
-            case 'd':
-            case 'i': {
-                /* Signed integer */
-                tanda64_t val;
-                if (is_long) {
-                    val = va_arg(ap, long);
-                } else {
-                    val = va_arg(ap, int);
+            {
+                int width = 0;
+                while (c >= '0' && c <= '9') {
+                    width = width * 10 + (c - '0');
+                    c = *format++;
+                    if (c == '\0') break;
                 }
-                int neg = 0;
-                if (val < 0) {
-                    neg = 1;
-                    val = -val;
+                if (c == '\0') break;
+
+                {
+                    int is_long = 0;
+                    if (c == 'l') {
+                        is_long = 1;
+                        c = *format++;
+                        if (c == '\0') break;
+                    }
+
+                    switch (c) {
+                        case 'd':
+                        case 'i': {
+                            tanda64_t val;
+                            int neg;
+                            if (is_long) {
+                                val = va_arg(ap, long);
+                            } else {
+                                val = va_arg(ap, int);
+                            }
+                            neg = 0;
+                            if (val < 0) {
+                                neg = 1;
+                                val = -val;
+                            }
+                            printf_print_num(&state, (tak_bertanda64_t)val,
+                                             10, width, pad, 0, neg);
+                            break;
+                        }
+
+                        case 'u': {
+                            tak_bertanda64_t val;
+                            if (is_long) {
+                                val = va_arg(ap, unsigned long);
+                            } else {
+                                val = va_arg(ap, unsigned int);
+                            }
+                            printf_print_num(&state, val, 10, width,
+                                             pad, 0, 0);
+                            break;
+                        }
+
+                        case 'x': {
+                            tak_bertanda64_t val;
+                            if (is_long) {
+                                val = va_arg(ap, unsigned long);
+                            } else {
+                                val = va_arg(ap, unsigned int);
+                            }
+                            printf_print_num(&state, val, 16, width,
+                                             pad, 0, 0);
+                            break;
+                        }
+
+                        case 'X': {
+                            tak_bertanda64_t val;
+                            if (is_long) {
+                                val = va_arg(ap, unsigned long);
+                            } else {
+                                val = va_arg(ap, unsigned int);
+                            }
+                            printf_print_num(&state, val, 16, width,
+                                             pad, 1, 0);
+                            break;
+                        }
+
+                        case 'p': {
+                            void *ptr = va_arg(ap, void *);
+                            printf_putchar(&state, '0');
+                            printf_putchar(&state, 'x');
+                            printf_print_num(&state,
+                                             (tak_bertanda64_t)(ukuran_t)ptr,
+                                             16, 8, '0', 0, 0);
+                            break;
+                        }
+
+                        case 's': {
+                            const char *s = va_arg(ap, const char *);
+                            printf_puts(&state, s);
+                            break;
+                        }
+
+                        case 'c': {
+                            char ch = (char)va_arg(ap, int);
+                            printf_putchar(&state, ch);
+                            break;
+                        }
+
+                        case '%': {
+                            printf_putchar(&state, '%');
+                            break;
+                        }
+
+                        default: {
+                            printf_putchar(&state, '%');
+                            printf_putchar(&state, c);
+                            break;
+                        }
+                    }
                 }
-                printf_print_num(&state, (tak_bertanda64_t)val, 10,
-                                width, pad, 0, neg);
-                break;
-            }
-
-            case 'u': {
-                /* Unsigned integer */
-                tak_bertanda64_t val;
-                if (is_long) {
-                    val = va_arg(ap, unsigned long);
-                } else {
-                    val = va_arg(ap, unsigned int);
-                }
-                printf_print_num(&state, val, 10, width, pad, 0, 0);
-                break;
-            }
-
-            case 'x': {
-                /* Hex lowercase */
-                tak_bertanda64_t val;
-                if (is_long) {
-                    val = va_arg(ap, unsigned long);
-                } else {
-                    val = va_arg(ap, unsigned int);
-                }
-                printf_print_num(&state, val, 16, width, pad, 0, 0);
-                break;
-            }
-
-            case 'X': {
-                /* Hex uppercase */
-                tak_bertanda64_t val;
-                if (is_long) {
-                    val = va_arg(ap, unsigned long);
-                } else {
-                    val = va_arg(ap, unsigned int);
-                }
-                printf_print_num(&state, val, 16, width, pad, 1, 0);
-                break;
-            }
-
-            case 'p': {
-                /* Pointer */
-                void *ptr = va_arg(ap, void *);
-                printf_putchar(&state, '0');
-                printf_putchar(&state, 'x');
-                printf_print_num(&state, (tak_bertanda64_t)(alamat_ptr_t)ptr,
-                                16, 8, '0', 0, 0);
-                break;
-            }
-
-            case 's': {
-                /* String */
-                const char *s = va_arg(ap, const char *);
-                printf_puts(&state, s);
-                break;
-            }
-
-            case 'c': {
-                /* Character */
-                char ch = (char)va_arg(ap, int);
-                printf_putchar(&state, ch);
-                break;
-            }
-
-            case '%': {
-                /* Literal % */
-                printf_putchar(&state, '%');
-                break;
-            }
-
-            default: {
-                /* Unknown, print as-is */
-                printf_putchar(&state, '%');
-                printf_putchar(&state, c);
-                break;
             }
         }
     }
 
-    /* Null terminate */
     if (state.buffer != NULL && state.size > 0) {
-        state.buffer[state.pos < state.size ? state.pos : state.size - 1] = '\0';
+        ukuran_t term_pos;
+        term_pos = (state.pos < state.size) ? state.pos : state.size - 1;
+        state.buffer[term_pos] = '\0';
     }
 
     return state.total;
 }
 
-/*
- * snprintf
- * --------
- * Format string ke buffer dengan ukuran terbatas.
- */
-int snprintf(char *str, ukuran_t size, const char *format, ...)
-{
-    va_list ap;
-    int ret;
 
-    va_start(ap, format);
-    ret = vsnprintf(str, size, format, ap);
-    va_end(ap);
-
-    return ret;
-}
 
 /*
  * ============================================================================
@@ -543,7 +571,7 @@ int kernel_printf(const char *format, ...)
     int ret;
 
     va_start(ap, format);
-    ret = vsnprintf(buffer, sizeof(buffer), format, ap);
+    ret = internal_vsnprintf(buffer, sizeof(buffer), format, ap);
     va_end(ap);
 
     if (ret > 0) {
@@ -564,17 +592,15 @@ int kernel_printk(int level, const char *format, ...)
     char buffer[1024];
     int ret;
 
-    /* Check log level */
-    if (level > LOG_LEVEL) {
+    if (level > CONFIG_LOG_LEVEL) {
         return 0;
     }
 
     va_start(ap, format);
-    ret = vsnprintf(buffer, sizeof(buffer), format, ap);
+    ret = internal_vsnprintf(buffer, sizeof(buffer), format, ap);
     va_end(ap);
 
     if (ret > 0) {
-        /* Set warna berdasarkan level */
         switch (level) {
             case LOG_ERROR:
                 hal_console_print_error(buffer);
@@ -643,14 +669,6 @@ void kernel_set_color(tak_bertanda8_t fg, tak_bertanda8_t bg)
  * kernel_snprintf
  * ---------------
  * Format string ke buffer dengan batas ukuran.
- *
- * Parameter:
- *   str    - Buffer output
- *   size   - Ukuran buffer
- *   format - Format string
- *   ...    - Argumen format
- *
- * Return: Jumlah karakter yang diformat
  */
 int kernel_snprintf(char *str, ukuran_t size, const char *format, ...)
 {
@@ -662,40 +680,47 @@ int kernel_snprintf(char *str, ukuran_t size, const char *format, ...)
     }
 
     va_start(ap, format);
-    ret = vsnprintf(str, size, format, ap);
+    ret = internal_vsnprintf(str, size, format, ap);
     va_end(ap);
 
     return ret;
 }
 
 /*
+ * kernel_vsnprintf
+ * ----------------
+ * Format string ke buffer dengan batas ukuran (variadic).
+ */
+int kernel_vsnprintf(char *str, ukuran_t size, const char *format,
+                     va_list args)
+{
+    if (str == NULL || size == 0) {
+        return 0;
+    }
+
+    return internal_vsnprintf(str, size, format, args);
+}
+
+/*
+ * ============================================================================
+ * FUNGSI UTILITAS KERNEL (KERNEL UTILITY FUNCTIONS)
+ * ============================================================================
+ */
+
+/*
  * kernel_delay
  * ------------
  * Delay sederhana (busy wait).
- *
- * Parameter:
- *   ms - Jumlah milidetik delay
  */
 void kernel_delay(tak_bertanda32_t ms)
 {
-    tak_bertanda32_t i;
-    tak_bertanda32_t iterations;
-
-    /* Estimasi kasar: ~1000 iterasi per mikrodetik pada CPU 1 GHz */
-    iterations = ms * 1000;
-
-    for (i = 0; i < iterations; i++) {
-        __asm__ __volatile__("nop");
-    }
+    hal_timer_sleep(ms);
 }
 
 /*
  * kernel_sleep
  * ------------
  * Sleep kernel untuk durasi tertentu.
- *
- * Parameter:
- *   ms - Jumlah milidetik sleep
  */
 void kernel_sleep(tak_bertanda32_t ms)
 {
@@ -706,8 +731,6 @@ void kernel_sleep(tak_bertanda32_t ms)
  * kernel_get_uptime
  * -----------------
  * Dapatkan uptime sistem.
- *
- * Return: Uptime dalam detik
  */
 tak_bertanda64_t kernel_get_uptime(void)
 {
@@ -718,8 +741,6 @@ tak_bertanda64_t kernel_get_uptime(void)
  * kernel_get_ticks
  * ----------------
  * Dapatkan jumlah timer ticks.
- *
- * Return: Jumlah ticks sejak boot
  */
 tak_bertanda64_t kernel_get_ticks(void)
 {
@@ -730,8 +751,6 @@ tak_bertanda64_t kernel_get_ticks(void)
  * kernel_get_info
  * ---------------
  * Dapatkan informasi sistem.
- *
- * Return: Pointer ke struktur info_sistem_t
  */
 const info_sistem_t *kernel_get_info(void)
 {
@@ -742,20 +761,16 @@ const info_sistem_t *kernel_get_info(void)
  * kernel_get_arch
  * ---------------
  * Dapatkan nama arsitektur.
- *
- * Return: String nama arsitektur
  */
 const char *kernel_get_arch(void)
 {
-    return "x86";
+    return NAMA_ARSITEKTUR;
 }
 
 /*
  * kernel_get_version
  * ------------------
  * Dapatkan versi kernel.
- *
- * Return: String versi kernel
  */
 const char *kernel_get_version(void)
 {

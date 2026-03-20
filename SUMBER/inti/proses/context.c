@@ -50,27 +50,6 @@
  * ============================================================================
  */
 
-/* Struktur context CPU untuk 32-bit */
-typedef struct {
-    tanda32_t eax;                  /* Register general purpose */
-    tanda32_t ebx;
-    tanda32_t ecx;
-    tanda32_t edx;
-    tanda32_t esi;
-    tanda32_t edi;
-    tanda32_t ebp;
-    tanda32_t esp;                  /* Stack pointer */
-    tanda32_t eip;                  /* Instruction pointer */
-    tak_bertanda32_t eflags;        /* Flags register */
-    tak_bertanda16_t cs;            /* Code segment */
-    tak_bertanda16_t ds;            /* Data segment */
-    tak_bertanda16_t es;
-    tak_bertanda16_t fs;
-    tak_bertanda16_t gs;
-    tak_bertanda16_t ss;            /* Stack segment */
-    tak_bertanda32_t cr3;           /* Page directory */
-} cpu_context_t;
-
 /* Struktur stack frame untuk interrupt */
 typedef struct {
     tak_bertanda32_t gs;
@@ -781,4 +760,130 @@ void context_print_info(void *ctx)
                   context->cs, context->ds);
     kernel_printf("  SS:     0x%04X\n", context->ss);
     kernel_printf("========================================\n");
+}
+
+/*
+ * context_dup
+ * ----------
+ * Duplikasi context untuk fork.
+ *
+ * Parameter:
+ *   ctx - Pointer ke context sumber
+ *
+ * Return: Pointer ke context baru, atau NULL
+ */
+void *context_dup(void *ctx)
+{
+    cpu_context_t *src;
+    cpu_context_t *dst;
+
+    if (ctx == NULL) {
+        return NULL;
+    }
+
+    src = (cpu_context_t *)ctx;
+
+    dst = context_alloc();
+    if (dst == NULL) {
+        return NULL;
+    }
+
+    /* Copy semua field */
+    kernel_memcpy(dst, src, sizeof(cpu_context_t));
+
+    return (void *)dst;
+}
+
+/*
+ * context_set_return
+ * ------------------
+ * Set return value dalam context (EAX).
+ *
+ * Parameter:
+ *   ctx    - Pointer ke context
+ *   retval - Return value
+ */
+void context_set_return(void *ctx, long retval)
+{
+    cpu_context_t *context;
+
+    if (ctx == NULL) {
+        return;
+    }
+
+    context = (cpu_context_t *)ctx;
+    context->eax = (tanda32_t)retval;
+}
+
+/*
+ * context_return_to_user
+ * ----------------------
+ * Return ke user mode dari system call.
+ *
+ * Parameter:
+ *   ctx - Pointer ke context user
+ */
+void context_return_to_user(void *ctx)
+{
+    cpu_context_t *context;
+    tak_bertanda32_t data_sel;
+
+    if (ctx == NULL) {
+        kernel_panic("context_return_to_user: context NULL");
+    }
+
+    context = (cpu_context_t *)ctx;
+
+    /* Set data segment selector */
+    data_sel = context->ds;
+
+    /* Set segment selectors */
+    __asm__ __volatile__(
+        "movw %0, %%ds\n\t"
+        "movw %0, %%es\n\t"
+        "movw %0, %%fs\n\t"
+        "movw %0, %%gs\n\t"
+        :
+        : "r"(data_sel)
+        : "memory"
+    );
+
+    /* Switch CR3 jika perlu */
+    if (context->cr3 != 0 && context->cr3 != cpu_read_cr3()) {
+        cpu_write_cr3(context->cr3);
+    }
+
+    /* Return ke user mode via IRET */
+    __asm__ __volatile__(
+        "pushl %0\n\t"          /* SS */
+        "pushl %1\n\t"          /* ESP */
+        "pushl %2\n\t"          /* EFLAGS */
+        "pushl %3\n\t"          /* CS */
+        "pushl %4\n\t"          /* EIP */
+        "movl %5, %%eax\n\t"    /* EAX */
+        "movl %6, %%ebx\n\t"    /* EBX */
+        "movl %7, %%ecx\n\t"    /* ECX */
+        "movl %8, %%edx\n\t"    /* EDX */
+        "movl %9, %%esi\n\t"    /* ESI */
+        "movl %10, %%edi\n\t"   /* EDI */
+        "movl %11, %%ebp\n\t"   /* EBP */
+        "iret\n\t"
+        :
+        : "r"((tak_bertanda32_t)context->ss),
+          "r"(context->esp),
+          "r"(context->eflags),
+          "r"((tak_bertanda32_t)context->cs),
+          "r"(context->eip),
+          "m"(context->eax),
+          "m"(context->ebx),
+          "m"(context->ecx),
+          "m"(context->edx),
+          "m"(context->esi),
+          "m"(context->edi),
+          "m"(context->ebp)
+        : "memory"
+    );
+
+    /* Tidak seharusnya sampai sini */
+    kernel_panic("context_return_to_user: should not return");
 }

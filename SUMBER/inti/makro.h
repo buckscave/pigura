@@ -8,11 +8,15 @@
  *
  * Versi: 1.0
  * Tanggal: 2025
+ *
+ * CATATAN: Semua makro di berkas ini adalah C90 compliant.
+ *          Jangan menggunakan typeof atau fitur non-standard.
  */
 
 #ifndef INTI_MAKRO_H
 #define INTI_MAKRO_H
 
+/* Include tipe dasar */
 #include "types.h"
 
 /*
@@ -27,7 +31,7 @@
 /* Mendapatkan offset member dalam struct */
 #define OFFSET_OF(tipe, member) ((ukuran_t) &((tipe *)0)->member)
 
-/* Mendapatkan struct dari pointer member */
+/* Mendapatkan struct dari pointer member (C90 compliant) */
 #define CONTAINER_OF(ptr, tipe, member) \
     ((tipe *)((char *)(ptr) - OFFSET_OF(tipe, member)))
 
@@ -40,7 +44,7 @@
 /* Batasi nilai dalam rentang */
 #define BATAS(val, min, maks)   (MIN(MAKS(val, min), maks))
 
-/* Tukar dua nilai */
+/* Tukar dua nilai (tipisahkan tipe eksplisit) */
 #define TUKAR(a, b, tipe)       \
     do {                        \
         tipe _tmp = (a);        \
@@ -53,25 +57,7 @@
 
 /* Bulatkan ke pangkat dua berikutnya */
 #define BULATKAN_PANGKAT_DUA(n) \
-    do {                        \
-        if ((n) > 0) {          \
-            (n)--;              \
-            (n) |= (n) >> 1;    \
-            (n) |= (n) >> 2;    \
-            (n) |= (n) >> 4;    \
-            (n) |= (n) >> 8;    \
-            (n) |= (n) >> 16;   \
-            (n)++;              \
-        }                       \
-    } while (0)
-
-/* Hitung log2 dari pangkat dua */
-#define LOG2_PANGKAT_DUA(n)     \
-    (((n) & 0xAAAAAAAA) ? 1 : 0) + \
-    (((n) & 0xCCCCCCCC) ? 2 : 0) + \
-    (((n) & 0xF0F0F0F0) ? 4 : 0) + \
-    (((n) & 0xFF00FF00) ? 8 : 0) + \
-    (((n) & 0xFFFF0000) ? 16 : 0)
+    (((n) > 0) ? (1UL << (32 - __builtin_clz((n) - 1))) : 1UL)
 
 /*
  * ============================================================================
@@ -134,7 +120,8 @@
 #define GABUNG_DWITA(lo, hi)    ((tak_bertanda32_t)(((hi) << 16) | (lo)))
 
 /* Gabungkan dword menjadi qword */
-#define GABUNG_KWITA(lo, hi)    ((tak_bertanda64_t)(((tak_bertanda64_t)(hi) << 32) | (lo)))
+#define GABUNG_KWITA(lo, hi)    ((tak_bertanda64_t)( \
+    ((tak_bertanda64_t)(hi) << 32) | (lo)))
 
 /*
  * ============================================================================
@@ -175,9 +162,6 @@
 /* Statement yang tidak digunakan */
 #define TIDAK_DIGUNAKAN(x)      ((void)(x))
 
-/* Breakpoint debugger */
-#define BREAKPOINT()            __asm__ __volatile__("int $3")
-
 /* Barrier memori */
 #define BARRIER_MEMORI()        __asm__ __volatile__("" ::: "memory")
 
@@ -210,10 +194,12 @@
 #define DIGIT_KE_CHAR(d)        ((d) + '0')
 
 /* Konversi huruf ke uppercase */
-#define KE_UPPER(c)             (((c) >= 'a' && (c) <= 'z') ? ((c) - 32) : (c))
+#define KE_UPPER(c)             (((c) >= 'a' && (c) <= 'z') ? \
+                                 ((c) - 32) : (c))
 
 /* Konversi huruf ke lowercase */
-#define KE_LOWER(c)             (((c) >= 'A' && (c) <= 'Z') ? ((c) + 32) : (c))
+#define KE_LOWER(c)             (((c) >= 'A' && (c) <= 'Z') ? \
+                                 ((c) + 32) : (c))
 
 /* Cek apakah karakter adalah digit */
 #define ADALAH_DIGIT(c)         ((c) >= '0' && (c) <= '9')
@@ -240,53 +226,9 @@
  * ============================================================================
  */
 
-/* Assertion untuk debug */
-#ifdef DEBUG
-    #define ASSERT(expr)                                        \
-        do {                                                    \
-            if (!(expr)) {                                      \
-                kernel_panic(__FILE__, __LINE__,                \
-                            "Assertion gagal: " #expr);         \
-            }                                                   \
-        } while (0)
-#else
-    #define ASSERT(expr)        TIDAK_DIGUNAKAN(expr)
-#endif
-
-/* Assertion dengan pesan kustom */
-#ifdef DEBUG
-    #define ASSERT_PESAN(expr, pesan)                           \
-        do {                                                    \
-            if (!(expr)) {                                      \
-                kernel_panic(__FILE__, __LINE__, pesan);        \
-            }                                                   \
-        } while (0)
-#else
-    #define ASSERT_PESAN(expr, pesan) TIDAK_DIGUNAKAN(expr)
-#endif
-
-/* Static assertion untuk compile-time check */
+/* Static assertion untuk compile-time check (C90 compliant) */
 #define STATIC_ASSERT(cond, nama) \
     typedef char static_assert_##nama[(cond) ? 1 : -1]
-
-/* Debug print kondisional */
-#ifdef DEBUG
-    #define DEBUG_PRINT(fmt, ...) \
-        kernel_printf("[DEBUG] " fmt "\n", ##__VA_ARGS__)
-#else
-    #define DEBUG_PRINT(fmt, ...) TIDAK_DIGUNAKAN(fmt)
-#endif
-
-/* Trace fungsi */
-#ifdef DEBUG
-    #define TRACE_ENTER() \
-        kernel_printf("[TRACE] Masuk: %s\n", __func__)
-    #define TRACE_EXIT() \
-        kernel_printf("[TRACE] Keluar: %s\n", __func__)
-#else
-    #define TRACE_ENTER()       ((void)0)
-    #define TRACE_EXIT()        ((void)0)
-#endif
 
 /*
  * ============================================================================
@@ -333,9 +275,15 @@
 
 /*
  * ============================================================================
- * MAKRO LINKED LIST (LINKED LIST MACROS)
+ * STRUKTUR DAN FUNGSI LINKED LIST (LINKED LIST)
  * ============================================================================
  */
+
+/* Struktur list head */
+struct list_head {
+    struct list_head *berikutnya;
+    struct list_head *sebelumnya;
+};
 
 /* Inisialisasi list head */
 #define LIST_HEAD_INIT(nama) { &(nama), &(nama) }
@@ -343,12 +291,6 @@
 /* Deklarasi list head */
 #define LIST_HEAD(nama) \
     struct list_head nama = LIST_HEAD_INIT(nama)
-
-/* Struktur list head */
-struct list_head {
-    struct list_head *berikutnya;
-    struct list_head *sebelumnya;
-};
 
 /* Inisialisasi list head dinamis */
 static inline void list_head_init(struct list_head *head)
@@ -399,7 +341,8 @@ static inline int list_kosong(const struct list_head *head)
 
 /* Iterasi list */
 #define list_for_each(pos, head) \
-    for ((pos) = (head)->berikutnya; (pos) != (head); (pos) = (pos)->berikutnya)
+    for ((pos) = (head)->berikutnya; (pos) != (head); \
+         (pos) = (pos)->berikutnya)
 
 /* Iterasi list dengan aman (bisa hapus saat iterasi) */
 #define list_for_each_aman(pos, n, head) \
@@ -411,49 +354,9 @@ static inline int list_kosong(const struct list_head *head)
 #define list_entry(ptr, tipe, member) \
     CONTAINER_OF(ptr, tipe, member)
 
-/* Iterasi entry */
-#define list_for_each_entry(pos, head, member) \
-    for ((pos) = list_entry((head)->berikutnya, typeof(*(pos)), member); \
-         &(pos)->member != (head); \
-         (pos) = list_entry((pos)->member.berikutnya, typeof(*(pos)), member))
-
 /*
  * ============================================================================
- * MAKRO HASH TABLE (HASH TABLE MACROS)
- * ============================================================================
- */
-
-/* Fungsi hash string sederhana (djb2) */
-static inline tak_bertanda32_t hash_string(const char *str)
-{
-    tak_bertanda32_t hash = 5381;
-    int c;
-
-    while ((c = *str++)) {
-        hash = ((hash << 5) + hash) + c;
-    }
-
-    return hash;
-}
-
-/* Fungsi hash integer */
-static inline tak_bertanda32_t hash_int(tak_bertanda32_t key)
-{
-    key = ((key >> 16) ^ key) * 0x45D9F3B;
-    key = ((key >> 16) ^ key) * 0x45D9F3B;
-    key = (key >> 16) ^ key;
-    return key;
-}
-
-/* Hash untuk pointer */
-static inline tak_bertanda32_t hash_ptr(const void *ptr)
-{
-    return hash_int((tak_bertanda32_t)(alamat_ptr_t)ptr);
-}
-
-/*
- * ============================================================================
- * MAKRO SPINLOCK (SPINLOCK MACROS)
+ * STRUKTUR DAN FUNGSI SPINLOCK (SPINLOCK)
  * ============================================================================
  */
 
@@ -493,14 +396,9 @@ static inline int spinlock_terkunci(spinlock_t *lock)
     return lock->terkunci != 0;
 }
 
-/* Scope-based lock */
-#define SPINLOCK_GUARD(lock) \
-    for (spinlock_kunci(&(lock)); ({ int _b = 1; _b; }); \
-         spinlock_buka(&(lock)), _b = 0)
-
 /*
  * ============================================================================
- * MAKRO RING BUFFER (RING BUFFER MACROS)
+ * STRUKTUR DAN FUNGSI RING BUFFER (RING BUFFER)
  * ============================================================================
  */
 
@@ -585,6 +483,40 @@ static inline int ring_buffer_kosong(const ring_buffer_t *rb)
 static inline ukuran_t ring_buffer_terisi(const ring_buffer_t *rb)
 {
     return (rb->kepala - rb->ekor) % rb->ukuran;
+}
+
+/*
+ * ============================================================================
+ * FUNGSI HASH (HASH FUNCTIONS)
+ * ============================================================================
+ */
+
+/* Fungsi hash string sederhana (djb2) */
+static inline tak_bertanda32_t hash_string(const char *str)
+{
+    tak_bertanda32_t hash = 5381;
+    int c;
+
+    while ((c = *str++)) {
+        hash = ((hash << 5) + hash) + c;
+    }
+
+    return hash;
+}
+
+/* Fungsi hash integer */
+static inline tak_bertanda32_t hash_int(tak_bertanda32_t key)
+{
+    key = ((key >> 16) ^ key) * 0x45D9F3B;
+    key = ((key >> 16) ^ key) * 0x45D9F3B;
+    key = (key >> 16) ^ key;
+    return key;
+}
+
+/* Hash untuk pointer */
+static inline tak_bertanda32_t hash_ptr(const void *ptr)
+{
+    return hash_int((tak_bertanda32_t)(ukuran_t)ptr);
 }
 
 #endif /* INTI_MAKRO_H */

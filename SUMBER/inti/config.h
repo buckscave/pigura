@@ -9,6 +9,9 @@
  *
  * Versi: 1.0
  * Tanggal: 2025
+ *
+ * CATATAN: Berkas ini harus di-include PERTAMA sebelum header lain
+ *          karena menentukan arsitektur target.
  */
 
 #ifndef INTI_CONFIG_H
@@ -19,52 +22,61 @@
  * KONFIGURASI ARSITEKTUR (ARCHITECTURE CONFIGURATION)
  * ============================================================================
  * Konfigurasi arsitektur target. Pilih satu dari opsi yang tersedia.
- */
-
-/* Arsitektur yang didukung:
+ *
+ * Arsitektur yang didukung:
  * - ARSITEKTUR_X86    : Intel/AMD 32-bit
  * - ARSITEKTUR_X86_64 : Intel/AMD 64-bit
- * - ARSITEKTUR_ARM    : ARM 32-bit generik
- * - ARSITEKTUR_ARMV7  : ARM Cortex-A series
+ * - ARSITEKTUR_ARM32  : ARM 32-bit generik
+ * - ARSITEKTUR_ARM64  : ARM 64-bit (AArch64)
  */
 
 /* Default ke x86 jika tidak didefinisikan */
 #if !defined(ARSITEKTUR_X86) && !defined(ARSITEKTUR_X86_64) && \
-    !defined(ARSITEKTUR_ARM) && !defined(ARSITEKTUR_ARMV7)
+    !defined(ARSITEKTUR_ARM32) && !defined(ARSITEKTUR_ARM64)
     #define ARSITEKTUR_X86      1
 #endif
 
 /* Fitur arsitektur berdasarkan pilihan */
-#ifdef ARSITEKTUR_X86
+#if defined(ARSITEKTUR_X86)
     #define NAMA_ARSITEKTUR     "x86 (32-bit)"
     #define LEBAR_BIT           32
     #define PAGING_32BIT        1
     #define PAGING_64BIT        0
     #define SUPPORT_PAE         0
-#endif
 
-#ifdef ARSITEKTUR_X86_64
+#elif defined(ARSITEKTUR_X86_64)
     #define NAMA_ARSITEKTUR     "x86_64 (64-bit)"
     #define LEBAR_BIT           64
     #define PAGING_32BIT        0
     #define PAGING_64BIT        1
     #define SUPPORT_LONG_MODE   1
-#endif
 
-#ifdef ARSITEKTUR_ARM
+#elif defined(ARSITEKTUR_ARM32)
     #define NAMA_ARSITEKTUR     "ARM (32-bit)"
     #define LEBAR_BIT           32
     #define PAGING_32BIT        1
     #define SUPPORT_MMU_ARM     1
-#endif
 
-#ifdef ARSITEKTUR_ARMV7
-    #define NAMA_ARSITEKTUR     "ARMv7 (Cortex-A)"
-    #define LEBAR_BIT           32
-    #define PAGING_32BIT        1
+#elif defined(ARSITEKTUR_ARM64)
+    #define NAMA_ARSITEKTUR     "ARM64 (AArch64)"
+    #define LEBAR_BIT           64
+    #define PAGING_64BIT        1
     #define SUPPORT_VFP         1
     #define SUPPORT_NEON        1
 #endif
+
+/*
+ * ============================================================================
+ * VERSI KERNEL (KERNEL VERSION)
+ * ============================================================================
+ */
+
+#define PIGURA_VERSI_MAJOR      1
+#define PIGURA_VERSI_MINOR      0
+#define PIGURA_VERSI_PATCH      0
+#define PIGURA_VERSI_STRING     "1.0.0"
+#define PIGURA_NAMA             "Pigura OS"
+#define PIGURA_JULUKAN          "Bingkai Digital"
 
 /*
  * ============================================================================
@@ -105,18 +117,18 @@
  * 3 = Error + Warning + Info
  * 4 = Semua termasuk debug
  */
-#ifndef LOG_LEVEL
-    #define LOG_LEVEL           3
+#ifndef CONFIG_LOG_LEVEL
+    #define CONFIG_LOG_LEVEL    3
 #endif
 
 /* Output log ke serial port */
-#ifndef LOG_SERIAL
-    #define LOG_SERIAL          1
+#ifndef CONFIG_LOG_SERIAL
+    #define CONFIG_LOG_SERIAL   1
 #endif
 
 /* Output log ke framebuffer */
-#ifndef LOG_FRAMEBUFFER
-    #define LOG_FRAMEBUFFER     1
+#ifndef CONFIG_LOG_FRAMEBUFFER
+    #define CONFIG_LOG_FRAMEBUFFER 1
 #endif
 
 /*
@@ -126,16 +138,17 @@
  * Pengaturan alokasi dan manajemen memori.
  */
 
-/* Ukuran halaman (bytes) */
-#define CONFIG_UKURAN_HALAMAN       4096
-
 /* Ukuran minimum heap kernel (bytes) */
-#define CONFIG_HEAP_MINIMAL         (1UL * 1024UL * 1024UL)  /* 1 MB */
+#define CONFIG_HEAP_MINIMAL         (1UL * 1024UL * 1024UL)
 
 /* Ukuran maksimum heap kernel (bytes), 0 = unlimited */
 #define CONFIG_HEAP_MAKSIMAL        0
 
-/* Alokasi memori fisik: 0 = first-fit, 1 = best-fit, 2 = buddy */
+/* Algoritma alokasi memori fisik:
+ * 0 = first-fit
+ * 1 = best-fit
+ * 2 = buddy
+ */
 #define CONFIG_ALOKASI_ALGORITMA    0
 
 /* Aktifkan memory pooling */
@@ -153,7 +166,7 @@
 #define CONFIG_DMA_BUFFER           1
 
 /* Ukuran DMA buffer pool */
-#define CONFIG_DMA_POOL_UKURAN      (16UL * 1024UL)  /* 16 KB */
+#define CONFIG_DMA_POOL_UKURAN      (16UL * 1024UL)
 
 /*
  * ============================================================================
@@ -172,10 +185,10 @@
 #define CONFIG_MAKS_FD              256
 
 /* Ukuran stack kernel (bytes) */
-#define CONFIG_STACK_KERNEL         (8UL * 1024UL)  /* 8 KB */
+#define CONFIG_STACK_KERNEL         (8UL * 1024UL)
 
 /* Ukuran stack user (bytes) */
-#define CONFIG_STACK_USER           (1UL * 1024UL * 1024UL)  /* 1 MB */
+#define CONFIG_STACK_USER           (1UL * 1024UL * 1024UL)
 
 /* Quantum scheduler (ticks) */
 #define CONFIG_SCHEDULER_QUANTUM    10
@@ -208,7 +221,7 @@
 
 /* Dukungan NTFS */
 #define CONFIG_FS_NTFS              1
-#define CONFIG_FS_NTFS_WRITE        0  /* Read-only untuk keamanan */
+#define CONFIG_FS_NTFS_WRITE        0
 
 /* Dukungan ext2 */
 #define CONFIG_FS_EXT2              1
@@ -238,7 +251,7 @@
 #define CONFIG_MAKS_MOUNT           16
 
 /* Cache buffer size */
-#define CONFIG_BUFFER_CACHE         (4UL * 1024UL * 1024UL)  /* 4 MB */
+#define CONFIG_BUFFER_CACHE         (4UL * 1024UL * 1024UL)
 
 /*
  * ============================================================================
@@ -332,56 +345,6 @@
 
 /*
  * ============================================================================
- * KONFIGURASI FONT (FONT CONFIGURATION)
- * ============================================================================
- * Pengaturan sistem font.
- */
-
-/* Font default */
-#define CONFIG_FONT_DEFAULT         "font_default.pf"
-
-/* Aktifkan bitmap font */
-#define CONFIG_FONT_BITMAP          1
-
-/* Aktifkan TTF font */
-#define CONFIG_FONT_TTF             0
-
-/* Ukuran font cache */
-#define CONFIG_FONT_CACHE_SIZE      4096
-
-/*
- * ============================================================================
- * KONFIGURASI APLIKASI (APPLICATION CONFIGURATION)
- * ============================================================================
- * Pengaturan aplikasi sistem.
- */
-
-/* Aktifkan shell */
-#define CONFIG_SHELL                1
-
-/* Aktifkan init process */
-#define CONFIG_INIT                 1
-
-/* Aktifkan login */
-#define CONFIG_LOGIN                1
-
-/* Aktifkan file manager */
-#define CONFIG_FILE_MANAGER         1
-
-/* Aktifkan text editor */
-#define CONFIG_TEXT_EDITOR          1
-
-/* Aktifkan terminal */
-#define CONFIG_TERMINAL             1
-
-/* Aktifkan calculator */
-#define CONFIG_CALCULATOR           1
-
-/* Aktifkan image viewer */
-#define CONFIG_IMAGE_VIEWER         1
-
-/*
- * ============================================================================
  * KONFIGURASI KEAMANAN (SECURITY CONFIGURATION)
  * ============================================================================
  * Pengaturan keamanan sistem.
@@ -448,25 +411,37 @@
 
 /*
  * ============================================================================
- * KONFIGURASI PERFORMA (PERFORMANCE CONFIGURATION)
+ * KONFIGURASI KERNEL (KERNEL CONFIGURATION)
  * ============================================================================
- * Pengaturan optimasi performa.
+ * Pengaturan umum kernel.
  */
 
-/* Aktifkan cache optimization */
-#define CONFIG_CACHE_OPT            1
+/* Nama kernel */
+#define CONFIG_NAMA_KERNEL          "pigura"
 
-/* Aktifkan prefetch */
-#define CONFIG_PREFETCH             1
+/* Hostname default */
+#define CONFIG_HOSTNAME_DEFAULT     "pigura"
 
-/* Aktifkan lazy allocation */
-#define CONFIG_LAZY_ALLOC           1
+/* Aktifkan kernel modules */
+#define CONFIG_MODULES              0
 
-/* Aktifkan zero-copy */
-#define CONFIG_ZERO_COPY            0
+/* Aktifkan hotplug */
+#define CONFIG_HOTPLUG              0
 
-/* Aktifkan SIMD optimization */
-#define CONFIG_SIMD_OPT             0
+/* Aktifkan kexec */
+#define CONFIG_KEXEC                0
+
+/* Ukuran kernel log buffer */
+#define CONFIG_LOG_BUF_SIZE         (16UL * 1024UL)
+
+/* Aktifkan sysfs */
+#define CONFIG_SYSFS                0
+
+/* Aktifkan procfs */
+#define CONFIG_PROCFS               1
+
+/* Aktifkan devfs */
+#define CONFIG_DEVFS                1
 
 /*
  * ============================================================================
@@ -492,43 +467,6 @@
 
 /*
  * ============================================================================
- * KONFIGURASI KERNEL (KERNEL CONFIGURATION)
- * ============================================================================
- * Pengaturan umum kernel.
- */
-
-/* Nama kernel */
-#define CONFIG_NAMA_KERNEL          "pigura"
-
-/* Versi kernel string */
-#define CONFIG_VERSI_STRING         PIGURA_VERSI_STRING
-
-/* Hostname default */
-#define CONFIG_HOSTNAME_DEFAULT     "pigura"
-
-/* Aktifkan kernel modules */
-#define CONFIG_MODULES              0
-
-/* Aktifkan hotplug */
-#define CONFIG_HOTPLUG              0
-
-/* Aktifkan kexec */
-#define CONFIG_KEXEC                0
-
-/* Ukuran kernel log buffer */
-#define CONFIG_LOG_BUF_SIZE         (16UL * 1024UL)  /* 16 KB */
-
-/* Aktifkan sysfs */
-#define CONFIG_SYSFS                0
-
-/* Aktifkan procfs */
-#define CONFIG_PROCFS               1
-
-/* Aktifkan devfs */
-#define CONFIG_DEVFS                1
-
-/*
- * ============================================================================
  * VALIDASI KONFIGURASI (CONFIGURATION VALIDATION)
  * ============================================================================
  * Validasi konsistensi konfigurasi.
@@ -536,13 +474,8 @@
 
 /* Pastikan salah satu arsitektur dipilih */
 #if !defined(ARSITEKTUR_X86) && !defined(ARSITEKTUR_X86_64) && \
-    !defined(ARSITEKTUR_ARM) && !defined(ARSITEKTUR_ARMV7)
-    #error "Tidak ada arsitektur yang dipilih. Definisikan salah satu: ARSITEKTUR_X86, ARSITEKTUR_X86_64, ARSITEKTUR_ARM, atau ARSITEKTUR_ARMV7"
-#endif
-
-/* Pastikan konfigurasi memori valid */
-#if CONFIG_UKURAN_HALAMAN != 4096
-    #warning "Ukuran halaman yang tidak standar mungkin menyebabkan masalah kompatibilitas"
+    !defined(ARSITEKTUR_ARM32) && !defined(ARSITEKTUR_ARM64)
+    #error "Tidak ada arsitektur yang dipilih. Definisikan salah satu."
 #endif
 
 /* Pastikan konfigurasi proses valid */
@@ -557,11 +490,15 @@
 
 /*
  * ============================================================================
- * MACRO HELPER UNTUK KONFIGURASI (CONFIGURATION HELPER MACROS)
+ * MAKRO HELPER KONFIGURASI (CONFIGURATION HELPER MACROS)
  * ============================================================================
  */
 
 /* Cek apakah fitur enabled */
+#define KONFIG_ENABLED(x)       ((x) != 0)
+#define KONFIG_DISABLED(x)      ((x) == 0)
+
+/* Helper untuk kondisional compile-time */
 #ifdef DEBUG
     #define IF_DEBUG(stmt) stmt
 #else
@@ -585,9 +522,5 @@
 #else
     #define IF_AUDIO(stmt)
 #endif
-
-/* Helper untuk kondisional compile-time */
-#define KONFIG_ENABLED(x)       (x)
-#define KONFIG_DISABLED(x)      (!(x))
 
 #endif /* INTI_CONFIG_H */

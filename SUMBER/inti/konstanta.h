@@ -8,25 +8,19 @@
  *
  * Versi: 1.0
  * Tanggal: 2025
+ *
+ * CATATAN: Jangan definisikan tipe data di berkas ini.
+ *          Gunakan types.h untuk tipe data.
  */
 
 #ifndef INTI_KONSTANTA_H
 #define INTI_KONSTANTA_H
 
+/* Include tipe dasar */
 #include "types.h"
 
-/*
- * ============================================================================
- * VERSI SISTEM (SYSTEM VERSION)
- * ============================================================================
- */
-
-#define PIGURA_VERSI_MAJOR      1
-#define PIGURA_VERSI_MINOR      0
-#define PIGURA_VERSI_PATCH      0
-#define PIGURA_VERSI_STRING     "1.0.0"
-#define PIGURA_NAMA             "Pigura OS"
-#define PIGURA_JULUKAN          "Bingkai Digital"
+/* Include konfigurasi */
+#include "config.h"
 
 /*
  * ============================================================================
@@ -34,17 +28,18 @@
  * ============================================================================
  */
 
-/* Ukuran memori dasar */
-#define UKURAN_HALAMAN          4096UL
-#define UKURAN_HALAMAN_BESAR    (2UL * 1024UL * 1024UL)  /* 2 MB huge page */
-#define UKURAN_HALAMAN_RAKSASA  (1UL * 1024UL * 1024UL * 1024UL) /* 1 GB */
+/* Ukuran halaman besar (2 MB huge page) */
+#define UKURAN_HALAMAN_BESAR    (2UL * 1024UL * 1024UL)
+
+/* Ukuran halaman raksasa (1 GB) */
+#define UKURAN_HALAMAN_RAKSASA  (1UL * 1024UL * 1024UL * 1024UL)
 
 /* Mask dan shift untuk operasi halaman */
 #define MASK_HALAMAN            0xFFFFF000UL
 #define MASK_HALAMAN_BESAR      0xFFE00000UL
 #define SHIFT_HALAMAN           12
 
-/* Alamat memori khusus */
+/* Alamat memori khusus - x86/x86_64 */
 #define ALAMAT_NULL             0x00000000UL
 #define ALAMAT_IDENTITAS_MULAI  0x00000000UL
 #define ALAMAT_IDENTITAS_AKHIR  0x00400000UL   /* 4 MB */
@@ -52,7 +47,7 @@
 #define ALAMAT_KERNEL_AKHIR     0xFFFFFFFFUL
 #define ALAMAT_USER_MULAI       0x00400000UL   /* 4 MB */
 #define ALAMAT_USER_AKHIR       0xBFFFFFFFUL   /* 3 GB - 1 */
-#define ALAMAT_STACK_USER       0xBFFFF000UL   /* Stack user mode */
+#define ALAMAT_STACK_USER       0xBFFF0000UL
 #define ALAMAT_HEAP_MULAI       0x00800000UL   /* 8 MB */
 
 /* Ukuran stack */
@@ -75,9 +70,11 @@
  */
 
 /* Batas proses */
-#define MAKS_PROSES             256
-#define MAKS_THREAD_PER_PROSES  16
-#define MAKS_FD_PER_PROSES      256
+#define MAKS_PROSES             CONFIG_MAKS_PROSES
+#define MAKS_THREAD_PER_PROSES  CONFIG_MAKS_THREAD
+#define MAKS_FD_PER_PROSES      CONFIG_MAKS_FD
+
+/* Batas argumen */
 #define MAKS_ARGC               32
 #define MAKS_ARGV_LEN           256
 #define MAKS_ENV_LEN            256
@@ -87,14 +84,19 @@
 /* Nilai khusus PID */
 #define PID_KERNEL              0
 #define PID_INIT                1
-#define PID_IDLE                0
+#define PID_IDLE                2
 
 /* Quantum scheduler (dalam tick) */
-#define QUANTUM_DEFAULT         10
+#define QUANTUM_DEFAULT         CONFIG_SCHEDULER_QUANTUM
 #define QUANTUM_REALTIME        20
 #define QUANTUM_RENDAH          5
 
-/* Batas signal */
+/*
+ * ============================================================================
+ * KONSTANTA SIGNAL (SIGNAL CONSTANTS)
+ * ============================================================================
+ */
+
 #define MAKS_SIGNAL             32
 #define SIGNAL_KILL             9
 #define SIGNAL_TERM             15
@@ -106,7 +108,7 @@
 
 /*
  * ============================================================================
- * KONSTANTA INTERUPSI (INTERRUPT CONSTANTS)
+ * KONSTANTA INTERUPSI - x86/x86_64 (INTERRUPT CONSTANTS)
  * ============================================================================
  */
 
@@ -171,7 +173,6 @@
 
 /* Frekuensi timer */
 #define FREKUENSI_TIMER         100   /* 100 Hz = 10ms per tick */
-#define DETIK_PER_TICK          (1.0 / FREKUENSI_TIMER)
 #define MILIDETIK_PER_TICK      (1000 / FREKUENSI_TIMER)
 
 /* Frekuensi PIT (Programmable Interval Timer) */
@@ -187,17 +188,13 @@
 #define PIT_CMD_MODE_0          0x00  /* Interrupt on terminal count */
 #define PIT_CMD_MODE_1          0x02  /* Hardware retriggerable one-shot */
 #define PIT_CMD_MODE_2          0x04  /* Rate generator */
-#define PIT_CMD_CMD_MODE_3      0x06  /* Square wave mode */
+#define PIT_CMD_MODE_3          0x06  /* Square wave mode */
 #define PIT_CMD_MODE_4          0x08  /* Software triggered strobe */
 #define PIT_CMD_MODE_5          0x0A  /* Hardware triggered strobe */
 #define PIT_CMD_LATCH           0x00
 #define PIT_CMD_LSB             0x10
 #define PIT_CMD_MSB             0x20
 #define PIT_CMD_BOTH            0x30
-#define PIT_CMD_CHANNEL_0       0x00
-#define PIT_CMD_CHANNEL_1       0x40
-#define PIT_CMD_CHANNEL_2       0x80
-#define PIT_CMD_READ_BACK       0xC0
 
 /*
  * ============================================================================
@@ -242,26 +239,6 @@
 /* Port CMOS/RTC */
 #define PORT_CMOS_INDEX         0x70
 #define PORT_CMOS_DATA          0x71
-
-/* Port DMA */
-#define PORT_DMA0_CH0_ADR       0x00
-#define PORT_DMA0_CH0_CNT       0x01
-#define PORT_DMA0_CH1_ADR       0x02
-#define PORT_DMA0_CH1_CNT       0x03
-#define PORT_DMA0_CH2_ADR       0x04
-#define PORT_DMA0_CH2_CNT       0x05
-#define PORT_DMA0_CH3_ADR       0x06
-#define PORT_DMA0_CH3_CNT       0x07
-#define PORT_DMA0_COMMAND       0x08
-#define PORT_DMA0_STATUS        0x08
-#define PORT_DMA0_REQUEST       0x09
-#define PORT_DMA0_MASK          0x0A
-#define PORT_DMA0_MODE          0x0B
-#define PORT_DMA0_CLEAR_FF      0x0C
-#define PORT_DMA0_TEMP          0x0D
-#define PORT_DMA0_MASTER_CLEAR  0x0D
-#define PORT_DMA0_CLEAR_MASK    0x0E
-#define PORT_DMA0_ALL_MASK      0x0F
 
 /*
  * ============================================================================
@@ -321,29 +298,6 @@
  * KONSTANTA TSS (TASK STATE SEGMENT)
  * ============================================================================
  */
-
-/* Offset TSS */
-#define TSS_OFFSET_SS0          8
-#define TSS_OFFSET_ESP0         4
-#define TSS_OFFSET_CR3          28
-#define TSS_OFFSET_EIP          32
-#define TSS_OFFSET_EFLAGS       36
-#define TSS_OFFSET_EAX          40
-#define TSS_OFFSET_ECX          44
-#define TSS_OFFSET_EDX          48
-#define TSS_OFFSET_EBX          52
-#define TSS_OFFSET_ESP          56
-#define TSS_OFFSET_EBP          60
-#define TSS_OFFSET_ESI          64
-#define TSS_OFFSET_EDI          68
-#define TSS_OFFSET_ES           72
-#define TSS_OFFSET_CS           76
-#define TSS_OFFSET_SS           80
-#define TSS_OFFSET_DS           84
-#define TSS_OFFSET_FS           88
-#define TSS_OFFSET_GS           92
-#define TSS_OFFSET_LDT          96
-#define TSS_OFFSET_IOPB         102
 
 /* Ukuran TSS */
 #define TSS_UKURAN_MIN          104
@@ -428,7 +382,7 @@
 
 /* Flag akses file */
 #define FILE_BACA               0x01
-#define FILE_TULIS             0x02
+#define FILE_TULIS              0x02
 #define FILE_BACA_TULIS         0x03
 #define FILE_BUAT               0x100
 #define FILE_TRUNCATE           0x200
@@ -542,40 +496,5 @@
 
 /* Signature ELF */
 #define ELF_MAGIC               0x464C457F  /* 0x7F 'E' 'L' 'F' */
-
-/*
- * ============================================================================
- * KONSTANTA PROSES (PROCESS CONSTANTS)
- * ============================================================================
- */
-
-/* PID khusus */
-#define PID_KERNEL              0
-#define PID_IDLE                1
-#define PID_INIT                2
-
-/* Process name max length */
-#define MAKS_NAMA_PROSES        64
-
-/* Quantum default */
-#define QUANTUM_DEFAULT         CONFIG_SCHEDULER_QUANTUM
-
-/* Thread constants */
-#define CONFIG_MAKS_THREAD_PER_PROSES    CONFIG_MAKS_THREAD
-
-/* User stack address */
-#define ALAMAT_STACK_USER       0xBFFF0000UL
-
-/*
- * ============================================================================
- * KONSTANTA SIGNAL (SIGNAL CONSTANTS)
- * ============================================================================
- */
-
-/* Signal numbers */
-#define SIGNAL_KILL             9
-#define SIGNAL_TERM             15
-#define SIGNAL_STOP             19
-#define SIGNAL_CONT             18
 
 #endif /* INTI_KONSTANTA_H */

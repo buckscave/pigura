@@ -8,6 +8,9 @@
  *
  * Versi: 1.0
  * Tanggal: 2025
+ *
+ * CATATAN: Include berkas ini untuk mengakses semua fungsi kernel.
+ *          Jangan include header lain secara langsung kecuali diperlukan.
  */
 
 #ifndef INTI_KERNEL_H
@@ -15,43 +18,44 @@
 
 /*
  * ============================================================================
- * INCLUDE HEADER STANDAR (STANDARD HEADER INCLUDES)
+ * INCLUDE HEADER INTI KERNEL (CORE KERNEL HEADERS)
  * ============================================================================
  */
 
-/* Header inti kernel */
+/* Tipe dasar (harus pertama) */
 #include "types.h"
-#include "konstanta.h"
-#include "makro.h"
+
+/* Konfigurasi build */
 #include "config.h"
+
+/* Konstanta sistem */
+#include "konstanta.h"
+
+/* Makro utilitas */
+#include "makro.h"
+
+/* Fungsi panic */
 #include "panic.h"
+
+/* Hardware Abstraction Layer */
+#include "hal/hal.h"
 
 /*
  * ============================================================================
- * VERSI KERNEL (KERNEL VERSION)
+ * VARIABEL ARGUMEN (VARIADIC ARGUMENTS)
  * ============================================================================
+ * Diperlukan untuk fungsi printf-like.
  */
 
-/* Macro untuk mendapatkan versi kernel sebagai string */
-#define KERNEL_VERSI_STR() \
-    TOSTRING(PIGURA_VERSI_MAJOR) "." \
-    TOSTRING(PIGURA_VERSI_MINOR) "." \
-    TOSTRING(PIGURA_VERSI_PATCH)
-
-/* Cek versi kernel */
-#define KERNEL_VERSI(major, minor, patch) \
-    (((major) << 16) | ((minor) << 8) | (patch))
-
-#define KERNEL_VERSI_SEKARANG \
-    KERNEL_VERSI(PIGURA_VERSI_MAJOR, PIGURA_VERSI_MINOR, PIGURA_VERSI_PATCH)
+#include "stdarg.h"
 
 /*
  * ============================================================================
  * FORWARD DECLARATIONS (FORWARD DECLARATIONS)
  * ============================================================================
+ * Deklarasi forward untuk menghindari circular dependency.
  */
 
-/* Forward declarations untuk menghindari circular dependency */
 struct proses;
 struct vm_descriptor;
 struct page_directory;
@@ -127,29 +131,8 @@ typedef struct {
     tak_bertanda32_t reserved;      /* Reserved */
 } module_t;
 
-/*
- * ============================================================================
- * TIPE STATUS PROSES (PROCESS STATUS TYPES)
- * ============================================================================
- */
-
-/* Status proses */
-typedef enum {
-    PROSES_STATUS_BELUM = 0,        /* Belum diinisialisasi */
-    PROSES_STATUS_SIAP,            /* Ready to run */
-    PROSES_STATUS_JALAN,           /* Currently running */
-    PROSES_STATUS_TUNGGU,          /* Waiting for event */
-    PROSES_STATUS_ZOMBIE,          /* Terminated, not reaped */
-    PROSES_STATUS_STOP             /* Stopped by signal */
-} proses_status_t;
-
-/* Prioritas proses */
-typedef enum {
-    PRIORITAS_RENDAH = 0,
-    PRIORITAS_NORMAL = 1,
-    PRIORITAS_TINGGI = 2,
-    PRIORITAS_REALTIME = 3
-} prioritas_t;
+/* Process type */
+typedef struct proses proses_t;
 
 /*
  * ============================================================================
@@ -196,8 +179,6 @@ extern tak_bertanda32_t g_cpu_id;
  * Parameter:
  *   magic    - Magic number multiboot
  *   bootinfo - Pointer ke struktur multiboot info
- *
- * Return: Tidak pernah return
  */
 void kernel_main(tak_bertanda32_t magic,
                  multiboot_info_t *bootinfo) __attribute__((noreturn));
@@ -206,14 +187,6 @@ void kernel_main(tak_bertanda32_t magic,
  * kernel_init
  * -----------
  * Inisialisasi kernel.
- * Dipanggil dari kernel_main setelah boot awal.
- *
- * Parameter:
- *   bootinfo - Pointer ke struktur multiboot info
- *
- * Return:
- *   STATUS_BERHASIL jika berhasil
- *   Status error jika gagal
  */
 status_t kernel_init(multiboot_info_t *bootinfo);
 
@@ -221,9 +194,6 @@ status_t kernel_init(multiboot_info_t *bootinfo);
  * kernel_start
  * ------------
  * Mulai operasi normal kernel.
- * Memulai scheduler dan beralih ke user mode.
- *
- * Return: Tidak pernah return
  */
 void kernel_start(void) __attribute__((noreturn));
 
@@ -231,11 +201,6 @@ void kernel_start(void) __attribute__((noreturn));
  * kernel_shutdown
  * ---------------
  * Shutdown kernel dengan aman.
- *
- * Parameter:
- *   reboot - Jika tidak nol, lakukan reboot
- *
- * Return: Tidak pernah return
  */
 void kernel_shutdown(int reboot) __attribute__((noreturn));
 
@@ -249,12 +214,6 @@ void kernel_shutdown(int reboot) __attribute__((noreturn));
  * kernel_printf
  * -------------
  * Print formatted string ke console kernel.
- *
- * Parameter:
- *   format - Format string
- *   ...    - Argumen format
- *
- * Return: Jumlah karakter yang dicetak
  */
 int kernel_printf(const char *format, ...);
 
@@ -262,13 +221,6 @@ int kernel_printf(const char *format, ...);
  * kernel_printk
  * -------------
  * Print ke kernel log dengan level.
- *
- * Parameter:
- *   level  - Level log (0=error, 1=warn, 2=info, 3=debug)
- *   format - Format string
- *   ...    - Argumen format
- *
- * Return: Jumlah karakter yang dicetak
  */
 int kernel_printk(int level, const char *format, ...);
 
@@ -276,11 +228,6 @@ int kernel_printk(int level, const char *format, ...);
  * kernel_puts
  * -----------
  * Print string ke console kernel.
- *
- * Parameter:
- *   str - String yang akan dicetak
- *
- * Return: 0 jika berhasil
  */
 int kernel_puts(const char *str);
 
@@ -288,11 +235,6 @@ int kernel_puts(const char *str);
  * kernel_putchar
  * --------------
  * Print satu karakter ke console kernel.
- *
- * Parameter:
- *   c - Karakter yang akan dicetak
- *
- * Return: Karakter yang dicetak, atau EOF jika error
  */
 int kernel_putchar(int c);
 
@@ -307,10 +249,6 @@ void kernel_clear_screen(void);
  * kernel_set_color
  * ----------------
  * Set warna teks console.
- *
- * Parameter:
- *   fg - Warna foreground
- *   bg - Warna background
  */
 void kernel_set_color(tak_bertanda8_t fg, tak_bertanda8_t bg);
 
@@ -318,16 +256,16 @@ void kernel_set_color(tak_bertanda8_t fg, tak_bertanda8_t bg);
  * kernel_snprintf
  * ---------------
  * Format string ke buffer dengan batas ukuran.
- *
- * Parameter:
- *   str    - Buffer output
- *   size   - Ukuran buffer
- *   format - Format string
- *   ...    - Argumen format
- *
- * Return: Jumlah karakter yang diformat
  */
 int kernel_snprintf(char *str, ukuran_t size, const char *format, ...);
+
+/*
+ * kernel_vsnprintf
+ * ----------------
+ * Format string ke buffer dengan batas ukuran (variadic).
+ */
+int kernel_vsnprintf(char *str, ukuran_t size, const char *format,
+                     va_list args);
 
 /*
  * ============================================================================
@@ -341,38 +279,16 @@ int kernel_snprintf(char *str, ukuran_t size, const char *format, ...);
 #define LOG_INFO    3
 #define LOG_DEBUG   4
 
-/* Log level maksimum */
-#define LOG_LEVEL   LOG_DEBUG
-
-/*
- * log_error
- * ---------
- * Log pesan error.
- */
+/* Makro log */
 #define log_error(fmt, ...) \
     kernel_printk(LOG_ERROR, "[ERROR] " fmt, ##__VA_ARGS__)
 
-/*
- * log_warn
- * --------
- * Log pesan warning.
- */
 #define log_warn(fmt, ...) \
     kernel_printk(LOG_WARN, "[WARN] " fmt, ##__VA_ARGS__)
 
-/*
- * log_info
- * --------
- * Log pesan info.
- */
 #define log_info(fmt, ...) \
     kernel_printk(LOG_INFO, "[INFO] " fmt, ##__VA_ARGS__)
 
-/*
- * log_debug
- * ---------
- * Log pesan debug.
- */
 #ifdef DEBUG
     #define log_debug(fmt, ...) \
         kernel_printk(LOG_DEBUG, "[DEBUG] " fmt, ##__VA_ARGS__)
@@ -390,9 +306,6 @@ int kernel_snprintf(char *str, ukuran_t size, const char *format, ...);
  * kernel_delay
  * ------------
  * Delay sederhana (busy wait).
- *
- * Parameter:
- *   ms - Jumlah milidetik delay
  */
 void kernel_delay(tak_bertanda32_t ms);
 
@@ -400,9 +313,6 @@ void kernel_delay(tak_bertanda32_t ms);
  * kernel_sleep
  * ------------
  * Sleep kernel untuk durasi tertentu.
- *
- * Parameter:
- *   ms - Jumlah milidetik sleep
  */
 void kernel_sleep(tak_bertanda32_t ms);
 
@@ -410,8 +320,6 @@ void kernel_sleep(tak_bertanda32_t ms);
  * kernel_get_uptime
  * -----------------
  * Dapatkan uptime sistem.
- *
- * Return: Uptime dalam detik
  */
 tak_bertanda64_t kernel_get_uptime(void);
 
@@ -419,8 +327,6 @@ tak_bertanda64_t kernel_get_uptime(void);
  * kernel_get_ticks
  * ----------------
  * Dapatkan jumlah timer ticks.
- *
- * Return: Jumlah ticks sejak boot
  */
 tak_bertanda64_t kernel_get_ticks(void);
 
@@ -428,8 +334,6 @@ tak_bertanda64_t kernel_get_ticks(void);
  * kernel_get_info
  * ---------------
  * Dapatkan informasi sistem.
- *
- * Return: Pointer ke struktur info_sistem_t
  */
 const info_sistem_t *kernel_get_info(void);
 
@@ -437,8 +341,6 @@ const info_sistem_t *kernel_get_info(void);
  * kernel_get_arch
  * ---------------
  * Dapatkan nama arsitektur.
- *
- * Return: String nama arsitektur
  */
 const char *kernel_get_arch(void);
 
@@ -446,8 +348,6 @@ const char *kernel_get_arch(void);
  * kernel_get_version
  * ------------------
  * Dapatkan versi kernel.
- *
- * Return: String versi kernel
  */
 const char *kernel_get_version(void);
 
@@ -461,13 +361,6 @@ const char *kernel_get_version(void);
  * kernel_memcpy
  * -------------
  * Copy memory block.
- *
- * Parameter:
- *   dest - Destination buffer
- *   src  - Source buffer
- *   n    - Jumlah byte
- *
- * Return: Pointer ke dest
  */
 void *kernel_memcpy(void *dest, const void *src, ukuran_t n);
 
@@ -475,13 +368,6 @@ void *kernel_memcpy(void *dest, const void *src, ukuran_t n);
  * kernel_memset
  * -------------
  * Set memory block dengan nilai.
- *
- * Parameter:
- *   s   - Buffer
- *   c   - Nilai byte
- *   n   - Jumlah byte
- *
- * Return: Pointer ke s
  */
 void *kernel_memset(void *s, int c, ukuran_t n);
 
@@ -489,13 +375,6 @@ void *kernel_memset(void *s, int c, ukuran_t n);
  * kernel_memmove
  * --------------
  * Move memory block (handles overlap).
- *
- * Parameter:
- *   dest - Destination buffer
- *   src  - Source buffer
- *   n    - Jumlah byte
- *
- * Return: Pointer ke dest
  */
 void *kernel_memmove(void *dest, const void *src, ukuran_t n);
 
@@ -503,13 +382,6 @@ void *kernel_memmove(void *dest, const void *src, ukuran_t n);
  * kernel_memcmp
  * -------------
  * Compare memory blocks.
- *
- * Parameter:
- *   s1 - Block pertama
- *   s2 - Block kedua
- *   n  - Jumlah byte
- *
- * Return: <0, 0, >0 jika s1 < s2, s1 == s2, s1 > s2
  */
 int kernel_memcmp(const void *s1, const void *s2, ukuran_t n);
 
@@ -523,11 +395,6 @@ int kernel_memcmp(const void *s1, const void *s2, ukuran_t n);
  * kernel_strlen
  * -------------
  * Hitung panjang string.
- *
- * Parameter:
- *   s - String
- *
- * Return: Panjang string
  */
 ukuran_t kernel_strlen(const char *s);
 
@@ -535,13 +402,6 @@ ukuran_t kernel_strlen(const char *s);
  * kernel_strncpy
  * --------------
  * Copy string dengan batas.
- *
- * Parameter:
- *   dest - Buffer destination
- *   src  - String source
- *   n    - Ukuran buffer
- *
- * Return: Pointer ke dest
  */
 char *kernel_strncpy(char *dest, const char *src, ukuran_t n);
 
@@ -549,12 +409,6 @@ char *kernel_strncpy(char *dest, const char *src, ukuran_t n);
  * kernel_strcmp
  * -------------
  * Compare dua string.
- *
- * Parameter:
- *   s1 - String pertama
- *   s2 - String kedua
- *
- * Return: <0, 0, >0 jika s1 < s2, s1 == s2, s1 > s2
  */
 int kernel_strcmp(const char *s1, const char *s2);
 
@@ -562,13 +416,6 @@ int kernel_strcmp(const char *s1, const char *s2);
  * kernel_strncmp
  * --------------
  * Compare dua string dengan batas.
- *
- * Parameter:
- *   s1 - String pertama
- *   s2 - String kedua
- *   n  - Jumlah karakter maksimum
- *
- * Return: <0, 0, >0 jika s1 < s2, s1 == s2, s1 > s2
  */
 int kernel_strncmp(const char *s1, const char *s2, ukuran_t n);
 
@@ -633,7 +480,7 @@ status_t pmm_free_pages(alamat_fisik_t addr, tak_bertanda32_t count);
  * -------------
  * Dapatkan statistik PMM.
  */
-void pmm_get_stats(tak_bertanda64_t *total, tak_bertanda64_t *free,
+void pmm_get_stats(tak_bertanda64_t *total, tak_bertanda64_t *free_p,
                    tak_bertanda64_t *used);
 
 /*
@@ -763,221 +610,9 @@ void heap_print_stats(void);
 
 /*
  * ============================================================================
- * DEKLARASI FUNGSI VIRTUAL MEMORY (VIRTUAL MEMORY FUNCTIONS)
- * ============================================================================
- */
-
-/* VMA flags */
-#define VMA_FLAG_NONE           0x00
-#define VMA_FLAG_READ           0x01
-#define VMA_FLAG_WRITE          0x02
-#define VMA_FLAG_EXEC           0x04
-#define VMA_FLAG_STACK          0x08
-#define VMA_FLAG_HEAP           0x10
-#define VMA_FLAG_SHARED         0x20
-#define VMA_FLAG_FIXED          0x40
-
-/* VM descriptor type */
-typedef struct vm_descriptor vm_descriptor_t;
-
-/*
- * virtual_init
- * ------------
- * Inisialisasi virtual memory manager.
- */
-status_t virtual_init(void);
-
-/*
- * vm_create_address_space
- * -----------------------
- * Buat address space baru.
- */
-vm_descriptor_t *vm_create_address_space(void);
-
-/*
- * vm_destroy_address_space
- * ------------------------
- * Hancurkan address space.
- */
-status_t vm_destroy_address_space(vm_descriptor_t *vm);
-
-/*
- * vm_map
- * ------
- * Map region memori.
- */
-alamat_virtual_t vm_map(vm_descriptor_t *vm, alamat_virtual_t start,
-                        ukuran_t size, tak_bertanda32_t prot,
-                        tak_bertanda32_t flags);
-
-/*
- * vm_unmap
- * --------
- * Unmap region memori.
- */
-status_t vm_unmap(vm_descriptor_t *vm, alamat_virtual_t start,
-                  ukuran_t size);
-
-/*
- * vm_brk
- * ------
- * Ubah break address.
- */
-alamat_virtual_t vm_brk(vm_descriptor_t *vm, alamat_virtual_t addr);
-
-/*
- * vm_handle_page_fault
- * --------------------
- * Handler page fault.
- */
-bool_t vm_handle_page_fault(alamat_virtual_t addr,
-                            tak_bertanda32_t error,
-                            vm_descriptor_t *vm);
-
-/*
- * vm_print_stats
- * --------------
- * Print statistik VM.
- */
-void vm_print_stats(void);
-
-/*
- * ============================================================================
- * DEKLARASI FUNGSI KMAP (KERNEL MAPPING FUNCTIONS)
- * ============================================================================
- */
-
-/*
- * kmap_init
- * ---------
- * Inisialisasi kmap.
- */
-status_t kmap_init(void);
-
-/*
- * kmap
- * ----
- * Map halaman fisik ke virtual.
- */
-void *kmap(alamat_fisik_t phys);
-
-/*
- * kunmap
- * ------
- * Unmap alamat virtual.
- */
-status_t kunmap(void *vaddr);
-
-/*
- * kmap_print_stats
- * ----------------
- * Print statistik kmap.
- */
-void kmap_print_stats(void);
-
-/*
- * ============================================================================
- * DEKLARASI FUNGSI DMA (DMA BUFFER FUNCTIONS)
- * ============================================================================
- */
-
-/* DMA buffer type */
-typedef struct dma_buffer dma_buffer_t;
-
-/*
- * dma_init
- * --------
- * Inisialisasi DMA buffer manager.
- */
-status_t dma_init(void);
-
-/*
- * dma_alloc_coherent
- * ------------------
- * Alokasikan DMA buffer coherent.
- */
-dma_buffer_t *dma_alloc_coherent(ukuran_t size, tak_bertanda32_t align,
-                                 const char *nama);
-
-/*
- * dma_free_coherent
- * -----------------
- * Bebaskan DMA buffer.
- */
-void dma_free_coherent(dma_buffer_t *buf);
-
-/*
- * dma_print_stats
- * ---------------
- * Print statistik DMA.
- */
-void dma_print_stats(void);
-
-/*
- * ============================================================================
- * DEKLARASI FUNGSI ALLOCATOR (SLAB ALLOCATOR FUNCTIONS)
- * ============================================================================
- */
-
-/*
- * allocator_init
- * --------------
- * Inisialisasi slab allocator.
- */
-status_t allocator_init(void);
-
-/*
- * allocator_print_stats
- * ---------------------
- * Print statistik allocator.
- */
-void allocator_print_stats(void);
-
-/*
- * ============================================================================
- * DEKLARASI FUNGSI MEMORI UTAMA (MAIN MEMORY FUNCTIONS)
- * ============================================================================
- */
-
-/*
- * memori_init
- * -----------
- * Inisialisasi subsistem memori lengkap.
- */
-status_t memori_init(multiboot_info_t *bootinfo);
-
-/*
- * memori_get_total
- * ----------------
- * Dapatkan total memori fisik.
- */
-tak_bertanda64_t memori_get_total(void);
-
-/*
- * memori_get_available
- * --------------------
- * Dapatkan memori tersedia.
- */
-tak_bertanda64_t memori_get_available(void);
-
-/*
- * memori_print_info
- * -----------------
- * Print informasi memori.
- */
-void memori_print_info(void);
-
-/*
- * ============================================================================
  * DEKLARASI FUNGSI PROSES (PROCESS FUNCTIONS)
  * ============================================================================
  */
-
-/* Process type */
-typedef struct proses proses_t;
-
-/* Invalid PID */
-#define PID_INVALID             ((pid_t)-1)
 
 /*
  * proses_init
@@ -1085,9 +720,247 @@ void interupsi_disable(void);
 
 /*
  * ============================================================================
- * INLINE ASSEMBLY HELPERS (INLINE ASSEMBLY HELPERS)
+ * DEKLARASI FUNGSI MULTIBOOT (MULTIBOOT FUNCTIONS)
  * ============================================================================
  */
+
+/*
+ * multiboot_parse
+ * ---------------
+ * Parse informasi multiboot.
+ */
+status_t multiboot_parse(tak_bertanda32_t magic,
+                         multiboot_info_t *bootinfo);
+
+/*
+ * multiboot_get_mem_lower
+ * -----------------------
+ * Dapatkan memori lower (dalam KB).
+ */
+tak_bertanda32_t multiboot_get_mem_lower(multiboot_info_t *bootinfo);
+
+/*
+ * multiboot_get_mem_upper
+ * -----------------------
+ * Dapatkan memori upper (dalam KB).
+ */
+tak_bertanda32_t multiboot_get_mem_upper(multiboot_info_t *bootinfo);
+
+/*
+ * multiboot_get_total_mem
+ * -----------------------
+ * Dapatkan total memori (dalam byte).
+ */
+tak_bertanda64_t multiboot_get_total_mem(multiboot_info_t *bootinfo);
+
+/*
+ * multiboot_get_cmdline
+ * ---------------------
+ * Dapatkan command line kernel.
+ */
+const char *multiboot_get_cmdline(void);
+
+/*
+ * multiboot_get_bootloader
+ * ------------------------
+ * Dapatkan nama bootloader.
+ */
+const char *multiboot_get_bootloader(void);
+
+/*
+ * multiboot_get_module_count
+ * --------------------------
+ * Dapatkan jumlah module.
+ */
+tak_bertanda32_t multiboot_get_module_count(void);
+
+/*
+ * multiboot_get_module
+ * --------------------
+ * Dapatkan informasi module.
+ */
+status_t multiboot_get_module(tak_bertanda32_t index,
+                              alamat_fisik_t *mulai,
+                              alamat_fisik_t *akhir);
+
+/*
+ * multiboot_get_module_string
+ * ---------------------------
+ * Dapatkan string module.
+ */
+const char *multiboot_get_module_string(tak_bertanda32_t index);
+
+/*
+ * multiboot_get_mmap_count
+ * ------------------------
+ * Dapatkan jumlah memory map entry.
+ */
+tak_bertanda32_t multiboot_get_mmap_count(void);
+
+/*
+ * multiboot_get_mmap_entry
+ * ------------------------
+ * Dapatkan memory map entry.
+ */
+status_t multiboot_get_mmap_entry(tak_bertanda32_t index,
+                                  mmap_entry_t *entry);
+
+/*
+ * multiboot_print_info
+ * --------------------
+ * Print informasi multiboot.
+ */
+void multiboot_print_info(multiboot_info_t *bootinfo);
+
+/*
+ * ============================================================================
+ * DEKLARASI FUNGSI STACK (STACK FUNCTIONS)
+ * ============================================================================
+ */
+
+/*
+ * setup_kernel_stack
+ * ------------------
+ * Setup stack kernel.
+ */
+status_t setup_kernel_stack(void);
+
+/*
+ * setup_kernel_stack_early
+ * ------------------------
+ * Setup stack kernel awal.
+ */
+status_t setup_kernel_stack_early(void *stack_top, ukuran_t size);
+
+/*
+ * get_kernel_stack_top
+ * --------------------
+ * Dapatkan alamat top stack kernel.
+ */
+void *get_kernel_stack_top(void);
+
+/*
+ * get_kernel_stack_bottom
+ * -----------------------
+ * Dapatkan alamat bottom stack kernel.
+ */
+void *get_kernel_stack_bottom(void);
+
+/*
+ * get_kernel_stack_size
+ * ---------------------
+ * Dapatkan ukuran stack kernel.
+ */
+ukuran_t get_kernel_stack_size(void);
+
+/*
+ * check_stack_overflow
+ * --------------------
+ * Cek apakah stack overflow terjadi.
+ */
+bool_t check_stack_overflow(void);
+
+/*
+ * get_stack_usage
+ * ---------------
+ * Dapatkan penggunaan stack.
+ */
+ukuran_t get_stack_usage(void);
+
+/*
+ * get_stack_free
+ * --------------
+ * Dapatkan sisa stack yang tersedia.
+ */
+ukuran_t get_stack_free(void);
+
+/*
+ * print_stack_info
+ * ----------------
+ * Print informasi stack.
+ */
+void print_stack_info(void);
+
+/*
+ * ============================================================================
+ * DEKLARASI FUNGSI INIT (INITIALIZATION FUNCTIONS)
+ * ============================================================================
+ */
+
+/*
+ * kernel_init_early
+ * -----------------
+ * Inisialisasi awal kernel.
+ */
+status_t kernel_init_early(void);
+
+/*
+ * kernel_init_core
+ * ----------------
+ * Inisialisasi core subsistem.
+ */
+status_t kernel_init_core(void);
+
+/*
+ * kernel_init_drivers
+ * -------------------
+ * Inisialisasi driver.
+ */
+status_t kernel_init_drivers(void);
+
+/*
+ * kernel_init_services
+ * --------------------
+ * Inisialisasi layanan kernel.
+ */
+status_t kernel_init_services(void);
+
+/*
+ * kernel_init_late
+ * ----------------
+ * Inisialisasi akhir.
+ */
+status_t kernel_init_late(void);
+
+/*
+ * kernel_register_init
+ * --------------------
+ * Registrasi subsistem untuk inisialisasi.
+ */
+status_t kernel_register_init(const char *nama,
+                              status_t (*init)(void),
+                              tak_bertanda8_t stage,
+                              bool_t required);
+
+/*
+ * kernel_get_init_status
+ * ----------------------
+ * Dapatkan status inisialisasi.
+ */
+bool_t kernel_get_init_status(void);
+
+/*
+ * kernel_get_initialized_count
+ * ----------------------------
+ * Dapatkan jumlah subsistem yang diinisialisasi.
+ */
+tak_bertanda32_t kernel_get_initialized_count(void);
+
+/*
+ * kernel_print_init_status
+ * ------------------------
+ * Print status inisialisasi semua subsistem.
+ */
+void kernel_print_init_status(void);
+
+/*
+ * ============================================================================
+ * INLINE ASSEMBLY HELPERS - x86/x86_64 (ARCHITECTURE SPECIFIC)
+ * ============================================================================
+ * Hanya tersedia pada arsitektur x86/x86_64.
+ */
+
+#if defined(ARSITEKTUR_X86) || defined(ARSITEKTUR_X86_64)
 
 /* Hentikan CPU */
 static inline void cpu_halt(void)
@@ -1259,5 +1132,60 @@ static inline void cpu_restore_flags(tak_bertanda32_t flags)
         block; \
         IRQ_RESTORE(_flags); \
     } while (0)
+
+#endif /* ARSITEKTUR_X86 || ARSITEKTUR_X86_64 */
+
+/*
+ * ============================================================================
+ * INLINE ASSEMBLY HELPERS - ARM (ARCHITECTURE SPECIFIC)
+ * ============================================================================
+ * Hanya tersedia pada arsitektur ARM.
+ */
+
+#if defined(ARSITEKTUR_ARM32) || defined(ARSITEKTUR_ARM64)
+
+/* Hentikan CPU */
+static inline void cpu_halt(void)
+{
+    __asm__ __volatile__("wfi");
+}
+
+/* Enable interrupt */
+static inline void cpu_enable_irq(void)
+{
+    __asm__ __volatile__("cpsie i");
+}
+
+/* Disable interrupt */
+static inline void cpu_disable_irq(void)
+{
+    __asm__ __volatile__("cpsid i");
+}
+
+/* Tidak melakukan apa-apa */
+static inline void cpu_nop(void)
+{
+    __asm__ __volatile__("nop");
+}
+
+/* Data synchronization barrier */
+static inline void cpu_dsb(void)
+{
+    __asm__ __volatile__("dsb sy");
+}
+
+/* Data memory barrier */
+static inline void cpu_dmb(void)
+{
+    __asm__ __volatile__("dmb sy");
+}
+
+/* Instruction synchronization barrier */
+static inline void cpu_isb(void)
+{
+    __asm__ __volatile__("isb sy");
+}
+
+#endif /* ARSITEKTUR_ARM32 || ARSITEKTUR_ARM64 */
 
 #endif /* INTI_KERNEL_H */

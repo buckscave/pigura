@@ -14,7 +14,10 @@
 #ifndef INTI_PANIC_H
 #define INTI_PANIC_H
 
+/* Include tipe dasar */
 #include "types.h"
+
+/* Include konstanta (untuk vektor interupsi, dll) */
 #include "konstanta.h"
 
 /*
@@ -71,7 +74,7 @@ typedef struct {
     tak_bertanda16_t baris;             /* Nomor baris */
     char file[PANIC_FILE_MAX];          /* Nama file */
     char pesan[PANIC_PESAN_MAX];        /* Pesan error */
-    alamat_ptr_t alamat_fault;          /* Alamat yang menyebabkan fault */
+    ukuran_t alamat_fault;              /* Alamat yang menyebabkan fault */
     tak_bertanda32_t error_code;        /* Error code dari CPU */
     tak_bertanda32_t cr2;               /* Nilai CR2 untuk page fault */
     tak_bertanda32_t cr3;               /* Nilai CR3 */
@@ -112,8 +115,6 @@ typedef struct {
  *   baris  - Nomor baris tempat panic terjadi
  *   format - Format string pesan error
  *   ...    - Argumen format
- *
- * Return: Tidak pernah return
  */
 void kernel_panic(const char *file, int baris,
                   const char *format, ...) __attribute__((noreturn));
@@ -122,15 +123,6 @@ void kernel_panic(const char *file, int baris,
  * kernel_panic_kode
  * -----------------
  * Kernel panic dengan kode error spesifik.
- *
- * Parameter:
- *   kode   - Kode error panic
- *   file   - Nama file
- *   baris  - Nomor baris
- *   format - Format string
- *   ...    - Argumen format
- *
- * Return: Tidak pernah return
  */
 void kernel_panic_kode(tak_bertanda16_t kode, const char *file, int baris,
                        const char *format, ...) __attribute__((noreturn));
@@ -139,11 +131,6 @@ void kernel_panic_kode(tak_bertanda16_t kode, const char *file, int baris,
  * kernel_panic_register
  * ---------------------
  * Kernel panic dengan informasi register lengkap.
- *
- * Parameter:
- *   info - Pointer ke struktur informasi panic
- *
- * Return: Tidak pernah return
  */
 void kernel_panic_register(const panic_info_t *info) __attribute__((noreturn));
 
@@ -151,11 +138,6 @@ void kernel_panic_register(const panic_info_t *info) __attribute__((noreturn));
  * kernel_panic_exception
  * ----------------------
  * Kernel panic dari exception handler.
- *
- * Parameter:
- *   ctx - Pointer ke konteks register saat exception
- *
- * Return: Tidak pernah return
  */
 void kernel_panic_exception(const register_context_t *ctx)
     __attribute__((noreturn));
@@ -164,10 +146,6 @@ void kernel_panic_exception(const register_context_t *ctx)
  * kernel_halt
  * -----------
  * Hentikan sistem tanpa pesan error.
- * Digunakan untuk shutdown normal atau kondisi dimana
- * pesan error tidak diperlukan.
- *
- * Return: Tidak pernah return
  */
 void kernel_halt(void) __attribute__((noreturn));
 
@@ -175,11 +153,6 @@ void kernel_halt(void) __attribute__((noreturn));
  * kernel_reboot
  * -------------
  * Reboot sistem.
- *
- * Parameter:
- *   force - Jika tidak nol, lakukan hard reset
- *
- * Return: Tidak pernah return jika berhasil
  */
 void kernel_reboot(int force) __attribute__((noreturn));
 
@@ -187,9 +160,6 @@ void kernel_reboot(int force) __attribute__((noreturn));
  * panic_dump_register
  * -------------------
  * Tampilkan dump register ke console.
- *
- * Parameter:
- *   ctx - Pointer ke konteks register
  */
 void panic_dump_register(const register_context_t *ctx);
 
@@ -197,10 +167,6 @@ void panic_dump_register(const register_context_t *ctx);
  * panic_dump_stack
  * ----------------
  * Tampilkan dump stack memory.
- *
- * Parameter:
- *   esp   - Stack pointer
- *   depth - Jumlah dword yang ditampilkan
  */
 void panic_dump_stack(tak_bertanda32_t esp, int depth);
 
@@ -208,10 +174,6 @@ void panic_dump_stack(tak_bertanda32_t esp, int depth);
  * panic_dump_memory
  * -----------------
  * Tampilkan dump memory.
- *
- * Parameter:
- *   addr  - Alamat awal
- *   len   - Panjang dalam byte
  */
 void panic_dump_memory(void *addr, ukuran_t len);
 
@@ -219,9 +181,6 @@ void panic_dump_memory(void *addr, ukuran_t len);
  * panic_set_info
  * --------------
  * Set informasi panic tambahan.
- *
- * Parameter:
- *   info - Pointer ke struktur panic_info_t
  */
 void panic_set_info(panic_info_t *info);
 
@@ -331,19 +290,11 @@ void panic_set_info(panic_info_t *info);
 /*
  * BUILD_ASSERT
  * ------------
- * Assertion pada compile-time.
+ * Assertion pada compile-time (C90 compliant).
  */
 #define BUILD_ASSERT(cond) \
     typedef char __build_assert_##__LINE__[(cond) ? 1 : -1] \
         __attribute__((unused))
-
-/*
- * BUILD_ASSERT_MSG
- * ----------------
- * Assertion pada compile-time dengan pesan.
- */
-#define BUILD_ASSERT_MSG(cond, msg) \
-    _Static_assert(cond, msg)
 
 /*
  * VERIFY
@@ -370,6 +321,39 @@ void panic_set_info(panic_info_t *info);
                               "Verifikasi gagal: %s", msg); \
         } \
     } while (0)
+
+/*
+ * ============================================================================
+ * MAKRO ASSERTION DEBUG (DEBUG ASSERTION MACROS)
+ * ============================================================================
+ */
+
+#ifdef DEBUG
+
+/* Assertion dengan debug aktif */
+#define ASSERT(expr) \
+    do { \
+        if (!(expr)) { \
+            kernel_panic(__FILE__, __LINE__, \
+                        "Assertion gagal: " #expr); \
+        } \
+    } while (0)
+
+/* Assertion dengan pesan */
+#define ASSERT_PESAN(expr, pesan) \
+    do { \
+        if (!(expr)) { \
+            kernel_panic(__FILE__, __LINE__, pesan); \
+        } \
+    } while (0)
+
+#else
+
+/* Assertion dinonaktifkan saat DEBUG=0 */
+#define ASSERT(expr)             TIDAK_DIGUNAKAN(expr)
+#define ASSERT_PESAN(expr, pesan) TIDAK_DIGUNAKAN(expr)
+
+#endif /* DEBUG */
 
 /*
  * ============================================================================
