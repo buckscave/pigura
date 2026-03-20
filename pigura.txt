@@ -1,0 +1,1765 @@
+PIGURA OS
+
+Dokumen Desain Sistem Operasi
+
+Ringkasan Hasil Diskusi Perencanaan
+
+Monolithic Kernel dengan Pigura C90
+
+Tanpa X11/Wayland - Framebuffer + GPU Langsung
+
+Multi-Arsitektur: x86, x86_64, ARM, ARMv7
+
+Versi 1.1 - 2025
+
+
+================================================================================
+                              DAFTAR ISI
+================================================================================
+
+1.  Visi dan Konsep Dasar
+    1.1 Definisi Proyek
+    1.2 Karakteristik Utama
+    1.3 Perbandingan Pendekatan
+
+2.  Arsitektur Sistem
+    2.1 Model Kernel
+    2.2 Pembagian Tanggung Jawab Bahasa
+    2.3 Hardware Abstraction Layer (HAL)
+    2.4 Multi-Arsitektur
+
+3.  Pigura C90 - Bahasa Terpadu
+    3.1 Definisi Pigura C90
+    3.2 Filosofi "Satu Fungsi, Satu Tujuan"
+    3.3 Fungsi yang Dihapus
+    3.4 Fungsi yang Tersedia
+
+4.  LibC - Library C Terpadu
+    4.1 Struktur LibC
+    4.2 Header Tersedia
+    4.3 Implementasi
+    4.4 Arsitektur-Spesifik
+
+5.  Sistem Deteksi IC/Chip
+    5.1 Konsep Dasar
+    5.2 Komponen Sistem IC Detection
+    5.3 Alur Deteksi IC
+    5.4 Database Parameter IC
+    5.5 Driver Generik
+    5.6 Keuntungan Pendekatan Ini
+
+6.  Sistem Grafis dan Framebuffer
+    6.1 Kenapa Tanpa X11/Wayland?
+    6.2 Arsitektur Framebuffer
+    6.3 Arsitektur GPU
+    6.4 Arsitektur LibPigura
+    6.5 Perbandingan Kompleksitas
+
+7.  Dekor - Compositor Minimal
+    7.1 Kenapa Perlu Compositor?
+    7.2 Arsitektur Dekor
+    7.3 Komponen Dekor
+    7.4 Keuntungan Compositor Minimal
+
+8.  Sistem Font
+    8.1 Bitmap vs Vector Font
+    8.2 Rekomendasi: Pendekatan Hybrid
+    8.3 Format Pigura Font (.pf)
+    8.4 Rencana Implementasi Bertahap
+
+9.  Sistem File
+    9.1 Filesystem yang Didukung
+    9.2 Virtual File System (VFS)
+    9.3 FAT32
+    9.4 NTFS
+    9.5 ext2
+    9.6 ISO9660
+    9.7 initramfs
+    9.8 PiguraFS (Native)
+
+10. Sistem User Mode
+    10.1 Ring Protection
+    10.2 System Call
+    10.3 Process Management
+
+11. Struktur Direktori Proyek
+    11.1 Layout Direktori Utama
+    11.2 Struktur Lengkap
+
+12. Estimasi Ukuran dan Kompleksitas
+
+13. Daftar Implementasi Prioritas
+
+14. Sistem Build Multi-Arsitektur
+
+15. Kesimpulan
+
+
+================================================================================
+                        1. VISI DAN KONSEP DASAR
+================================================================================
+
+1.1 Definisi Proyek
+-------------------
+
+Pigura OS adalah sistem operasi original yang ditulis dari scratch, bukan 
+fork atau turunan dari Linux maupun Unix. Sistem operasi ini memiliki 
+identitas sendiri dengan filosofi minimalis dan efisiensi maksimal. Nama 
+"Pigura" diambil dari bahasa Indonesia yang berarti "bingkai" atau "frame", 
+mencerminkan konsep dasar sistem ini yang menggunakan framebuffer langsung 
+tanpa lapisan UI yang kompleks seperti X11 atau Wayland.
+
+Berbeda dengan sistem operasi modern yang cenderung membengkak dengan fitur-
+fitur yang sering tidak digunakan, Pigura OS dibangun dengan prinsip "hanya 
+yang diperlukan". Setiap komponen dirancang untuk memiliki fungsi spesifik 
+dan dapat diprediksi, menghilangkan kompleksitas yang tidak perlu sambil tetap 
+mempertahankan kemampuan untuk menghasilkan berkas-berkas universal seperti 
+PNG, PDF, dan CSV.
+
+Pigura OS ditulis menggunakan Pigura C90, yaitu C89 Core dengan tambahan 
+fungsi-fungsi aman dari POSIX (seperti snprintf, strncpy, fgets). Pendekatan 
+ini menggabungkan portabilitas C89 dengan keamanan fungsi POSIX, tanpa perlu 
+macro atau seleksi fitur. Inline assembly hanya digunakan untuk operasi-operasi 
+vital yang memerlukan akses hardware langsung.
+
+
+1.2 Karakteristik Utama
+-----------------------
+
+  - Original OS - bukan fork Linux/Unix, ditulis dari scratch
+  - Unix-like, POSIX-compatible (subset safe functions)
+  - Monolithic Kernel dengan Pigura C90 sebagai bahasa utama
+  - Inline assembly hanya untuk fungsi-fungsi vital:
+    * I/O port (inb, outb, inw, outw, dll)
+    * Context switching
+    * Interrupt handling
+    * Switching ke user mode (Ring 0 ke Ring 3)
+  - Tanpa X11/Wayland - langsung menggunakan framebuffer + GPU
+  - Target arsitektur: x86 (32-bit), x86_64 (64-bit), ARM, ARMv7
+  - Seluruh penamaan, komentar, dan dokumentasi dalam Bahasa Indonesia
+  - Dukungan multiple filesystem: FAT32, NTFS, ext2, ISO9660, PiguraFS
+  - IC Detection System - deteksi perangkat berdasarkan chip, bukan vendor
+  - Hardware Abstraction Layer (HAL) untuk portabilitas antar arsitektur
+
+
+1.3 Perbandingan Pendekatan
+---------------------------
+
++------------------+-------------------+-------------------+
+| Aspek            | Linux/Windows     | Pigura OS         |
++------------------+-------------------+-------------------+
+| Identitas        | Fork/Turunan      | ORIGINAL          |
+|                  |                   | (dari scratch)    |
++------------------+-------------------+-------------------+
+| UI Layer         | X11/Wayland       | Library Terintegrasi|
+|                  | (~500 MB)         | (~100 KB)         |
++------------------+-------------------+-------------------+
+| Driver Code      | Per-vendor        | Per-IC Series     |
+|                  | (~50 MB)          | (~600 KB)         |
++------------------+-------------------+-------------------+
+| Runtime          | Multiple          | Minimalist        |
+|                  | (~100 MB+)        | (~50 KB)          |
++------------------+-------------------+-------------------+
+| Filesystem       | ext4/XFS/Btrfs    | FAT32/NTFS/ext2/  |
+|                  |                   | ISO9660/PiguraFS  |
++------------------+-------------------+-------------------+
+| Bahasa           | C + Assembly      | Pigura C90        |
+|                  | campuran          | (assembly minimal)|
++------------------+-------------------+-------------------+
+| LibC             | glibc (~3000+     | Pigura libc       |
+|                  | fungsi)           | (~160 fungsi)     |
++------------------+-------------------+-------------------+
+| Arsitektur       | Multi-platform    | x86/x86_64/ARM/   |
+|                  |                   | ARMv7             |
++------------------+-------------------+-------------------+
+| Total Estimasi   | ~650 MB+          | ~5-6 MB           |
++------------------+-------------------+-------------------+
+
+Tabel 1: Perbandingan kompleksitas antara sistem operasi tradisional dan 
+Pigura OS
+
+
+================================================================================
+                          2. ARSITEKTUR SISTEM
+================================================================================
+
+2.1 Model Kernel
+----------------
+
+Pigura OS menggunakan model kernel monolitik yang dipilih karena 
+kesederhanaan implementasi dan efisiensi komunikasi antar komponen. Dalam 
+model ini, seluruh komponen inti seperti scheduler, memory manager, device 
+driver, dan filesystem berjalan dalam satu ruang alamat kernel. Pendekatan 
+ini mengeliminasi overhead komunikasi inter-process yang ada pada microkernel, 
+sehingga menghasilkan performa yang lebih baik untuk sistem operasi yang 
+ditargetkan untuk penggunaan personal.
+
+Pemilihan Pigura C90 sebagai bahasa utama didasarkan pada beberapa pertimbangan 
+penting. Pertama, C89 adalah standar bahasa C yang paling mature dan didukung 
+oleh hampir semua compiler. Kedua, fungsi-fungsi aman dari POSIX menyediakan 
+proteksi terhadap buffer overflow dan bug umum lainnya. Ketiga, kode lebih 
+mudah dibaca dan dipelihara dibandingkan Assembly, sehingga mempercepat proses 
+pengembangan. Keempat, dengan inline assembly yang minimal, kode dapat dengan 
+mudah dikompilasi untuk berbagai arsitektur.
+
+
+2.2 Pembagian Tanggung Jawab Bahasa
+-----------------------------------
+
+Pembagian bahasa pemrograman dalam Pigura OS mengikuti prinsip "hanya 
+assembly untuk yang benar-benar diperlukan":
+
++------------------+---------------------------+-----------------------+
+| Bahasa           | Komponen                  | Alasan                |
++------------------+---------------------------+-----------------------+
+| Pigura C90       | Seluruh kernel core,      | Portabilitas,         |
+|                  | driver, filesystem,       | keamanan,             |
+|                  | libc, libpigura,          | kemudahan maintenance,|
+|                  | aplikasi                  | standar matang        |
++------------------+---------------------------+-----------------------+
+| Inline Assembly  - I/O port (inb, outb,     - Akses hardware       |
+|                  - inw, outw, inoutl)       |   langsung            |
+|                  - Context switch           - Operasi kritis       |
+|                  - Interrupt handler entry  |   yang membutuhkan   |
+|                  - Ring switch (0 ke 3)     |   kontrol penuh      |
+|                  - CPUID, MSR access        - Instruksi khusus    |
+|                  - TLB flush, cache ops     |   CPU                |
++------------------+---------------------------+-----------------------+
+
+Tabel 2: Pembagian bahasa pemrograman berdasarkan komponen
+
+
+2.3 Hardware Abstraction Layer (HAL)
+------------------------------------
+
+HAL adalah lapisan yang memisahkan kode kernel dari detail spesifik 
+hardware. Dengan HAL, kode kernel dapat berjalan di berbagai arsitektur 
+tanpa modifikasi. HAL menyediakan interface yang konsisten untuk:
+
+  - hal_cpu: Operasi CPU (halt, restart, get_id, dll)
+  - hal_memori: Manajemen memori fisik dan virtual
+  - hal_interupsi: Handler interupsi dan IRQ
+  - hal_timer: Timer dan delay
+  - hal_console: Output console untuk debugging
+
+Setiap arsitektur mengimplementasikan HAL-nya sendiri di direktori:
+  - arsitektur/x86/hal_x86.c
+  - arsitektur/x86_64/hal_x86_64.c
+  - arsitektur/arm/hal_arm.c
+  - arsitektur/armv7/hal_armv7.c
+
+
+2.4 Multi-Arsitektur
+--------------------
+
+Pigura OS dirancang dari awal untuk mendukung multiple arsitektur dengan 
+satu basis kode sumber. Sistem build menggunakan parameter ARSITEKTUR untuk 
+memilih target:
+
+  make ARSITEKTUR=x86      # Desktop 32-bit
+  make ARSITEKTUR=x86_64   # Desktop 64-bit
+  make ARSITEKTUR=arm      # Mobile/Embedded 32-bit
+  make ARSITEKTUR=armv7    # Mobile Cortex-A series
+
+Struktur direktori arsitektur:
+  SUMBER/arsitektur/
+  ├── x86/                  # Intel/AMD 32-bit
+  │   ├── boot/             # Boot sector, protected mode
+  │   ├── memori/           # Paging, GDT, segment
+  │   ├── proses/           # Context, TSS, user mode
+  │   └── interupsi/        # IDT, ISR, IRQ
+  ├── x86_64/               # Intel/AMD 64-bit
+  │   ├── boot/             # Long mode setup
+  │   ├── memori/           # PML4, paging 64-bit
+  │   ├── proses/           # Context 64-bit
+  │   └── interuknsi/       # IDT 64-bit
+  ├── arm/                  # ARM 32-bit generik
+  │   ├── boot/             # Vector table, MMU setup
+  │   ├── memori/           # Page tables, TLB
+  │   ├── proses/           # Context switching
+  │   └── interupsi/        # GIC, exceptions
+  └── armv7/                # ARM Cortex-A series
+      ├── boot/             # VFP, NEON setup
+      ├── memori/           # L2 cache
+      ├── proses/           # Context dengan VFP
+      └── interuknsi/       # GICv2/v3
+
+
+================================================================================
+                     3. PIGURA C90 - BAHASA TERPADU
+================================================================================
+
+3.1 Definisi Pigura C90
+-----------------------
+
+Pigura C90 adalah definisi bahasa khusus untuk Pigura OS yang menggabungkan:
+
+  PIGURA C90 = C89 Core + POSIX Safe Functions
+
+Komponen:
+  - C89 Core: Standar ANSI C yang mature dan portabel
+  - POSIX Safe Functions: Fungsi dengan bounds checking untuk keamanan
+
+Keunggulan pendekatan ini:
+  - Tidak perlu macro _POSIX_C_SOURCE atau _BSD_SOURCE
+  - Satu standard terpadu, tidak ada dualisme
+  - Semua fungsi aman tersedia secara default
+  - Portabilitas maksimal ke berbagai arsitektur
+
+
+3.2 Filosofi "Satu Fungsi, Satu Tujuan"
+---------------------------------------
+
+Dalam Pigura C90, setiap tugas hanya memiliki SATU fungsi - versi aman:
+
+  ┌────────────────────────────────────────────────────────────────┐
+  │  ❌ DIHAPUS              →        ✅ TERSEDIA                  │
+  │  ─────────────────────────────────────────────────────────────│
+  │  sprintf (unsafe)        →        snprintf (safe, bounded)    │
+  │  strcpy (unsafe)         →        strncpy (safe, bounded)     │
+  │  strcat (unsafe)         →        strncat (safe, bounded)     │
+  │  gets (unsafe)           →        fgets (safe, bounded)       │
+  │  strtok (not reentrant)  →        strtok_r (reentrant)        │
+  └────────────────────────────────────────────────────────────────┘
+
+Developer tidak perlu memilih antara versi aman atau tidak aman - yang 
+tersedia hanya versi aman. Ini menghilangkan kesalahan umum seperti buffer 
+overflow yang sering terjadi dengan fungsi-fungsi legacy.
+
+
+3.3 Fungsi yang Dihapus
+-----------------------
+
+Fungsi-fungsi berikut TIDAK disertakan dalam Pigura C90 karena dianggap 
+berbahaya atau redundant:
+
+STDIO:
+  - sprintf      → buffer overflow risk, gunakan snprintf
+  - vsprintf     → buffer overflow risk, gunakan vsnprintf
+  - gets         → buffer overflow risk, gunakan fgets
+  - scanf        → kompleks, jarang di kernel, gunakan parsing manual
+
+STDLIB:
+  - atof         → gunakan strtod dengan error checking
+  - realloc      → implementasi manual malloc + memcpy
+  - calloc       → implementasi manual malloc + memset
+
+STRING:
+  - strcpy       → buffer overflow risk, gunakan strncpy
+  - strcat       → buffer overflow risk, gunakan strncat
+  - strtok       → not reentrant, gunakan strtok_r
+  - strerror     → gunakan strerror_r (reentrant)
+
+
+3.4 Fungsi yang Tersedia
+------------------------
+
+Daftar lengkap fungsi yang tersedia dalam Pigura C90:
+
+STDIO (~25 fungsi):
+  snprintf, vsnprintf, printf, fprintf, sprintf (wrapper ke snprintf)
+  fgets, fputs, fopen, fclose, fread, fwrite
+  fseek, ftell, rewind, fflush, feof, ferror
+  puts, putchar, fputc, getchar, getc
+  remove, rename
+
+STDLIB (~30 fungsi):
+  malloc, free, calloc, realloc
+  atoi, atol, strtol, strtoul, strtod, strtof
+  rand, srand, exit, abort, atexit, _Exit
+  getenv, setenv, unsetenv, system
+  qsort, bsearch, abs, labs, div, ldiv
+
+STRING (~20 fungsi):
+  strncpy, strncat (selalu dengan size limit)
+  strlen, strcmp, strncmp
+  strchr, strrchr, strstr, strtok_r
+  memset, memcpy, memmove, memcmp, memchr
+  strerror_r, strcasecmp, strncasecmp
+
+CTYPE (~15 fungsi):
+  isalpha, isdigit, isalnum, isspace, isupper, islower
+  isprint, iscntrl, isgraph, ispunct, isxdigit
+  tolower, toupper
+
+UNISTD (~20 fungsi):
+  read, write, close, open, creat
+  fork, execve, getpid, getppid
+  chdir, getcwd, sleep, usleep
+  unlink, rmdir, access, dup, dup2
+
+FCNTL (~2 fungsi):
+  open (dengan O_RDONLY, O_WRONLY, O_RDWR, O_CREAT, O_APPEND, O_TRUNC)
+
+SIGNAL (~5 fungsi):
+  signal, raise, sigaction, sigprocmask
+
+TIME (~10 fungsi):
+  time, clock, ctime, asctime, gmtime, localtime, mktime, strftime
+
+MATH (~20 fungsi, opsional):
+  sin, cos, tan, asin, acos, atan, atan2
+  sqrt, pow, exp, log, log10, ceil, floor, fabs, fmod
+
+NETWORK (~10 fungsi, opsional):
+  socket, bind, listen, accept, connect
+  send, recv, sendto, recvfrom, shutdown
+
+
+================================================================================
+                          4. LIBC - LIBRARY C TERPADU
+================================================================================
+
+4.1 Struktur LibC
+-----------------
+
+LibC Pigura OS terdiri dari 73 file dengan ~160 fungsi aman:
+
+SUMBER/libc/
+│
+├── include/                         # HEADER PUBLIK (16 file)
+│   ├── stdio.h                      # I/O stream
+│   ├── stdlib.h                     # Utilitas umum
+│   ├── string.h                     # Operasi string & memory
+│   ├── stdint.h                     # Integer types (int8_t, uint32_t)
+│   ├── stddef.h                     # Definisi standar (NULL, size_t)
+│   ├── stdarg.h                     # Variadic arguments
+│   ├── ctype.h                      # Klasifikasi karakter
+│   ├── errno.h                      # Error codes
+│   ├── limits.h                     # Batas tipe
+│   ├── assert.h                     # Assertion macro
+│   ├── unistd.h                     # POSIX syscall wrapper
+│   ├── fcntl.h                      # File control
+│   ├── signal.h                     # Signal handling
+│   ├── time.h                       # Waktu & tanggal
+│   ├── math.h                       # Matematika (opsional)
+│   ├── setjmp.h                     # Non-local jump
+│   └── sys/
+│       ├── types.h                  # Tipe sistem (pid_t, mode_t, off_t)
+│       ├── stat.h                   # File status
+│       ├── wait.h                   # Process wait
+│       ├── mman.h                   # Memory mapping
+│       ├── socket.h                 # Socket (networking)
+│       ├── ioctl.h                  # Device control
+│       └── uio.h                    # Scatter/gather I/O
+│
+├── internal/                        # INTERNAL (3 file + arch)
+│   ├── syscall.S                    # System call entry
+│   ├── errno.c                      # Global errno variable
+│   ├── startup.c                    # _start entry point
+│   └── arch/                        # Architecture-specific
+│       ├── x86/syscall.S
+│       ├── x86_64/syscall.S
+│       ├── arm/syscall.S
+│       └── armv7/syscall.S
+│
+├── stdio/                           # I/O STREAM (11 file)
+│   ├── printf.c                     # printf, fprintf, sprintf
+│   ├── snprintf.c                   # snprintf, vsnprintf (AMAN)
+│   ├── puts.c                       # puts, putchar, fputc, fputs
+│   ├── gets.c                       # fgets (AMAN), getchar, getc
+│   ├── file.c                       # fopen, fclose, fread, fwrite
+│   ├── seek.c                       # fseek, ftell, rewind
+│   ├── flush.c                      # fflush
+│   ├── error.c                      # feof, ferror, clearerr
+│   ├── remove.c                     # remove, rename
+│   ├── tmp.c                        # tmpfile, tmpnam
+│   └── stdio.h                      # Internal header
+│
+├── stdlib/                          # UTILITAS (9 file)
+│   ├── mem.c                        # malloc, free, calloc, realloc
+│   ├── conv.c                       # atoi, atol, strtol, strtoul
+│   ├── rand.c                       # rand, srand
+│   ├── exit.c                       # exit, abort, atexit, _Exit
+│   ├── system.c                     # system (shell execute)
+│   ├── getenv.c                     # getenv, setenv, unsetenv
+│   ├── bsearch.c                    # Binary search
+│   ├── qsort.c                      # Quick sort
+│   └── abs.c                        # abs, labs, div, ldiv
+│
+├── string/                          # STRING & MEMORY (6 file)
+│   ├── mem.c                        # memset, memcpy, memmove, memcmp
+│   ├── str.c                        # strlen, strcmp, strncmp
+│   ├── strcopy.c                    # strncpy (AMAN), strncat (AMAN)
+│   ├── strfind.c                    # strchr, strrchr, strstr, strtok_r
+│   ├── strutil.c                    # strcasecmp, strncasecmp
+│   └── strerror.c                   # strerror_r
+│
+├── ctype/                           # KARAKTER (1 file)
+│   └── ctype.c                      # isalpha, isdigit, tolower, toupper, dll
+│
+├── unistd/                          # POSIX SYSCALL (6 file)
+│   ├── io.c                         # read, write, close
+│   ├── file.c                       # open, creat, dup, dup2
+│   ├── proc.c                       # fork, execve, getpid, getppid
+│   ├── cwd.c                        # chdir, getcwd
+│   ├── sleep.c                      # sleep, usleep
+│   └── unlink.c                     # unlink, rmdir, access
+│
+├── fcntl/                           # FILE CONTROL (1 file)
+│   └── fcntl.c                      # open, creat, fcntl
+│
+├── signal/                          # SIGNAL (1 file)
+│   └── signal.c                     # signal, raise, sigaction
+│
+├── time/                            # WAKTU (3 file)
+│   ├── time.c                       # time, clock
+│   ├── ctime.c                      # ctime, asctime, gmtime, localtime
+│   └── strftime.c                   # strftime
+│
+├── math/                            # MATEMATIKA (1 file, opsional)
+│   └── math.c                       # sin, cos, tan, sqrt, pow, dll
+│
+├── setjmp/                          # NON-LOCAL JUMP (1 file)
+│   └── setjmp.c                     # setjmp, longjmp
+│
+└── network/                         # NETWORKING (3 file, opsional)
+    ├── socket.c                     # socket, bind, listen, accept
+    ├── send.c                       # send, recv, sendto, recvfrom
+    └── netdb.c                      # gethostbyname, getservbyname
+
+
+4.2 Header Tersedia
+-------------------
+
+Header publik yang tersedia untuk developer:
+
++------------------+------------------------------------------+
+| Header           | Isi                                      |
++------------------+------------------------------------------+
+| <stdio.h>        | I/O stream operations                    |
+| <stdlib.h>       | Memory, conversion, process control      |
+| <string.h>       | String dan memory operations             |
+| <stdint.h>       | Integer types (int8_t, uint32_t, dll)    |
+| <stddef.h>       | NULL, size_t, ptrdiff_t                  |
+| <stdarg.h>       | va_list, va_start, va_end                |
+| <ctype.h>        | Character classification                 |
+| <errno.h>        | Error codes dan errno                    |
+| <limits.h>       | Tipe limits (INT_MAX, CHAR_BIT)          |
+| <assert.h>       | Assert macro                             |
+| <unistd.h>       | POSIX syscall wrappers                   |
+| <fcntl.h>        | File control constants                   |
+| <signal.h>       | Signal handling                          |
+| <time.h>         | Time functions                           |
+| <math.h>         | Mathematical functions (opsional)        |
+| <setjmp.h>       | Non-local jumps                          |
+| <sys/types.h>    | System types (pid_t, mode_t, off_t)      |
+| <sys/stat.h>     | File status struct                       |
+| <sys/wait.h>     | Process wait                             |
+| <sys/mman.h>     | Memory mapping                           |
+| <sys/socket.h>   | Socket operations                        |
+| <sys/ioctl.h>    | Device control                           |
+| <sys/uio.h>      | Scatter/gather I/O                       |
++------------------+------------------------------------------+
+
+
+4.3 Implementasi
+----------------
+
+Setiap modul diimplementasikan dengan pendekatan minimalis:
+
+STDIO:
+  - printf menggunakan vsnprintf internally untuk keamanan
+  - sprintf adalah wrapper ke snprintf (tidak ada versi unsafe)
+  - fgets selalu dengan size limit
+
+STDLIB:
+  - malloc menggunakan simple allocator (first-fit)
+  - strtol dengan proper error handling
+  - rand menggunakan LCG (Linear Congruential Generator)
+
+STRING:
+  - strncpy SELALAU null-terminate jika ada ruang
+  - strncat SELALU dengan size check
+  - Semua fungsi mem* dioptimasi per-arsitektur jika perlu
+
+UNISTD:
+  - Wrapper langsung ke syscall kernel
+  - Implementasi arch-specific di internal/arch/
+
+
+4.4 Arsitektur-Spesifik
+-----------------------
+
+System call implementation berbeda per arsitektur:
+
+x86 (32-bit):
+  - int 0x80 untuk syscall
+  - Parameter via stack atau register
+
+x86_64:
+  - syscall instruction
+  - Parameter via register (rdi, rsi, rdx, r10, r8, r9)
+
+ARM:
+  - SVC instruction
+  - Parameter via register (r0-r6)
+
+ARMv7:
+  - SVC dengan ARM EABI calling convention
+
+
+================================================================================
+                     5. SISTEM DETEKSI IC/CHIP
+================================================================================
+
+5.1 Konsep Dasar
+----------------
+
+Pendekatan deteksi IC/Chip dalam Pigura OS merupakan salah satu inovasi utama 
+yang membedakannya dari sistem operasi konvensional. Alih-alih membuat driver 
+terpisah untuk setiap vendor atau model perangkat, Pigura OS mendeteksi IC 
+berdasarkan fungsi dan spesifikasi teknisnya. Konsep ini terinspirasi dari 
+kenyataan bahwa banyak IC dari vendor berbeda memiliki karakteristik yang 
+serupa atau bahkan identik.
+
+Sebagai contoh, jika sebuah IC USB terdeteksi dan umumnya digunakan untuk 
+fungsi WiFi, maka sistem akan melakukan probe sebagai perangkat WiFi. Proses 
+probe ini mencakup identifikasi parameter operasional seperti transfer rate, 
+TX power, dan frekuensi. Sistem kemudian membandingkan nilai-nilai yang 
+terdeteksi dengan database nilai standar untuk memilih konfigurasi yang paling 
+aman dan kompatibel.
+
+
+5.2 Komponen Sistem IC Detection
+--------------------------------
+
+Sistem IC Detection terdiri dari beberapa komponen utama:
+
+SUMBER/perangkat/ic/
+├── ic_deteksi.c           # Engine deteksi utama
+├── ic_engine.c            # Core engine
+├── ic_klasifikasi.c       # Klasifikasi fungsi IC
+├── ic_parameter.c         # Struktur dan parsing parameter
+├── ic_validasi.c          # Validasi parameter terhadap database
+│
+├── database/              # Database parameter IC standar
+│   ├── database.c         # Core database
+│   ├── db_cpu.c           # Parameter CPU IC
+│   ├── db_gpu.c           # Parameter GPU IC
+│   ├── db_network.c       # Parameter Network IC (WiFi, Ethernet)
+│   ├── db_storage.c       # Parameter Storage IC (ATA, NVMe)
+│   ├── db_display.c       # Parameter Display IC (VGA, HDMI)
+│   ├── db_audio.c         # Parameter Audio IC (HDA)
+│   ├── db_input.c         # Parameter Input IC (USB HID)
+│   └── db_usb.c           # Parameter USB Controller
+│
+├── probe/                 # Membaca parameter dari hardware
+│   ├── probe.c            # Core probe engine
+│   ├── probe_pci.c        # Probe via bus PCI
+│   ├── probe_usb.c        # Probe via bus USB
+│   ├── probe_i2c.c        # Probe via bus I2C
+│   ├── probe_spi.c        # Probe via bus SPI
+│   └── probe_mmio.c       # Probe via Memory-Mapped I/O
+│
+└── driver_generik/        # Driver berdasarkan FUNGSI, bukan vendor
+    ├── driver_generik.c   # Framework driver generik
+    ├── net_wifi_generik.c       # WiFi generik
+    ├── net_ethernet_generik.c   # Ethernet generik
+    ├── storage_ata_generik.c    # ATA/IDE generik
+    ├── storage_nvme_generik.c   # NVMe generik
+    ├── display_vga_generik.c    # VGA generik
+    ├── display_hdmi_generik.c   # HDMI generik
+    ├── audio_hda_generik.c      # Intel HDA generik
+    └── input_usb_hid_generik.c  # USB HID generik
+
+
+5.3 Alur Deteksi IC
+-------------------
+
+Proses deteksi dan inisialisasi IC mengikuti alur berikut:
+
+  1. DETEKSI IC
+     Sistem mengidentifikasi keberadaan IC melalui bus sistem (PCI, USB, 
+     I2C, SPI, atau MMIO). Setiap bus memiliki probe handler sendiri.
+
+  2. IDENTIFIKASI FUNGSI
+     Berdasarkan signature (Vendor ID, Device ID, Class Code) dan database, 
+     sistem menentukan fungsi utama IC (WiFi, Storage, Display, dll).
+
+  3. PROBE PARAMETER
+     Sistem membaca parameter operasional dari IC:
+     - Nilai minimum (batas bawah yang didukung)
+     - Nilai maksimum (batas atas yang didukung)
+     - Nilai typical (nilai yang direkomendasikan IC)
+
+  4. VALIDASI
+     Parameter yang terbaca dibandingkan dengan nilai standar di database.
+     Jika parameter di luar rentang aman, sistem menandai peringatan.
+
+  5. PILIH DEFAULT
+     Sistem memilih konfigurasi default yang paling aman berdasarkan:
+     - Nilai typical dari IC (prioritas utama)
+     - Nilai default dari database (fallback)
+     - Nilai minimum yang valid (safemode)
+
+  6. INISIALISASI
+     Driver generik dengan parameter yang dipilih menginisialisasi IC.
+
+
+5.4 Database Parameter IC
+-------------------------
+
+Database IC menyimpan parameter standar untuk setiap kategori perangkat.
+Contoh struktur parameter IC WiFi:
+
++----------------+-------+-------+---------+--------+
+| Parameter      | Min   | Max   | Default | Satuan |
++----------------+-------+-------+---------+--------+
+| Transfer Rate  | 1     | 150   | 54      | Mbps   |
++----------------+-------+-------+---------+--------+
+| TX Power       | 0     | 20    | 10      | dBm    |
++----------------+-------+-------+---------+--------+
+| Frekuensi      | 2.4   | 5.8   | 2.4     | GHz    |
++----------------+-------+-------+---------+--------+
+| Channel        | 1     | 14    | 6       | -      |
++----------------+-------+-------+---------+--------+
+
+Tabel 3: Contoh parameter IC WiFi dengan nilai minimum, maksimum, dan default
+
+
+5.5 Driver Generik
+------------------
+
+Driver generik adalah driver yang bekerja berdasarkan kelas fungsi IC, bukan 
+berdasarkan vendor atau model spesifik. Keuntungan pendekatan ini:
+
+  - Satu driver WiFi generik mendukung ratusan IC WiFi dari berbagai vendor
+  - Tidak perlu driver terpisah untuk Realtek, Intel, Atheros, dll
+  - Parameter disesuaikan otomatis berdasarkan kemampuan IC
+  - Ukuran kode driver jauh lebih kecil
+
+Contoh driver generik dan cakupannya:
+
++-------------------------+----------------------------------------+
+| Driver                  | IC yang Didukung                       |
++-------------------------+----------------------------------------+
+| net_wifi_generik        | RTL8188, RTL8192, AR9271, Intel WiFi, |
+|                         | dan ratusan IC WiFi 802.11 lainnya     |
++-------------------------+----------------------------------------+
+| storage_ata_generik     | Semua controller ATA/IDE yang kompatibel|
++-------------------------+----------------------------------------+
+| display_vga_generik     | Semua kartu VGA standar VBE            |
++-------------------------+----------------------------------------+
+| input_usb_hid_generik   | Semua perangkat USB HID (keyboard,     |
+|                         | mouse, gamepad)                        |
++-------------------------+----------------------------------------+
+
+
+5.6 Keuntungan Pendekatan Ini
+-----------------------------
+
+Pendekatan deteksi IC berbasis fungsi ini memberikan beberapa keuntungan 
+signifikan:
+
+  1. PENGHEMATAN WAKTU DEVELOPMENT
+     Satu driver dapat mendukung seluruh IC series dengan karakteristik 
+     serupa, terlepas dari vendor pembuatnya. Estimasi penghematan: 50-60%.
+
+  2. PARAMETER DEFAULT YANG AMAN
+     Sistem selalu memilih nilai yang terdeteksi valid oleh IC itu sendiri, 
+     mengurangi risiko kerusakan hardware akibat konfigurasi yang salah.
+
+  3. UKURAN DRIVER KECIL
+     Tidak perlu menyimpan database vendor-specific yang besar. Driver 
+     generik biasanya hanya 10-20 KB.
+
+  4. MAINTENANCE SEDERHANA
+     Perbaikan atau peningkatan pada satu driver akan otomatis berlaku untuk 
+     seluruh IC yang kompatibel.
+
+  5. SISTEM LEBIH TANGGUH
+     Parameter yang digunakan selalu dalam rentang yang disupport oleh 
+     hardware, sehingga lebih stabil.
+
+
+================================================================================
+                   6. SISTEM GRAFIS DAN FRAMEBUFFER
+================================================================================
+
+6.1 Kenapa Tanpa X11/Wayland?
+-----------------------------
+
+X11 Window System yang digunakan di Linux dirancang pada era 1984 untuk 
+komputasi terdistribusi, di mana satu mainframe server melayani banyak dummy 
+terminal. Konsep server-client dalam X11 dibuat untuk network transparency, 
+memungkinkan aplikasi berjalan di server sementara tampilan dikirim ke 
+terminal melalui jaringan. Pendekatan ini tepat untuk masalah tahun 1980-an, 
+namun menjadi overhead yang tidak perlu untuk PC personal modern.
+
+Windows mengambil pendekatan berbeda dengan Graphics Device Interface (GDI) 
+yang terintegrasi langsung tanpa arsitektur server-client. Ini lebih efisien 
+untuk penggunaan personal karena mengeliminasi IPC overhead dan kompleksitas 
+protocol parsing. Pigura OS mengadopsi pendekatan serupa dengan library 
+grafis terintegrasi (LibPigura) yang berkomunikasi langsung dengan driver GPU 
+dan framebuffer hardware.
+
+
+6.2 Arsitektur Framebuffer
+--------------------------
+
+Framebuffer adalah area memori yang secara langsung mewakili pixel di layar. 
+Pigura OS mengakses framebuffer secara langsung tanpa lapisan tambahan:
+
+SUMBER/perangkat/tampilan/framebuffer/
+├── framebuffer.c          # Core framebuffer driver
+├── fb_init.c              # Inisialisasi framebuffer
+├── fb_mode.c              # Mode setting (resolusi, depth)
+├── fb_render.c            # Render ke framebuffer
+├── fb_blit.c              # Blitting operations
+├── fb_console.c           # Text console di framebuffer
+├── fb_cursor.c            # Hardware/software cursor
+├── vbe.c                  # VESA BIOS Extensions (BIOS)
+└── uefi_gop.c             # UEFI Graphics Output Protocol
+
+Cara kerja framebuffer:
+  1. Bootloader atau UEFI menginisialisasi mode grafis
+  2. Alamat framebuffer diperoleh dari BIOS/UEFI
+  3. Kernel memetakan framebuffer ke ruang alamat kernel
+  4. LibPigura menulis pixel langsung ke alamat tersebut
+  5. Tampilan langsung terupdate tanpa copying
+
+
+6.3 Arsitektur GPU
+------------------
+
+Untuk sistem yang memiliki GPU, Pigura OS dapat memanfaatkan akselerasi 
+hardware:
+
+SUMBER/perangkat/tampilan/gpu/
+├── gpu.c                  # Core GPU driver
+├── gpu_deteksi.c          # Deteksi GPU via IC Detection
+├── gpu_init.c             # Inisialisasi GPU
+├── gpu_render.c           # Render commands
+├── gpu_2d.c               # 2D acceleration (blit, fill, copy)
+├── gpu_3d.c               # 3D acceleration (vertex, shader)
+├── gpu_memori.c           # GPU memory management
+├── gpu_command.c          # Command buffer
+└── gpu_shader.c           # Shader handling
+
+GPU dideteksi menggunakan IC Detection System, bukan driver vendor-specific.
+Jika GPU terdeteksi dan mendukung operasi 2D/3D, LibPigura akan menggunakan 
+akselerasi hardware. Jika tidak, fallback ke CPU rendering.
+
+
+6.4 Arsitektur LibPigura
+------------------------
+
+LibPigura adalah library grafis terintegrasi yang menyediakan API untuk 
+menggambar primitif, mengelola jendela, dan merender teks. Library ini 
+dirancang untuk dapat menggunakan CPU maupun GPU secara transparan:
+
+SUMBER/pigura/
+├── kanvas/                 # Drawing surface management
+│   ├── kanvas.c           # Core kanvas
+│   ├── kanvas_buat.c      # Buat kanvas baru
+│   ├── kanvas_hapus.c     # Hapus kanvas
+│   ├── kanvas_resize.c    # Ubah ukuran
+│   ├── kanvas_flip.c      # Flip buffer
+│   └── kanvas_blit.c      # Blit antar kanvas
+│
+├── render/                 # Rendering engine
+│   ├── render.c           # Core render
+│   ├── render_cpu.c       # CPU software rendering
+│   ├── render_gpu.c       # GPU hardware rendering
+│   ├── render_hybrid.c    # CPU+GPU hybrid
+│   ├── primitif.c         # Primitive dispatcher
+│   ├── titik.c            # Draw point
+│   ├── garis.c            # Draw line
+│   ├── kotak.c            # Draw rectangle
+│   ├── lingkaran.c        # Draw circle
+│   ├── elips.c            # Draw ellipse
+│   ├── poligon.c          # Draw polygon
+│   ├── arc.c              # Draw arc
+│   ├── curve.c            # Draw bezier curve
+│   └── fill.c             # Fill shapes
+│
+├── gpu_accel/              # GPU acceleration
+│   ├── gpu_accel.c        # Core acceleration
+│   ├── gpu_blit.c         # Hardware blit
+│   ├── gpu_fill.c         # Hardware fill
+│   ├── gpu_copy.c         # Hardware copy
+│   ├── gpu_scale.c        # Hardware scale
+│   ├── gpu_rotate.c       # Hardware rotate
+│   └── gpu_blend.c        # Hardware blending
+│
+├── teks/                   # Text and font rendering
+│   ├── teks.c             # Core text
+│   ├── font.c             # Font management
+│   ├── font_bitmap.c      # Bitmap font
+│   ├── font_ttf.c         # TTF font (opsional)
+│   ├── font_cache.c       # Glyph cache
+│   ├── glyph.c            # Glyph handling
+│   ├── measure.c          # Text measurement
+│   └── render_teks.c      # Text rendering
+│
+└── jendela/                # Window management (lihat DEKOR)
+    ├── jendela.c          # Core window
+    ├── wm.c               # Window manager
+    ├── decorasi.c         # Window decoration
+    ├── event.c            # Window events
+    ├── widget.c           # Widget base
+    ├── button.c           # Button widget
+    ├── textbox.c          # Textbox widget
+    ├── checkbox.c         # Checkbox widget
+    ├── scrollbar.c        # Scrollbar widget
+    ├── menu.c             # Menu widget
+    ├── dialog.c           # Dialog boxes
+    └── z_order.c          # Z-ordering
+
+Fungsi-Fungsi Inti LibPigura:
+
+  - pigura_mulai() / pigura_selesai(): Inisialisasi dan pembersihan
+  - kanvas_buat() / kanvas_hapus(): Manajemen permukaan gambar
+  - render_titik(), render_garis(), render_kotak(), render_lingkaran()
+  - render_teks(): Rendering teks dengan font yang dimuat
+  - jendela_buat() / jendela_hapus(): Manajemen jendela
+  - gpu_aktifkan(), gpu_render(): Akselerasi GPU
+
+
+6.5 Perbandingan Kompleksitas
+-----------------------------
+
++------------------+-------------------+-------------------+
+| Metrik           | X11/Wayland       | LibPigura         |
++------------------+-------------------+-------------------+
+| Kode (baris)     | ~500,000+         | ~5,000            |
++------------------+-------------------+-------------------+
+| Komunikasi       | Socket IPC        | Langsung (call)   |
++------------------+-------------------+-------------------+
+| Overhead         | Tinggi            | Minimal           |
++------------------+-------------------+-------------------+
+| Network Transp.  | Ya                | Tidak             |
++------------------+-------------------+-------------------+
+| GPU Support      | Via DRM/KMS       | Langsung          |
++------------------+-------------------+-------------------+
+| Penghematan      | -                 | ~99% kode         |
++------------------+-------------------+-------------------+
+
+Tabel 4: Perbandingan kompleksitas sistem grafis tradisional vs LibPigura
+
+
+================================================================================
+                      7. DEKOR - COMPOSITOR MINIMAL
+================================================================================
+
+7.1 Kenapa Perlu Compositor?
+----------------------------
+
+Menulis langsung ke framebuffer tanpa perantara memiliki beberapa kelemahan
+serius untuk sistem multi-aplikasi:
+
+  1. KEAMANAN
+     Semua aplikasi bisa menimpa area aplikasi lain. Aplikasi malicious bisa
+     menggambar di atas aplikasi lain tanpa batasan.
+
+  2. STABILITAS
+     Jika satu aplikasi crash, framebuffer bisa dalam state tidak konsisten
+     dan merusak tampilan semua aplikasi.
+
+  3. KOORDINASI
+     Butuh locking mechanism untuk mencegah race condition. Z-order management
+     menjadi kompleks tanpa koordinasi pusat.
+
+  4. FUNGSIONALITAS TERBATAS
+     Sulit mengimplementasikan resize window, drag, minimize, dan efek visual.
+
+Dekor hadir sebagai solusi: compositor minimal yang mengelola semua window
+dan merender ke framebuffer secara terkoordinasi.
+
+
+7.2 Arsitektur Dekor
+--------------------
+
+Dekor adalah compositor ringka yang mengelola:
+  - Backbuffer untuk setiap aplikasi (isolasi)
+  - Clipping region (tidak saling menimpa)
+  - Z-order / layer management
+  - Event routing ke aplikasi yang tepat
+  - Efek visual opsional (shadow, transparency)
+
+Alur rendering Dekor:
+
+  +------------------+     +------------------+
+  | Aplikasi A       |     | Aplikasi B       |
+  | (backbuffer)     |     | (backbuffer)     |
+  +--------+---------+     +--------+---------+
+           |                        |
+           v                        v
+  +--------------------------------------------+
+  |                DEKOR COMPOSITOR            |
+  |  - Clipping                                |
+  |  - Z-order sorting                         |
+  |  - Compositing                             |
+  |  - Efek visual (opsional)                  |
+  +--------------------+-----------------------+
+                       |
+                       v
+  +--------------------------------------------+
+  |              FRAMEBUFFER                   |
+  |           (tampilan akhir)                 |
+  +--------------------------------------------+
+
+Struktur direktori Dekor:
+
+SUMBER/dekor/
+├── core/                    # Core compositor
+│   ├── dekor.c             # Main interface
+│   ├── compositor.c        # Compositing engine
+│   ├── render.c            # Render loop
+│   ├── init.c              # Inisialisasi
+│   └── destroy.c           # Cleanup
+│
+├── buffer/                  # Buffer management
+│   ├── buffer.c            # Buffer abstraction
+│   ├── backbuffer.c        # Per-window backbuffer
+│   ├── surface.c           # Drawing surface
+│   ├── damage.c            # Damage tracking (optimasi)
+│   └── swap.c              # Buffer swap
+│
+├── event/                   # Event routing
+│   ├── event.c             # Event structure
+│   ├── dispatcher.c        # Event dispatcher
+│   ├── input.c             # Input events
+│   ├── focus.c             # Focus management
+│   └── pointer.c           # Mouse/pointer events
+│
+├── clip/                    # Clipping
+│   ├── clip.c              # Clip engine
+│   ├── region.c            # Clip region
+│   ├── rect.c              # Rectangle operations
+│   ├── union.c             # Region union
+│   └── intersect.c         # Region intersection
+│
+├── layer/                   # Z-order management
+│   ├── layer.c             # Layer abstraction
+│   ├── z_order.c           # Z-order tracking
+│   ├── stack.c             # Window stack
+│   ├── raise.c             # Bring to front
+│   └── lower.c             # Send to back
+│
+└── efek/                    # Visual effects (opsional)
+    ├── efek.c              # Effect engine
+    ├── shadow.c            # Window shadow
+    ├── blur.c              # Blur effect
+    ├── transparency.c      # Alpha blending
+    └── animasi.c           # Window animation
+
+
+7.3 Komponen Dekor
+------------------
+
+CORE (core/):
+  - dekor.c: Interface utama, API publik
+  - compositor.c: Engine yang menggabungkan semua window
+  - render.c: Loop render utama
+  - init.c: Setup compositor, alokasi buffer
+  - destroy.c: Cleanup saat shutdown
+
+BUFFER (buffer/):
+  - Setiap aplikasi memiliki backbuffer sendiri
+  - Aplikasi menggambar ke backbuffer, bukan framebuffer langsung
+  - Damage tracking: hanya render area yang berubah
+
+EVENT (event/):
+  - Router event ke aplikasi yang tepat
+  - Focus management: aplikasi mana yang aktif
+  - Pointer events: mouse movement, click
+
+CLIP (clip/):
+  - Menentukan area yang boleh digambar
+  - Window tidak bisa menggambar di luar area mereka
+  - Region operations: union, intersection
+
+LAYER (layer/):
+  - Z-order: window mana di atas yang mana
+  - Raise/lower: ubah urutan window
+  - Stack management: daftar semua window
+
+EFEK (efek/):
+  - Opsional, bisa di-disable untuk performa
+  - Shadow, transparency, blur
+  - Animasi: minimize, maximize, close
+
+
+7.4 Keuntungan Compositor Minimal
+---------------------------------
+
++------------------+-------------------+-------------------+
+| Aspek            | Tanpa Compositor  | Dengan Dekor      |
++------------------+-------------------+-------------------+
+| Keamanan         | Tidak ada         | Isolasi penuh     |
++------------------+-------------------+-------------------+
+| Stabilitas       | Crash = rusak     | Crash = 1 window  |
++------------------+-------------------+-------------------+
+| Multi-window     | Chaos             | Terkoordinasi     |
++------------------+-------------------+-------------------+
+| Efek visual      | Tidak bisa        | Opsional          |
++------------------+-------------------+-------------------+
+| Ukuran kode      | 0 KB              | ~30-50 KB         |
++------------------+-------------------+-------------------+
+| Overhead render  | 0%                | ~5-10%            |
++------------------+-------------------+-------------------+
+
+Tabel 5: Perbandingan dengan dan tanpa compositor
+
+Dekor dirancang minimal (~30-50 KB) dibandingkan:
+  - X11: ~500 MB
+  - Wayland (Weston): ~50-100 MB
+  - Windows DWM: ~100+ MB
+
+API Dekor (konsep):
+
+  /* Inisialisasi */
+  int dekor_mulai(void);
+  void dekor_selesai(void);
+
+  /* Window management */
+  int dekor_jendela_buat(int x, int y, int lebar, int tinggi);
+  void dekor_jendela_hapus(int id);
+  void dekor_jendela_tampilkan(int id);
+  void dekor_jendela_sembunyikan(int id);
+
+  /* Buffer */
+  uint32_t *dekor_buffer_dapatkan(int id);
+  void dekor_buffer_submit(int id);
+
+  /* Z-order */
+  void dekor_jendela_raise(int id);
+  void dekor_jendela_lower(int id);
+
+  /* Event */
+  int dekor_event_poll(struct dekor_event *ev);
+
+
+================================================================================
+                            8. SISTEM FONT
+================================================================================
+
+8.1 Bitmap vs Vector Font
+-------------------------
+
+Bitmap font menyimpan setiap karakter sebagai array pixel yang dirender 
+langsung ke framebuffer. Pendekatan ini sangat sederhana dan cepat, namun 
+memiliki keterbatasan: font tidak bisa di-scale dan terlihat pecah jika 
+diperbesar. Untuk setiap ukuran font yang berbeda, diperlukan file font 
+terpisah.
+
+Vector font seperti TTF dan OTF menyimpan karakter sebagai kurva matematika 
+(Bezier curves) yang dapat di-scale ke ukuran berapa pun tanpa kehilangan 
+kualitas. Namun, rendering vector font memerlukan parser kompleks dan proses 
+rasterisasi yang lebih berat. Library FreeType yang umum digunakan memiliki 
+ukuran sekitar 200KB, yang mungkin terlalu besar untuk filosofi minimalis 
+Pigura OS.
+
+
+8.2 Rekomendasi: Pendekatan Hybrid
+----------------------------------
+
+Untuk Pigura OS, pendekatan hybrid direkomendasikan:
+
+  - BITMAP FONT untuk kebutuhan sistem:
+    * Boot menu
+    * Dialog sistem
+    * Terminal
+    * File manager
+    * Performa maksimal, ukuran minimal
+
+  - TTF/OTF (opsional) untuk aplikasi yang membutuhkan:
+    * Editor gambar
+    * PDF viewer
+    * Word processor
+
+Sistem caching menjadi komponen penting. Glyph dari font vektor yang sudah 
+di-render akan disimpan sebagai bitmap dalam cache. Render hanya dilakukan 
+sekali untuk setiap karakter pada ukuran tertentu.
+
+
+8.3 Format Pigura Font (.pf)
+----------------------------
+
+Pigura OS mendefinisikan format font bitmap sendiri dengan ekstensi .pf 
+(Pigura Font):
+
+Struktur Header (16 byte):
+  +--------+--------+----------------------------------+
+  | Offset | Ukuran | Deskripsi                        |
+  +--------+--------+----------------------------------+
+  | 0      | 4      | Magic: "PFNT"                    |
+  +--------+--------+----------------------------------+
+  | 4      | 1      | Versi format                     |
+  +--------+--------+----------------------------------+
+  | 5      | 1      | Tinggi font (pixel)              |
+  +--------+--------+----------------------------------+
+  | 6      | 1      | Baseline offset                  |
+  +--------+--------+----------------------------------+
+  | 7      | 1      | Reserved                         |
+  +--------+--------+----------------------------------+
+  | 8      | 4      | Jumlah glyph                     |
+  +--------+--------+----------------------------------+
+  | 12     | 4      | Offset ke data glyph             |
+  +--------+--------+----------------------------------+
+
+
+8.4 Rencana Implementasi Bertahap
+---------------------------------
+
+FASE 1 - Bitmap Font (Awal):
+  - Font default 8x8 built-in langsung di kernel
+  - Dukungan format .pf untuk font tambahan
+  - Rendering cepat untuk UI sistem
+
+FASE 2 - Cache System:
+  - Cache glyph yang sudah di-render
+  - Pre-render saat boot untuk font umum
+
+FASE 3 - TTF Support (Opsional):
+  - Parser TTF/OTF minimal
+  - Rasterisasi dengan cache
+  - Untuk aplikasi yang membutuhkan font fleksibel
+
+
+================================================================================
+                          9. SISTEM FILE
+================================================================================
+
+9.1 Filesystem yang Didukung
+----------------------------
+
+Pigura OS mendukung multiple filesystem untuk kompatibilitas maksimal:
+
++------------+------------+----------------------------------------+
+| Filesystem | Tipe       | Keterangan                            |
++------------+------------+----------------------------------------+
+| FAT32      | Read/Write | Flash drive, SD card, kompatibel      |
+|            |            | universal                             |
++------------+------------+----------------------------------------+
+| NTFS       | Read/Write | Partisi Windows, dengan kompresi      |
++------------+------------+----------------------------------------+
+| ext2       | Read/Write | Linux native                          |
+| ext3/ext4  | Read-only  | Kompatibel dengan ext2 (tanpa journal)|
++------------+------------+----------------------------------------+
+| ISO9660    | Read-only  | CD/DVD, dengan RockRidge & Joliet     |
++------------+------------+----------------------------------------+
+| initramfs  | Read-only  | Boot image, format cpio               |
++------------+------------+----------------------------------------+
+| PiguraFS   | Read/Write | Native filesystem dengan journaling   |
++------------+------------+----------------------------------------+
+
+
+9.2 Virtual File System (VFS)
+-----------------------------
+
+VFS adalah abstraksi yang menyatukan semua filesystem dalam satu interface:
+
+SUMBER/berkas/vfs/
+├── vfs.c                  # Core VFS
+├── filesystem.c           # Filesystem registration
+├── mount.c                # Mount/unmount
+├── inode.c                # Inode operations
+├── dentry.c               # Directory entry cache
+├── file.c                 # File operations
+├── superblock.c           # Superblock management
+└── namei.c                # Pathname resolution
+
+
+9.3 FAT32
+---------
+
+Driver FAT32 untuk kompatibilitas dengan flash drive dan SD card:
+
+SUMBER/berkas/fat32/
+├── fat32.c                # Core driver
+├── fat32_boot.c           # Boot sector parsing
+├── fat32_fat.c            # FAT table operations
+├── fat32_dir.c            # Directory operations
+├── fat32_file.c           # File operations
+├── fat32_cluster.c        # Cluster chain management
+└── fat32_lfn.c            # Long filename support
+
+
+9.4 NTFS
+--------
+
+Driver NTFS untuk kompatibilitas dengan partisi Windows:
+
+SUMBER/berkas/ntfs/
+├── ntfs.c                 # Core driver
+├── ntfs_boot.c            # Boot sector
+├── ntfs_mft.c             # Master File Table
+├── ntfs_attrib.c          # Attribute parsing
+├── ntfs_dir.c             # Directory operations
+├── ntfs_file.c            # File operations
+├── ntfs_index.c           # Index allocation
+└── ntfs_compress.c        # Decompression support
+
+
+9.5 ext2
+--------
+
+Driver ext2 dengan kompatibilitas read-only untuk ext3/ext4:
+
+SUMBER/berkas/ext2/
+├── ext2.c                 # Core driver
+├── ext2_super.c           # Superblock
+├── ext2_inode.c           # Inode operations
+├── ext2_dir.c             # Directory operations
+├── ext2_file.c            # File operations
+├── ext2_group.c           # Block group descriptor
+└── ext2_bitmap.c          # Inode/block bitmap
+
+
+9.6 ISO9660
+-----------
+
+Driver ISO9660 untuk CD/DVD dengan ekstensi:
+
+SUMBER/berkas/iso9660/
+├── iso9660.c              # Core driver
+├── iso9660_primary.c      # Primary volume descriptor
+├── iso9660_dir.c          # Directory operations
+├── iso9660_file.c         # File operations
+├── rockridge.c            # RockRidge extensions (Unix)
+└── joliet.c               # Joliet extensions (Unicode)
+
+
+9.7 initramfs
+-------------
+
+initramfs untuk loading image boot:
+
+SUMBER/berkas/initramfs/
+├── initramfs.c            # Core driver
+├── cpio.c                 # CPIO format parsing
+└── initramfs_extract.c    # Extraction
+
+
+9.8 PiguraFS (Native)
+---------------------
+
+PiguraFS adalah filesystem native dengan fitur modern:
+
+SUMBER/berkas/pigurafs/
+├── pigurafs.c             # Core driver
+├── pigurafs_super.c       # Superblock
+├── pigurafs_inode.c       # Inode operations
+├── pigurafs_dir.c         # Directory operations
+├── pigurafs_file.c        # File operations
+├── pigurafs_btree.c       # B-tree indexing
+├── pigurafs_extent.c      # Extent-based allocation
+└── pigurafs_journal.c     # Journaling untuk keamanan data
+
+Fitur PiguraFS:
+  - Journaling untuk crash recovery
+  - B-tree untuk pencarian cepat
+  - Extent-based allocation (mengurangi fragmentasi)
+  - Metadata extended
+  - Support file besar (>4GB)
+
+
+================================================================================
+                         10. SISTEM USER MODE
+================================================================================
+
+10.1 Ring Protection
+--------------------
+
+Pigura OS menggunakan x86 protection rings untuk isolasi:
+
+  Ring 0: Kernel mode
+    - Akses penuh ke hardware
+    - Semua instruksi CPU tersedia
+    - Memory unprotected
+
+  Ring 3: User mode
+    - Akses terbatas
+    - Instruksi privileged tidak tersedia
+    - Memory protected via paging
+
+Switch dari Ring 0 ke Ring 3 dilakukan via:
+  - Setup TSS (Task State Segment)
+  - Setup user segments (DS, ES, FS, GS)
+  - IRET dengan CPL=3
+
+
+10.2 System Call
+----------------
+
+System call adalah mekanisme user mode untuk meminta layanan kernel:
+
+System Call Table (contoh):
+  +-----+------------------+--------------------------------+
+  | ID  | System Call      | Deskripsi                      |
+  +-----+------------------+--------------------------------+
+  | 0   | sys_read         | Baca dari file descriptor      |
+  | 1   | sys_write        | Tulis ke file descriptor       |
+  | 2   | sys_open         | Buka file                      |
+  | 3   | sys_close        | Tutup file descriptor          |
+  | 4   | sys_fork         | Duplikasi proses               |
+  | 5   | sys_exec         | Eksekusi program               |
+  | 6   | sys_exit         | Terminasi proses               |
+  | 7   | sys_getpid       | Dapatkan process ID            |
+  | ... | ...              | ...                            |
+  +-----+------------------+--------------------------------+
+
+Implementasi per arsitektur:
+
+  x86:
+    - int 0x80 atau sysenter
+    - EAX = syscall number
+    - EBX, ECX, EDX, ESI, EDI = parameters
+
+  x86_64:
+    - syscall instruction
+    - RAX = syscall number
+    - RDI, RSI, RDX, R10, R8, R9 = parameters
+
+  ARM:
+    - SVC instruction
+    - R0 = syscall number
+    - R1-R6 = parameters
+
+
+10.3 Process Management
+-----------------------
+
+Process Control Block (PCB):
+
+  struct pcb {
+      int pid;                    // Process ID
+      int ppid;                   // Parent PID
+      int state;                  // RUNNING, READY, BLOCKED
+      void *stack_kernel;         // Kernel stack
+      void *stack_user;           // User stack
+      struct context context;     // Saved registers
+      struct page_dir *page_dir;  // Address space
+      int priority;               // Scheduling priority
+      // ... fields lainnya
+  };
+
+Scheduler:
+  - Priority-based round robin
+  - Timer interrupt triggers context switch
+  - Support untuk blocking I/O
+
+
+================================================================================
+                    11. STRUKTUR DIREKTORI PROYEK
+================================================================================
+
+11.1 Layout Direktori Utama
+---------------------------
+
+PIGURA/
+├── SUMBER/                 # Source code
+│   ├── kernel/             # Kernel core
+│   ├── arsitektur/         # Arch-specific code
+│   ├── libc/               # C library terpadu
+│   ├── pigura/             # LibPigura graphics
+│   ├── dekor/              # Compositor
+│   ├── perangkat/          # Device drivers & IC detection
+│   ├── berkas/             # Filesystem drivers
+│   └── aplikasi/           # User applications
+│
+├── BUILD/                  # Build output
+│   ├── x86/
+│   ├── x86_64/
+│   ├── arm/
+│   └── armv7/
+│
+├── ALAT/                   # Tools
+│   ├── compiler/           # Cross-compiler
+│   ├── emulator/           # QEMU, etc
+│   └── scripts/            # Build scripts
+│
+├── DOKUMENTASI/            # Documentation
+│
+└── Makefile                # Main build file
+
+
+11.2 Struktur Lengkap
+---------------------
+
+PIGURA/
+├── SUMBER/
+│   │
+│   ├── kernel/                     # Kernel Core
+│   │   ├── main.c                  # Entry point
+│   │   ├── gdt.c, idt.c            # Descriptor tables
+│   │   ├── isr.c, irq.c            # Interrupt handlers
+│   │   ├── timer.c, pit.c          # Timer
+│   │   ├── panic.c                 # Kernel panic
+│   │   └── printk.c                # Kernel printf
+│   │
+│   ├── arsitektur/                 # Architecture-specific
+│   │   ├── x86/
+│   │   ├── x86_64/
+│   │   ├── arm/
+│   │   └── armv7/
+│   │
+│   ├── libc/                       # C Library (73 file)
+│   │   ├── include/                # Headers
+│   │   ├── internal/               # Internal impl
+│   │   ├── stdio/                  # I/O
+│   │   ├── stdlib/                 # Utilitas
+│   │   ├── string/                 # String ops
+│   │   ├── ctype/                  # Character
+│   │   ├── unistd/                 # POSIX
+│   │   ├── fcntl/                  # File control
+│   │   ├── signal/                 # Signal
+│   │   ├── time/                   # Time
+│   │   ├── math/                   # Math (opsional)
+│   │   ├── setjmp/                 # Non-local jump
+│   │   └── network/                # Network (opsional)
+│   │
+│   ├── pigura/                     # LibPigura
+│   │   ├── kanvas/
+│   │   ├── render/
+│   │   ├── gpu_accel/
+│   │   ├── teks/
+│   │   └── jendela/
+│   │
+│   ├── dekor/                      # Compositor
+│   │   ├── core/
+│   │   ├── buffer/
+│   │   ├── event/
+│   │   ├── clip/
+│   │   ├── layer/
+│   │   └── efek/
+│   │
+│   ├── perangkat/                  # Device drivers
+│   │   ├── ic/                     # IC Detection System
+│   │   │   ├── database/
+│   │   │   ├── probe/
+│   │   │   └── driver_generik/
+│   │   ├── tampilan/               # Display
+│   │   │   ├── framebuffer/
+│   │   │   └── gpu/
+│   │   ├── masukan/                # Input
+│   │   ├── jaringan/               # Network
+│   │   ├── penyimpanan/            # Storage
+│   │   └── suara/                  # Audio
+│   │
+│   ├── berkas/                     # Filesystem
+│   │   ├── vfs/
+│   │   ├── fat32/
+│   │   ├── ntfs/
+│   │   ├── ext2/
+│   │   ├── iso9660/
+│   │   ├── initramfs/
+│   │   └── pigurafs/
+│   │
+│   └── aplikasi/                   # User applications
+│       ├── shell/
+│       ├── editor/
+│       └── utilitas/
+│
+├── BUILD/
+│   ├── x86/
+│   │   ├── kernel.bin
+│   │   ├── pigura.iso
+│   │   └── initramfs.cpio
+│   ├── x86_64/
+│   ├── arm/
+│   └── armv7/
+│
+├── ALAT/
+│   ├── compiler/
+│   │   ├── i686-pigura-*
+│   │   ├── x86_64-pigura-*
+│   │   └── arm-pigura-*
+│   ├── emulator/
+│   │   └── qemu/
+│   └── scripts/
+│       ├── build.sh
+│       └── test.sh
+│
+├── DOKUMENTASI/
+│   ├── pigura.txt                  # Dokumen ini
+│   ├── API.md                      # API reference
+│   └── CONTRIBUTE.md               # Contribution guide
+│
+├── Makefile
+└── README.md
+
+
+================================================================================
+                    12. ESTIMASI UKURAN DAN KOMPLEKSITAS
+================================================================================
+
+Estimasi Komponen:
++---------------------------+------------+------------+
+| Komponen                  | File       | Est. Size  |
++---------------------------+------------+------------+
+| Kernel Core               | ~30        | ~100 KB    |
++---------------------------+------------+------------+
+| LibC (73 file)            | 73         | ~150 KB    |
++---------------------------+------------+------------+
+| LibPigura                 | ~40        | ~80 KB     |
++---------------------------+------------+------------+
+| Dekor Compositor          | ~30        | ~50 KB     |
++---------------------------+------------+------------+
+| IC Detection System       | ~25        | ~60 KB     |
++---------------------------+------------+------------+
+| Filesystem Drivers        | ~45        | ~120 KB    |
++---------------------------+------------+------------+
+| Architecture (per arch)   | ~20        | ~50 KB     |
++---------------------------+------------+------------+
+| Device Drivers Generik    | ~15        | ~40 KB     |
++---------------------------+------------+------------+
+| Bootloader                | ~5         | ~10 KB     |
++---------------------------+------------+------------+
+| Aplikasi Dasar            | ~10        | ~50 KB     |
++---------------------------+------------+------------+
+| TOTAL                     | ~300 file  | ~5-6 MB    |
++---------------------------+------------+------------+
+
+Tabel 6: Estimasi ukuran komponen Pigura OS
+
+
+================================================================================
+                    13. DAFTAR IMPLEMENTASI PRIORITAS
+================================================================================
+
+PRIORITAS TINGGI (MVP):
+  [ ] Bootloader text-based (Pigura C90 + inline assembly)
+  [ ] Kernel basic (GDT, IDT, ISR, IRQ)
+  [ ] Framebuffer console
+  [ ] Memory management (pmm, vmm)
+  [ ] LibC core (stdio, stdlib, string)
+  [ ] FAT32 read support
+  [ ] Basic shell
+
+PRIORITAS SEDANG:
+  [ ] IC Detection System
+  [ ] Driver generik (storage, display)
+  [ ] LibPigura basic rendering
+  [ ] FAT32 write support
+  [ ] Process management
+  [ ] Dekor compositor basic
+
+PRIORITAS RENDAH:
+  [ ] NTFS support
+  [ ] ext2 support
+  [ ] GPU acceleration
+  [ ] Network support
+  [ ] PiguraFS
+  [ ] Advanced Dekor effects
+
+
+================================================================================
+                    14. SISTEM BUILD MULTI-ARSITEKTUR
+================================================================================
+
+Makefile Utama:
+
+  # Arsitektur target
+  ARSITEKTUR ?= x86
+  
+  # Compiler per arsitektur
+  ifeq ($(ARSITEKTUR),x86)
+      CC = i686-pigura-gcc
+      CFLAGS = -m32 -ffreestanding
+  endif
+  
+  ifeq ($(ARSITEKTUR),x86_64)
+      CC = x86_64-pigura-gcc
+      CFLAGS = -m64 -ffreestanding
+  endif
+  
+  ifeq ($(ARSITEKTUR),arm)
+      CC = arm-pigura-gcc
+      CFLAGS = -marm -ffreestanding
+  endif
+  
+  # Source files
+  SRCS = $(wildcard SUMBER/kernel/*.c)
+  SRCS += $(wildcard SUMBER/arsitektur/$(ARSITEKTUR)/**/*.c)
+  SRCS += $(wildcard SUMBER/libc/**/*.c)
+  
+  # Output
+  TARGET = BUILD/$(ARSITEKTUR)/kernel.bin
+  
+  all: $(TARGET)
+  
+  $(TARGET): $(SRCS)
+      $(CC) $(CFLAGS) -o $@ $^
+
+Usage:
+  make ARSITEKTUR=x86       # Build untuk 32-bit
+  make ARSITEKTUR=x86_64    # Build untuk 64-bit
+  make ARSITEKTUR=arm       # Build untuk ARM
+
+
+================================================================================
+                            15. KESIMPULAN
+================================================================================
+
+Pigura OS adalah sistem operasi ORIGINAL yang ditulis dari scratch dengan 
+karakteristik utama:
+
+  1. IDENTITAS UNIK
+     - Bukan fork Linux/Unix
+     - Unix-like, POSIX-compatible (subset)
+     - Desain dan implementasi sendiri
+
+  2. PIGURA C90
+     - C89 Core + POSIX Safe Functions
+     - Tanpa macro, tanpa dualisme
+     - Semua fungsi aman secara default
+
+  3. LIBC TERPADU
+     - 73 file, ~160 fungsi aman
+     - Tidak ada fungsi berbahaya
+     - Filosofi "satu fungsi, satu tujuan"
+
+  4. MINIMALIS
+     - Total ~300 file, ~5-6 MB
+     - Hanya komponen yang diperlukan
+     - Tanpa X11/Wayland
+
+  5. PORTABEL
+     - Multi-arsitektur (x86, x86_64, ARM, ARMv7)
+     - Hardware Abstraction Layer
+     - Single source tree
+
+  6. AMAN
+     - IC Detection dengan parameter aman
+     - Compositor untuk isolasi aplikasi
+     - Fungsi bounds-checked
+
+Dengan pendekatan ini, Pigura OS menjadi sistem operasi yang:
+  - Mudah dipahami dan dipelihara
+  - Ringkas namun fungsional
+  - Memiliki identitas sendiri
+  - Portabel ke berbagai platform
+
+
+================================================================================
+                              LAMPIRAN
+================================================================================
+
+A. Referensi Standar
+--------------------
+
+  - ISO/IEC 9899:1990 (C89/C90)
+  - IEEE Std 1003.1 (POSIX.1-2008) - subset safe functions
+  - Intel 64 and IA-32 Architectures Software Developer's Manual
+  - ARM Architecture Reference Manual
+
+
+B. Lisensi
+----------
+
+  Seluruh kode Pigura OS dibagikan untuk tujuan edukasi dan pembelajaran.
+
+
+C. Kontribusi
+-------------
+
+  Silakan baca DOKUMENTASI/CONTRIBUTE.md untuk panduan kontribusi.
+
+
+================================================================================
+                           AKHIR DOKUMEN
+================================================================================
