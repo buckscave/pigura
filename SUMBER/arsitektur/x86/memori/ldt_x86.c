@@ -1,448 +1,387 @@
 /*
- * =============================================================================
- * PIGURA OS - INTERRUPT DESCRIPTOR TABLE (IDT) x86
- * =============================================================================
- *
- * Berkas ini berisi implementasi Interrupt Descriptor Table (IDT) untuk
- * arsitektur x86. IDT mendefinisikan handler untuk setiap interrupt dan
- * exception yang dapat terjadi pada CPU.
- *
- * Struktur IDT:
- *   - Entry 0-19:  CPU Exceptions (wajib)
- *   - Entry 20-31: Reserved
- *   - Entry 32-47: IRQ 0-15
- *   - Entry 48-255: Software Interrupts (syscall, dll)
- *
- * Arsitektur: x86 (32-bit protected mode)
- * Versi: 1.0
- * =============================================================================
- */
-
-#include <stdint.h>
-#include <stddef.h>
-
-/* =============================================================================
- * KONSTANTA
- * =============================================================================
- */
-
-/* Jumlah entry IDT */
-#define IDT_JUMLAH_ENTRY        256
-
-/* Vektor exception CPU */
-#define IDT_VEKTOR_DE           0       /* Divide Error */
-#define IDT_VEKTOR_DB           1       /* Debug Exception */
-#define IDT_VEKTOR_NMI          2       /* NMI Interrupt */
-#define IDT_VEKTOR_BP           3       /* Breakpoint */
-#define IDT_VEKTOR_OF           4       /* Overflow */
-#define IDT_VEKTOR_BR           5       /* BOUND Range Exceeded */
-#define IDT_VEKTOR_UD           6       /* Invalid Opcode */
-#define IDT_VEKTOR_NM           7       /* Device Not Available */
-#define IDT_VEKTOR_DF           8       /* Double Fault */
-#define IDT_VEKTOR_TS           10      /* Invalid TSS */
-#define IDT_VEKTOR_NP           11      /* Segment Not Present */
-#define IDT_VEKTOR_SS           12      /* Stack-Segment Fault */
-#define IDT_VEKTOR_GP           13      /* General Protection */
-#define IDT_VEKTOR_PF           14      /* Page Fault */
-#define IDT_VEKTOR_MF           16      /* x87 FPU Error */
-#define IDT_VEKTOR_AC           17      /* Alignment Check */
-#define IDT_VEKTOR_MC           18      /* Machine Check */
-#define IDT_VEKTOR_XF           19      /* SIMD Exception */
-
-/* Vektor IRQ */
-#define IDT_VEKTOR_IRQ0         32      /* Timer */
-#define IDT_VEKTOR_IRQ1         33      /* Keyboard */
-#define IDT_VEKTOR_IRQ2         34      /* Cascade */
-#define IDT_VEKTOR_IRQ3         35      /* COM2 */
-#define IDT_VEKTOR_IRQ4         36      /* COM1 */
-#define IDT_VEKTOR_IRQ5         37      /* LPT2 */
-#define IDT_VEKTOR_IRQ6         38      /* Floppy */
-#define IDT_VEKTOR_IRQ7         39      /* LPT1 */
-#define IDT_VEKTOR_IRQ8         40      /* RTC */
-#define IDT_VEKTOR_IRQ9         41      /* Free */
-#define IDT_VEKTOR_IRQ10        42      /* Free */
-#define IDT_VEKTOR_IRQ11        43      /* Free */
-#define IDT_VEKTOR_IRQ12        44      /* PS/2 Mouse */
-#define IDT_VEKTOR_IRQ13        45      /* FPU */
-#define IDT_VEKTOR_IRQ14        46      /* Primary ATA */
-#define IDT_VEKTOR_IRQ15        47      /* Secondary ATA */
-
-/* Vektor syscall */
-#define IDT_VEKTOR_SYSCALL      128     /* 0x80 - System call */
-
-/* Flag deskriptor IDT */
-#define IDT_FLAG_GATETYPE_TASK   0x05   /* Task gate */
-#define IDT_FLAG_GATETYPE_INT    0x0E   /* Interrupt gate (32-bit) */
-#define IDT_FLAG_GATETYPE_TRAP   0x0F   /* Trap gate (32-bit) */
-
-#define IDT_FLAG_PRESENT         0x80   /* Descriptor present */
-#define IDT_FLAG_DPL0            0x00   /* Privilege level 0 */
-#define IDT_FLAG_DPL3            0x60   /* Privilege level 3 */
-#define IDT_FLAG_STORAGE         0x00   /* Storage segment (must be 0) */
-
-/* Selector untuk IDT */
-#define IDT_SELECTOR_KODE        0x08   /* Kernel code selector */
-
-/* =============================================================================
- * STRUKTUR DATA
- * =============================================================================
- */
-
-/*
- * Entry IDT (8 byte)
- * Mendefinisikan satu interrupt gate dalam IDT.
- */
-struct idt_entry {
-    uint16_t offset_rendah;     /* Bit 0-15 dari handler address */
-    uint16_t selector;          /* Code segment selector */
-    uint8_t  nol;               /* Reserved, harus 0 */
-    uint8_t  flags;             /* Type dan attribute flags */
-    uint16_t offset_atas;       /* Bit 16-31 dari handler address */
-} __attribute__((packed));
-
-/*
- * Pointer IDT (6 byte)
- * Struktur untuk instruksi LIDT.
- */
-struct idt_pointer {
-    uint16_t batas;             /* Ukuran IDT minus 1 */
-    uint32_t basis;             /* Alamat IDT */
-} __attribute__((packed));
-
-/*
- * Struktur stack frame saat interrupt
- * Diteruskan ke handler C
- */
-struct int_frame {
-    uint32_t gs, fs, es, ds;                            /* Segment */
-    uint32_t edi, esi, ebp, esp_kolon, ebx, edx, ecx, eax;  /* Registers */
-    uint32_t int_no, err_code;                          /* Interrupt info */
-    uint32_t eip, cs, eflags, esp, ss;                  /* Saved by CPU */
-} __attribute__((packed));
-
-/* Tipe handler interrupt */
-typedef void (*handler_interrupt_t)(struct int_frame *frame);
-
-/* =============================================================================
- * VARIABEL GLOBAL
- * =============================================================================
- */
-
-/* Tabel IDT */
-static struct idt_entry g_tabel_idt[IDT_JUMLAH_ENTRY];
-
-/* Pointer IDT untuk LIDT */
-static struct idt_pointer g_pointer_idt;
-
-/* Array handler interrupt */
-static handler_interrupt_t g_handler[IDT_JUMLAH_ENTRY];
-
-/* Nama exception untuk pesan error */
-static const char *g_nama_exception[] = {
-    "Divide Error",              /* 0 */
-    "Debug Exception",           /* 1 */
-    "NMI Interrupt",             /* 2 */
-    "Breakpoint",                /* 3 */
-    "Overflow",                  /* 4 */
-    "BOUND Range Exceeded",      /* 5 */
-    "Invalid Opcode",            /* 6 */
-    "Device Not Available",      /* 7 */
-    "Double Fault",              /* 8 */
-    "Coprocessor Segment Overrun", /* 9 */
-    "Invalid TSS",               /* 10 */
-    "Segment Not Present",       /* 11 */
-    "Stack-Segment Fault",       /* 12 */
-    "General Protection",        /* 13 */
-    "Page Fault",                /* 14 */
-    "Reserved",                  /* 15 */
-    "x87 FPU Error",             /* 16 */
-    "Alignment Check",           /* 17 */
-    "Machine Check",             /* 18 */
-    "SIMD Exception"             /* 19 */
-};
-
-/* =============================================================================
- * FUNGSI INTERNAL
- * =============================================================================
- */
-
-/*
- * _atur_entry_idt
- * ---------------
- * Mengisi satu entry IDT dengan nilai yang diberikan.
- *
- * Parameter:
- *   index    - Index entry dalam IDT (0-255)
- *   handler  - Alamat handler interrupt
- *   selector - Code segment selector
- *   flags    - Flag deskriptor (type, DPL, present)
- */
-static void _atur_entry_idt(uint8_t index, uint32_t handler,
-                            uint16_t selector, uint8_t flags)
-{
-    struct idt_entry *entry;
-
-    entry = &g_tabel_idt[index];
-
-    /* Set offset handler */
-    entry->offset_rendah = (uint16_t)(handler & 0xFFFF);
-    entry->offset_atas = (uint16_t)((handler >> 16) & 0xFFFF);
-
-    /* Set selector */
-    entry->selector = selector;
-
-    /* Set flags */
-    entry->flags = flags;
-
-    /* Reserved field */
-    entry->nol = 0;
-}
-
-/*
- * _handler_exception_default
- * ---------------------------
- * Handler default untuk exception CPU yang tidak memiliki handler khusus.
- * Menampilkan informasi exception dan halt sistem.
- *
- * Parameter:
- *   frame - Stack frame saat interrupt terjadi
- */
-static void _handler_exception_default(struct int_frame *frame)
-{
-    const char *nama;
-    uint8_t no_exception;
-
-    no_exception = (uint8_t)frame->int_no;
-
-    /* Ambil nama exception */
-    if (no_exception < 20) {
-        nama = g_nama_exception[no_exception];
-    } else {
-        nama = "Unknown Exception";
-    }
-
-    /* Tampilkan pesan error via VGA console */
-    /* Format: "EXCEPTION: [nama] (nomor) at EIP=[alamat]" */
-    
-    /* Untuk sekarang, halt sistem */
-    /* Implementasi console akan ditambahkan kemudian */
-    
-    __asm__ __volatile__(
-        "cli\n\t"
-        "hlt\n\t"
-    );
-
-    /* Supaya compiler tidak complain */
-    (void)nama;
-}
-
-/*
- * _handler_irq_default
+ * PIGURA OS - LDT x86
  * --------------------
- * Handler default untuk IRQ yang tidak memiliki handler khusus.
+ * Implementasi Local Descriptor Table untuk arsitektur x86.
  *
- * Parameter:
- *   frame - Stack frame saat interrupt terjadi
+ * Berkas ini berisi fungsi-fungsi untuk mengelola LDT yang
+ * digunakan untuk segmentasi per-proses.
+ *
+ * Arsitektur: x86 (32-bit)
+ * Versi: 1.0
  */
-static void _handler_irq_default(struct int_frame *frame)
-{
-    uint8_t irq_no;
 
-    irq_no = (uint8_t)(frame->int_no - IDT_VEKTOR_IRQ0);
+#include "../../../inti/kernel.h"
 
-    /* Acknowledge IRQ ke PIC */
-    /* Untuk IRQ 8-15, perlu acknowledge ke slave PIC */
-    if (irq_no >= 8) {
-        outb(0x20, 0xA0);           /* EOI ke slave PIC */
-    }
-    outb(0x20, 0x20);               /* EOI ke master PIC */
+/*
+ * ============================================================================
+ * KONSTANTA LDT
+ * ============================================================================
+ */
 
-    (void)irq_no;
-}
+/* Jumlah entry LDT */
+#define LDT_JUMLAH_ENTRY        8192
 
-/* =============================================================================
- * FUNGSI PUBLIC
- * =============================================================================
+/* Selector LDT */
+#define LDT_SELECTOR_MULAI      0x0000
+#define LDT_SELECTOR_AKHIR      0xFFFF
+
+/* Flag deskriptor */
+#define LDT_FLAG_ADA            0x80
+#define LDT_FLAG_DPL0           0x00
+#define LDT_FLAG_DPL3           0x60
+#define LDT_FLAG_KODE           0x0A
+#define LDT_FLAG_DATA           0x02
+#define LDT_FLAG_TULIS          0x02
+#define LDT_FLAG_BACA           0x02
+
+/* Granularitas */
+#define LDT_GRAN_BYTE           0x00
+#define LDT_GRAN_4KB            0x80
+#define LDT_32BIT               0x40
+
+/*
+ * ============================================================================
+ * STRUKTUR DATA
+ * ============================================================================
+ */
+
+/* Entry LDT (8 byte) */
+struct ldt_entry {
+    tak_bertanda16_t batas_rendah;
+    tak_bertanda16_t basis_rendah;
+    tak_bertanda8_t basis_tengah;
+    tak_bertanda8_t akses;
+    tak_bertanda8_t granularitas;
+    tak_bertanda8_t basis_atas;
+} __attribute__((packed));
+
+/* LDT pointer */
+struct ldt_pointer {
+    tak_bertanda16_t batas;
+    tak_bertanda32_t basis;
+} __attribute__((packed));
+
+/*
+ * ============================================================================
+ * VARIABEL GLOBAL
+ * ============================================================================
+ */
+
+/* LDT default untuk proses */
+static struct ldt_entry g_ldt_default[LDT_JUMLAH_ENTRY]
+    __attribute__((aligned(8)));
+
+/* LDT pointer */
+static struct ldt_pointer g_ldt_ptr;
+
+/*
+ * ============================================================================
+ * FUNGSI INTERNAL
+ * ============================================================================
  */
 
 /*
- * idt_init
- * --------
- * Menginisialisasi Interrupt Descriptor Table.
+ * _atur_entry_ldt
+ * ---------------
+ * Mengatur satu entry LDT.
  *
- * Fungsi ini membuat semua entry IDT dengan handler default dan
- * memuat IDT ke CPU.
+ * Parameter:
+ *   ldt   - Pointer ke tabel LDT
+ *   index - Index entry
+ *   basis - Alamat basis
+ *   batas - Batas segmen
+ *   akses - Byte akses
+ *   gran  - Byte granularitas
+ */
+static void _atur_entry_ldt(struct ldt_entry *ldt, tak_bertanda32_t index,
+                            tak_bertanda32_t basis, tak_bertanda32_t batas,
+                            tak_bertanda8_t akses, tak_bertanda8_t gran)
+{
+    struct ldt_entry *entry;
+
+    if (ldt == NULL || index >= LDT_JUMLAH_ENTRY) {
+        return;
+    }
+
+    entry = &ldt[index];
+
+    /* Isi basis */
+    entry->basis_rendah = (tak_bertanda16_t)(basis & 0xFFFF);
+    entry->basis_tengah = (tak_bertanda8_t)((basis >> 16) & 0xFF);
+    entry->basis_atas = (tak_bertanda8_t)((basis >> 24) & 0xFF);
+
+    /* Isi batas */
+    entry->batas_rendah = (tak_bertanda16_t)(batas & 0xFFFF);
+    entry->granularitas = (tak_bertanda8_t)((batas >> 16) & 0x0F);
+    entry->granularitas |= (gran & 0xF0);
+
+    /* Set akses */
+    entry->akses = akses;
+}
+
+/*
+ * ============================================================================
+ * FUNGSI PUBLIC
+ * ============================================================================
+ */
+
+/*
+ * ldt_init
+ * --------
+ * Menginisialisasi LDT.
  *
  * Return:
- *   0 jika berhasil, nilai negatif jika gagal
+ *   STATUS_BERHASIL jika berhasil
  */
-int idt_init(void)
+status_t ldt_init(void)
 {
-    int i;
+    /* Clear LDT */
+    kernel_memset(g_ldt_default, 0, sizeof(g_ldt_default));
 
-    /* Reset semua handler */
-    for (i = 0; i < IDT_JUMLAH_ENTRY; i++) {
-        g_handler[i] = (handler_interrupt_t)0;
+    /* Setup pointer */
+    g_ldt_ptr.batas = sizeof(g_ldt_default) - 1;
+    g_ldt_ptr.basis = (tak_bertanda32_t)g_ldt_default;
+
+    return STATUS_BERHASIL;
+}
+
+/*
+ * ldt_load
+ * --------
+ * Memuat LDT ke CPU.
+ *
+ * Parameter:
+ *   ldt  - Pointer ke tabel LDT
+ *   ukuran - Ukuran LDT dalam byte
+ *
+ * Return:
+ *   STATUS_BERHASIL jika berhasil
+ */
+status_t ldt_load(void *ldt, ukuran_t ukuran)
+{
+    struct ldt_pointer ptr;
+
+    if (ldt == NULL || ukuran == 0) {
+        return STATUS_PARAM_INVALID;
     }
 
-    /* Inisialisasi semua entry IDT dengan handler default */
-    for (i = 0; i < IDT_JUMLAH_ENTRY; i++) {
-        if (i < 32) {
-            /* Exception handlers - interrupt gate, DPL 0 */
-            _atur_entry_idt((uint8_t)i,
-                           (uint32_t)_handler_exception_default,
-                           IDT_SELECTOR_KODE,
-                           IDT_FLAG_PRESENT | IDT_FLAG_DPL0 |
-                           IDT_FLAG_GATETYPE_INT);
-        } else if (i < 48) {
-            /* IRQ handlers - interrupt gate, DPL 0 */
-            _atur_entry_idt((uint8_t)i,
-                           (uint32_t)_handler_irq_default,
-                           IDT_SELECTOR_KODE,
-                           IDT_FLAG_PRESENT | IDT_FLAG_DPL0 |
-                           IDT_FLAG_GATETYPE_INT);
-        } else if (i == IDT_VEKTOR_SYSCALL) {
-            /* Syscall - trap gate, DPL 3 (user dapat memanggil) */
-            _atur_entry_idt((uint8_t)i,
-                           (uint32_t)_handler_irq_default,
-                           IDT_SELECTOR_KODE,
-                           IDT_FLAG_PRESENT | IDT_FLAG_DPL3 |
-                           IDT_FLAG_GATETYPE_TRAP);
-        } else {
-            /* Software interrupts - interrupt gate, DPL 0 */
-            _atur_entry_idt((uint8_t)i,
-                           (uint32_t)_handler_irq_default,
-                           IDT_SELECTOR_KODE,
-                           IDT_FLAG_PRESENT | IDT_FLAG_DPL0 |
-                           IDT_FLAG_GATETYPE_INT);
-        }
-    }
+    ptr.batas = (tak_bertanda16_t)(ukuran - 1);
+    ptr.basis = (tak_bertanda32_t)ldt;
 
-    /* Setup pointer IDT */
-    g_pointer_idt.batas = sizeof(g_tabel_idt) - 1;
-    g_pointer_idt.basis = (uint32_t)&g_tabel_idt;
-
-    /* Load IDT */
+    /* Load LDT menggunakan LLDT instruction */
     __asm__ __volatile__(
-        "lidt %0\n\t"
+        "lldt %0\n\t"
         :
-        : "m"(g_pointer_idt)
+        : "m"(ptr.batas)
         : "memory"
     );
 
-    return 0;
+    return STATUS_BERHASIL;
 }
 
 /*
- * idt_set_handler
- * ---------------
- * Mengatur handler untuk vektor interrupt tertentu.
- *
- * Parameter:
- *   vektor  - Nomor vektor interrupt (0-255)
- *   handler - Pointer ke fungsi handler
- *
- * Return:
- *   0 jika berhasil, -1 jika vektor tidak valid
+ * ldt_load_default
+ * ----------------
+ * Memuat LDT default.
  */
-int idt_set_handler(uint8_t vektor, handler_interrupt_t handler)
+void ldt_load_default(void)
 {
-    if (vektor >= IDT_JUMLAH_ENTRY) {
-        return -1;
-    }
-
-    g_handler[vektor] = handler;
-
-    /* Update entry IDT dengan handler baru */
-    _atur_entry_idt(vektor,
-                   (uint32_t)handler,
-                   IDT_SELECTOR_KODE,
-                   g_tabel_idt[vektor].flags);
-
-    return 0;
+    /* Load default LDT */
+    __asm__ __volatile__(
+        "lldt %0\n\t"
+        :
+        : "m"(g_ldt_ptr.batas)
+        : "memory"
+    );
 }
 
 /*
- * idt_get_handler
- * ---------------
- * Mendapatkan handler untuk vektor interrupt tertentu.
- *
- * Parameter:
- *   vektor - Nomor vektor interrupt (0-255)
- *
- * Return:
- *   Pointer ke handler, atau NULL jika tidak ada
- */
-handler_interrupt_t idt_get_handler(uint8_t vektor)
-{
-    if (vektor >= IDT_JUMLAH_ENTRY) {
-        return (handler_interrupt_t)0;
-    }
-
-    return g_handler[vektor];
-}
-
-/*
- * idt_enable_interrupt
+ * ldt_buat_segmen_kode
  * --------------------
- * Enable interrupt (sti).
- */
-void idt_enable_interrupt(void)
-{
-    __asm__ __volatile__("sti\n\t");
-}
-
-/*
- * idt_disable_interrupt
- * ---------------------
- * Disable interrupt (cli).
- */
-void idt_disable_interrupt(void)
-{
-    __asm__ __volatile__("cli\n\t");
-}
-
-/*
- * idt_get_pointer
- * ---------------
- * Mendapatkan pointer ke struktur IDT pointer.
- *
- * Return:
- *   Pointer ke idt_pointer
- */
-const struct idt_pointer *idt_get_pointer(void)
-{
-    return &g_pointer_idt;
-}
-
-/*
- * idt_set_gate
- * ------------
- * Mengatur interrupt gate dengan parameter lengkap.
+ * Membuat deskriptor segmen kode di LDT.
  *
  * Parameter:
- *   vektor   - Nomor vektor interrupt
- *   handler  - Alamat handler
- *   selector - Code segment selector
- *   dpl      - Privilege level (0-3)
+ *   ldt   - Pointer ke tabel LDT
+ *   index - Index entry
+ *   basis - Alamat basis
+ *   batas - Batas segmen
+ *   dpl   - Privilege level (0-3)
  *
  * Return:
- *   0 jika berhasil, -1 jika gagal
+ *   Selector LDT
  */
-int idt_set_gate(uint8_t vektor, uint32_t handler,
-                 uint16_t selector, uint8_t dpl)
+tak_bertanda16_t ldt_buat_segmen_kode(void *ldt, tak_bertanda32_t index,
+                                       tak_bertanda32_t basis,
+                                       tak_bertanda32_t batas,
+                                       tak_bertanda8_t dpl)
 {
-    uint8_t flags;
+    tak_bertanda8_t akses;
+    tak_bertanda8_t gran;
+    struct ldt_entry *ldt_table;
 
-    if (vektor >= IDT_JUMLAH_ENTRY) {
-        return -1;
+    if (ldt == NULL || index >= LDT_JUMLAH_ENTRY || dpl > 3) {
+        return 0;
     }
 
-    /* Build flags */
-    flags = IDT_FLAG_PRESENT | IDT_FLAG_GATETYPE_INT;
-    flags |= (dpl & 0x03) << 5;
+    ldt_table = (struct ldt_entry *)ldt;
 
-    _atur_entry_idt(vektor, handler, selector, flags);
+    /* Buat akses byte */
+    akses = LDT_FLAG_ADA | LDT_FLAG_KODE | LDT_FLAG_BACA;
+    akses |= (dpl << 5);
 
-    return 0;
+    /* Granularitas 4 KB, 32-bit */
+    gran = LDT_GRAN_4KB | LDT_32BIT;
+
+    _atur_entry_ldt(ldt_table, index, basis, batas, akses, gran);
+
+    /* Return selector dengan TI=1 (LDT) */
+    return (tak_bertanda16_t)((index << 3) | (dpl & 0x03) | 0x04);
+}
+
+/*
+ * ldt_buat_segmen_data
+ * --------------------
+ * Membuat deskriptor segmen data di LDT.
+ *
+ * Parameter:
+ *   ldt   - Pointer ke tabel LDT
+ *   index - Index entry
+ *   basis - Alamat basis
+ *   batas - Batas segmen
+ *   dpl   - Privilege level (0-3)
+ *
+ * Return:
+ *   Selector LDT
+ */
+tak_bertanda16_t ldt_buat_segmen_data(void *ldt, tak_bertanda32_t index,
+                                       tak_bertanda32_t basis,
+                                       tak_bertanda32_t batas,
+                                       tak_bertanda8_t dpl)
+{
+    tak_bertanda8_t akses;
+    tak_bertanda8_t gran;
+    struct ldt_entry *ldt_table;
+
+    if (ldt == NULL || index >= LDT_JUMLAH_ENTRY || dpl > 3) {
+        return 0;
+    }
+
+    ldt_table = (struct ldt_entry *)ldt;
+
+    /* Buat akses byte */
+    akses = LDT_FLAG_ADA | LDT_FLAG_DATA | LDT_FLAG_TULIS;
+    akses |= (dpl << 5);
+
+    /* Granularitas 4 KB, 32-bit */
+    gran = LDT_GRAN_4KB | LDT_32BIT;
+
+    _atur_entry_ldt(ldt_table, index, basis, batas, akses, gran);
+
+    /* Return selector dengan TI=1 (LDT) */
+    return (tak_bertanda16_t)((index << 3) | (dpl & 0x03) | 0x04);
+}
+
+/*
+ * ldt_hapus_segmen
+ * ----------------
+ * Menghapus deskriptor segmen dari LDT.
+ *
+ * Parameter:
+ *   ldt   - Pointer ke tabel LDT
+ *   index - Index entry
+ *
+ * Return:
+ *   STATUS_BERHASIL jika berhasil
+ */
+status_t ldt_hapus_segmen(void *ldt, tak_bertanda32_t index)
+{
+    struct ldt_entry *ldt_table;
+
+    if (ldt == NULL || index >= LDT_JUMLAH_ENTRY) {
+        return STATUS_PARAM_INVALID;
+    }
+
+    ldt_table = (struct ldt_entry *)ldt;
+
+    /* Clear entry */
+    kernel_memset(&ldt_table[index], 0, sizeof(struct ldt_entry));
+
+    return STATUS_BERHASIL;
+}
+
+/*
+ * ldt_alokasi
+ * -----------
+ * Mengalokasikan LDT baru untuk proses.
+ *
+ * Parameter:
+ *   ukuran - Jumlah entry yang diperlukan
+ *
+ * Return:
+ *   Pointer ke LDT, atau NULL jika gagal
+ */
+void *ldt_alokasi(tak_bertanda32_t ukuran)
+{
+    ukuran_t total_ukuran;
+    void *ldt;
+
+    if (ukuran == 0 || ukuran > LDT_JUMLAH_ENTRY) {
+        return NULL;
+    }
+
+    total_ukuran = ukuran * sizeof(struct ldt_entry);
+
+    /* Alokasikan memori untuk LDT */
+    ldt = (void *)kmalloc(total_ukuran);
+    if (ldt == NULL) {
+        return NULL;
+    }
+
+    /* Clear LDT */
+    kernel_memset(ldt, 0, total_ukuran);
+
+    return ldt;
+}
+
+/*
+ * ldt_bebaskan
+ * ------------
+ * Membebaskan LDT yang dialokasikan.
+ *
+ * Parameter:
+ *   ldt - Pointer ke LDT
+ */
+void ldt_bebaskan(void *ldt)
+{
+    if (ldt == NULL) {
+        return;
+    }
+
+    kfree(ldt);
+}
+
+/*
+ * ldt_get_default
+ * ---------------
+ * Mendapatkan pointer ke LDT default.
+ *
+ * Return:
+ *   Pointer ke LDT default
+ */
+void *ldt_get_default(void)
+{
+    return g_ldt_default;
+}
+
+/*
+ * ldt_get_pointer
+ * ---------------
+ * Mendapatkan pointer ke LDT pointer.
+ *
+ * Return:
+ *   Pointer ke LDT pointer
+ */
+void *ldt_get_pointer(void)
+{
+    return &g_ldt_ptr;
 }

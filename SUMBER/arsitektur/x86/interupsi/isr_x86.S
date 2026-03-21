@@ -1,11 +1,11 @@
 # =============================================================================
 # PIGURA OS - INTERRUPT SERVICE ROUTINES (ISR) x86
 # =============================================================================
+# Berkas ini berisi entry point untuk semua interrupt exception (0-31)
+# dan IRQ (32-47). Setiap entry menyimpan state, memanggil handler C,
+# dan merestore state.
 #
-# Berkas ini berisi handler untuk CPU exceptions dan interrupt gates.
-# Setiap ISR menyimpan context, memanggil handler C, dan restore context.
-#
-# Arsitektur: x86 (32-bit protected mode)
+# Arsitektur: x86 (32-bit)
 # Versi: 1.0
 # =============================================================================
 
@@ -13,388 +13,323 @@
 # KONSTANTA
 # =============================================================================
 
-.set UKURAN_INTERRUPT_FRAME,  72        # Ukuran struct int_frame
+.set VEKTOR_IRQ_MULAI,    32
 
 # =============================================================================
 # MAKRO
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# MAKRO_ISR_TANPA_ERROR
-# ----------------------
-# Membuat ISR untuk exception yang tidak push error code.
-# Parameter: vektor - nomor vektor interrupt
-# -----------------------------------------------------------------------------
-.macro MAKRO_ISR_TANPA_ERROR vektor
-.global _isr_\vektor
-_isr_\vektor:
-    # Push dummy error code untuk konsistensi
-    pushl $0
-    
-    # Push nomor interrupt
-    pushl $\vektor
-    
-    # Jump ke handler umum
-    jmp _isr_handler_umum
+# Makro untuk membuat ISR tanpa error code
+.macro ISR_NOERR nomor
+.global isr\nomor
+isr\nomor:
+    pushl $0                  # Push dummy error code
+    pushl $\nomor             # Push interrupt number
+    jmp isr_common
 .endm
 
-# -----------------------------------------------------------------------------
-# MAKRO_ISR_DENGAN_ERROR
-# -----------------------
-# Membuat ISR untuk exception yang push error code.
-# Parameter: vektor - nomor vektor interrupt
-# -----------------------------------------------------------------------------
-.macro MAKRO_ISR_DENGAN_ERROR vektor
-.global _isr_\vektor
-_isr_\vektor:
-    # Error code sudah di-push oleh CPU
-    
-    # Push nomor interrupt
-    pushl $\vektor
-    
-    # Jump ke handler umum
-    jmp _isr_handler_umum
+# Makro untuk membuat ISR dengan error code
+.macro ISR_ERR nomor
+.global isr\nomor
+isr\nomor:
+    pushl $\nomor             # Push interrupt number
+    jmp isr_common
+.endm
+
+# Makro untuk IRQ handler
+.macro IRQ_HANDLER nomor, irq_num
+.global irq\nomor
+irq\nomor:
+    pushl $0                  # Dummy error code
+    pushl $\irq_num           # IRQ number (32-47)
+    jmp irq_common
 .endm
 
 # =============================================================================
-# KODE
+# SECTION TEXT
 # =============================================================================
 
 .section .text
 .code32
 
-# -----------------------------------------------------------------------------
-# Exception handlers (ISR 0-31)
-# -----------------------------------------------------------------------------
+# =============================================================================
+# EXCEPTION HANDLERS (ISR 0-31)
+# =============================================================================
 
-# ISR 0: Divide Error (#DE)
-MAKRO_ISR_TANPA_ERROR 0
+# Exception 0-7: Tanpa error code
+ISR_NOERR 0      # Divide Error
+ISR_NOERR 1      # Debug Exception
+ISR_NOERR 2      # NMI Interrupt
+ISR_NOERR 3      # Breakpoint
+ISR_NOERR 4      # Overflow
+ISR_NOERR 5      # BOUND Range Exceeded
+ISR_NOERR 6      # Invalid Opcode
+ISR_NOERR 7      # Device Not Available
 
-# ISR 1: Debug Exception (#DB)
-MAKRO_ISR_TANPA_ERROR 1
+# Exception 8: Double Fault (dengan error code)
+ISR_ERR 8
 
-# ISR 2: NMI Interrupt
-MAKRO_ISR_TANPA_ERROR 2
+# Exception 9: Coprocessor Segment Overrun
+ISR_NOERR 9
 
-# ISR 3: Breakpoint (#BP)
-MAKRO_ISR_TANPA_ERROR 3
+# Exception 10-14: Dengan error code
+ISR_ERR 10      # Invalid TSS
+ISR_ERR 11      # Segment Not Present
+ISR_ERR 12      # Stack-Segment Fault
+ISR_ERR 13      # General Protection
+ISR_ERR 14      # Page Fault
 
-# ISR 4: Overflow (#OF)
-MAKRO_ISR_TANPA_ERROR 4
+# Exception 15: Reserved
+ISR_NOERR 15
 
-# ISR 5: BOUND Range Exceeded (#BR)
-MAKRO_ISR_TANPA_ERROR 5
+# Exception 16-19: Tanpa error code
+ISR_NOERR 16    # x87 FPU Error
+ISR_NOERR 17    # Alignment Check
+ISR_NOERR 18    # Machine Check
+ISR_NOERR 19    # SIMD Exception
 
-# ISR 6: Invalid Opcode (#UD)
-MAKRO_ISR_TANPA_ERROR 6
+# Exception 20-31: Reserved
+ISR_NOERR 20
+ISR_NOERR 21
+ISR_NOERR 22
+ISR_NOERR 23
+ISR_NOERR 24
+ISR_NOERR 25
+ISR_NOERR 26
+ISR_NOERR 27
+ISR_NOERR 28
+ISR_NOERR 29
+ISR_NOERR 30
+ISR_NOERR 31
 
-# ISR 7: Device Not Available (#NM)
-MAKRO_ISR_TANPA_ERROR 7
+# =============================================================================
+# IRQ HANDLERS (IRQ 0-15, vektor 32-47)
+# =============================================================================
 
-# ISR 8: Double Fault (#DF) - dengan error code
-MAKRO_ISR_DENGAN_ERROR 8
+IRQ_HANDLER 0, 32    # Timer
+IRQ_HANDLER 1, 33    # Keyboard
+IRQ_HANDLER 2, 34    # Cascade
+IRQ_HANDLER 3, 35    # COM2
+IRQ_HANDLER 4, 36    # COM1
+IRQ_HANDLER 5, 37    # LPT2
+IRQ_HANDLER 6, 38    # Floppy
+IRQ_HANDLER 7, 39    # LPT1
+IRQ_HANDLER 8, 40    # RTC
+IRQ_HANDLER 9, 41    # Free
+IRQ_HANDLER 10, 42   # Free
+IRQ_HANDLER 11, 43   # Free
+IRQ_HANDLER 12, 44   # PS/2 Mouse
+IRQ_HANDLER 13, 45   # FPU
+IRQ_HANDLER 14, 46   # Primary ATA
+IRQ_HANDLER 15, 47   # Secondary ATA
 
-# ISR 9: Coprocessor Segment Overrun
-MAKRO_ISR_TANPA_ERROR 9
+# =============================================================================
+# COMMON ISR HANDLER
+# =============================================================================
 
-# ISR 10: Invalid TSS (#TS) - dengan error code
-MAKRO_ISR_DENGAN_ERROR 10
+.extern exception_handler_umum
 
-# ISR 11: Segment Not Present (#NP) - dengan error code
-MAKRO_ISR_DENGAN_ERROR 11
-
-# ISR 12: Stack-Segment Fault (#SS) - dengan error code
-MAKRO_ISR_DENGAN_ERROR 12
-
-# ISR 13: General Protection (#GP) - dengan error code
-MAKRO_ISR_DENGAN_ERROR 13
-
-# ISR 14: Page Fault (#PF) - dengan error code
-MAKRO_ISR_DENGAN_ERROR 14
-
-# ISR 15: Reserved
-MAKRO_ISR_TANPA_ERROR 15
-
-# ISR 16: x87 FPU Error (#MF)
-MAKRO_ISR_TANPA_ERROR 16
-
-# ISR 17: Alignment Check (#AC) - dengan error code
-MAKRO_ISR_DENGAN_ERROR 17
-
-# ISR 18: Machine Check (#MC)
-MAKRO_ISR_TANPA_ERROR 18
-
-# ISR 19: SIMD Exception (#XF)
-MAKRO_ISR_TANPA_ERROR 19
-
-# ISR 20-31: Reserved
-MAKRO_ISR_TANPA_ERROR 20
-MAKRO_ISR_TANPA_ERROR 21
-MAKRO_ISR_TANPA_ERROR 22
-MAKRO_ISR_TANPA_ERROR 23
-MAKRO_ISR_TANPA_ERROR 24
-MAKRO_ISR_TANPA_ERROR 25
-MAKRO_ISR_TANPA_ERROR 26
-MAKRO_ISR_TANPA_ERROR 27
-MAKRO_ISR_TANPA_ERROR 28
-MAKRO_ISR_TANPA_ERROR 29
-MAKRO_ISR_TANPA_ERROR 30
-MAKRO_ISR_TANPA_ERROR 31
-
-# -----------------------------------------------------------------------------
-# IRQ handlers (ISR 32-47)
-# -----------------------------------------------------------------------------
-
-# IRQ 0-15
-MAKRO_ISR_TANPA_ERROR 32
-MAKRO_ISR_TANPA_ERROR 33
-MAKRO_ISR_TANPA_ERROR 34
-MAKRO_ISR_TANPA_ERROR 35
-MAKRO_ISR_TANPA_ERROR 36
-MAKRO_ISR_TANPA_ERROR 37
-MAKRO_ISR_TANPA_ERROR 38
-MAKRO_ISR_TANPA_ERROR 39
-MAKRO_ISR_TANPA_ERROR 40
-MAKRO_ISR_TANPA_ERROR 41
-MAKRO_ISR_TANPA_ERROR 42
-MAKRO_ISR_TANPA_ERROR 43
-MAKRO_ISR_TANPA_ERROR 44
-MAKRO_ISR_TANPA_ERROR 45
-MAKRO_ISR_TANPA_ERROR 46
-MAKRO_ISR_TANPA_ERROR 47
-
-# -----------------------------------------------------------------------------
-# Syscall handler (ISR 128 / 0x80)
-# -----------------------------------------------------------------------------
-
-.global _isr_128
-_isr_128:
-    pushl $0                            # Dummy error code
-    pushl $128                          # Syscall number
-    jmp _isr_handler_umum
-
-# -----------------------------------------------------------------------------
-# _isr_handler_umum
-# -----------------
-# Handler umum untuk semua ISR.
-# Menyimpan context, memanggil handler C, dan restore context.
-# -----------------------------------------------------------------------------
-.global _isr_handler_umum
-_isr_handler_umum:
-    # Simpan semua register general-purpose
-    pushal                              # EAX, ECX, EDX, EBX, ESP, EBP, ESI, EDI
-    
-    # Simpan segment register
+isr_common:
+    # Simpan semua segment register
     pushl %ds
     pushl %es
     pushl %fs
     pushl %gs
-    
-    # Load kernel data segment
-    movw $0x10, %ax                     # Kernel data selector
+
+    # Simpan semua register umum
+    pushal
+
+    # Set data segment ke kernel
+    movw $0x10, %ax
     movw %ax, %ds
     movw %ax, %es
     movw %ax, %fs
     movw %ax, %gs
-    
-    # Setup stack frame untuk handler C
-    # Stack sekarang:
-    #   [GS] [FS] [ES] [DS] [EDI] [ESI] [EBP] [ESP kolon] [EBX] [EDX] [ECX] [EAX]
-    #   [ERR_CODE] [INT_NO] [EIP] [CS] [EFLAGS] [ESP] [SS]
-    
-    # Push pointer ke stack frame
-    pushl %esp                          # Argumen: pointer ke frame
-    
+
+    # Stack pointer sekarang menunjuk ke struct int_frame
+    # Push pointer ke stack sebagai argumen
+    pushl %esp
+
     # Panggil handler C
-    call _handler_interrupt_c
-    
+    call exception_handler_umum
+
     # Bersihkan argumen
     addl $4, %esp
-    
+
+    # Restore register
+    popal
+
     # Restore segment register
     popl %gs
     popl %fs
     popl %es
     popl %ds
-    
-    # Restore general-purpose registers
-    popal
-    
-    # Hapus error code dan interrupt number
+
+    # Skip error code dan interrupt number
     addl $8, %esp
-    
+
     # Return dari interrupt
     iret
 
 # =============================================================================
-# FUNGSI-FUNGSI KHUSUS
+# COMMON IRQ HANDLER
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# _isr_page_fault_khusus
-# -----------------------
-# Handler khusus untuk Page Fault dengan informasi tambahan.
-# -----------------------------------------------------------------------------
-.global _isr_page_fault_khusus
-_isr_page_fault_khusus:
-    # Page fault sudah push error code
-    pushl $14                           # Page fault vector
-    
-    # Simpan CR2 (alamat yang menyebabkan page fault)
-    movl %cr2, %eax
-    pushl %eax                          # Simpan untuk handler
-    
-    # Simpan context seperti biasa
-    pushal
+.extern irq_handler_umum
+
+irq_common:
+    # Simpan semua segment register
     pushl %ds
     pushl %es
     pushl %fs
     pushl %gs
-    
-    # Load kernel data segment
+
+    # Simpan semua register umum
+    pushal
+
+    # Set data segment ke kernel
     movw $0x10, %ax
     movw %ax, %ds
     movw %ax, %es
     movw %ax, %fs
     movw %ax, %gs
-    
-    # Panggil handler page fault
-    pushl %esp
-    call _handler_page_fault_c
+
+    # Ambil IRQ number dari stack
+    # Stack: ... int_no, err_code, gs, fs, es, ds, pusha...
+    movl 32(%esp), %eax    # int_no ada di offset 32
+
+    # Cek apakah IRQ 7 atau 15 (spurious)
+    cmpl $39, %eax
+    je .check_spurious_7
+    cmpl $47, %eax
+    je .check_spurious_15
+    jmp .call_irq_handler
+
+.check_spurious_7:
+    # Cek ISR register master PIC
+    movb $0x0B, %al        # Read ISR command
+    outb %al, $0x20
+    inb $0x20, %al
+    testb $0x80, %al       # Bit 7 = IRQ7
+    jz .spurious_irq
+    jmp .call_irq_handler
+
+.check_spurious_15:
+    # Cek ISR register slave PIC
+    movb $0x0B, %al
+    outb %al, $0xA0
+    inb $0xA0, %al
+    testb $0x80, %al       # Bit 7 = IRQ15
+    jz .spurious_irq
+
+.call_irq_handler:
+    # Panggil handler C dengan IRQ number
+    pushl %eax
+    call irq_handler_umum
     addl $4, %esp
-    
-    # Hapus CR2 yang disimpan
-    addl $4, %esp
-    
-    # Restore
+    jmp .irq_exit
+
+.spurious_irq:
+    # Spurious IRQ - skip handler
+
+.irq_exit:
+    # Restore register
+    popal
+
+    # Restore segment register
     popl %gs
     popl %fs
     popl %es
     popl %ds
-    popal
+
+    # Skip error code dan interrupt number
     addl $8, %esp
+
+    # Return dari interrupt
     iret
 
-# -----------------------------------------------------------------------------
-# _isr_double_fault_khusus
-# -------------------------
-# Handler khusus untuk Double Fault (non-recoverable).
-# -----------------------------------------------------------------------------
-.global _isr_double_fault_khusus
-_isr_double_fault_khusus:
-    # Double fault push error code
-    pushl $8                            # Double fault vector
-    
-    # Simpan context
-    pushal
+# =============================================================================
+# SYSCALL HANDLER (int 0x80)
+# =============================================================================
+
+.extern syscall_handler
+
+.global syscall_entry
+syscall_entry:
+    # Syscall via int 0x80
+    # EAX = syscall number
+    # EBX, ECX, EDX, ESI, EDI, EBP = argumen
+
+    # Simpan segment register
     pushl %ds
     pushl %es
     pushl %fs
     pushl %gs
-    
-    # Load kernel data segment
+
+    # Simpan register umum
+    pushal
+
+    # Set data segment ke kernel
     movw $0x10, %ax
     movw %ax, %ds
     movw %ax, %es
     movw %ax, %fs
     movw %ax, %gs
-    
-    # Double fault fatal - halt sistem
-    call _handler_double_fault_c
-    
-    # Tidak return dari double fault
-    cli
-    hlt
-    jmp .
 
-# -----------------------------------------------------------------------------
-# _interrupt_enable / _interrupt_disable
-# ---------------------------------------
-# Fungsi untuk enable/disable interrupt.
-# -----------------------------------------------------------------------------
-.global _interrupt_enable
-_interrupt_enable:
-    sti
-    ret
+    # Panggil syscall handler
+    # Argumen sudah di register dari user space
+    call syscall_handler
 
-.global _interrupt_disable
-_interrupt_disable:
-    cli
-    ret
+    # Result sudah di EAX
 
-# -----------------------------------------------------------------------------
-# _interrupt_simpan / _interrupt_kembalikan
-# ------------------------------------------
-# Fungsi untuk menyimpan dan mengembalikan status interrupt.
-# -----------------------------------------------------------------------------
-.global _interrupt_simpan
-_interrupt_simpan:
-    pushfl
-    popl %eax
-    andl $0x200, %eax                   # IF flag
-    shr $9, %eax                        # Shift ke bit 0
-    ret
+    # Restore register
+    popal
 
-.global _interrupt_kembalikan
-_interrupt_kembalikan:
-    pushl %eax
-    popfl
-    ret
+    popl %gs
+    popl %fs
+    popl %es
+    popl %ds
+
+    iret
 
 # =============================================================================
 # DATA
 # =============================================================================
 
-.section .rodata
+.section .data
 
-# Tabel alamat ISR untuk inisialisasi IDT
-.global _tabel_alamat_isr
-_tabel_alamat_isr:
-    .long _isr_0
-    .long _isr_1
-    .long _isr_2
-    .long _isr_3
-    .long _isr_4
-    .long _isr_5
-    .long _isr_6
-    .long _isr_7
-    .long _isr_8
-    .long _isr_9
-    .long _isr_10
-    .long _isr_11
-    .long _isr_12
-    .long _isr_13
-    .long _isr_14
-    .long _isr_15
-    .long _isr_16
-    .long _isr_17
-    .long _isr_18
-    .long _isr_19
-    .long _isr_20
-    .long _isr_21
-    .long _isr_22
-    .long _isr_23
-    .long _isr_24
-    .long _isr_25
-    .long _isr_26
-    .long _isr_27
-    .long _isr_28
-    .long _isr_29
-    .long _isr_30
-    .long _isr_31
-    .long _isr_32
-    .long _isr_33
-    .long _isr_34
-    .long _isr_35
-    .long _isr_36
-    .long _isr_37
-    .long _isr_38
-    .long _isr_39
-    .long _isr_40
-    .long _isr_41
-    .long _isr_42
-    .long _isr_43
-    .long _isr_44
-    .long _isr_45
-    .long _isr_46
-    .long _isr_47
+# Pointer ke ISR handler array
+.global isr_table
+isr_table:
+    .long isr0
+    .long isr1
+    .long isr2
+    .long isr3
+    .long isr4
+    .long isr5
+    .long isr6
+    .long isr7
+    .long isr8
+    .long isr9
+    .long isr10
+    .long isr11
+    .long isr12
+    .long isr13
+    .long isr14
+    .long isr15
+    .long isr16
+    .long isr17
+    .long isr18
+    .long isr19
+    .long isr20
+    .long isr21
+    .long isr22
+    .long isr23
+    .long isr24
+    .long isr25
+    .long isr26
+    .long isr27
+    .long isr28
+    .long isr29
+    .long isr30
+    .long isr31
