@@ -6,7 +6,7 @@
  * Berkas ini berisi implementasi fungsi-fungsi untuk mengelola
  * interrupt descriptor table (IDT) dan interrupt service routines (ISR).
  *
- * Versi: 1.0
+ * Versi: 1.1
  * Tanggal: 2025
  */
 
@@ -46,7 +46,7 @@ typedef struct {
 /* Struktur IDTR */
 typedef struct {
     tak_bertanda16_t limit;         /* Ukuran IDT - 1 */
-    tak_bertanda32_t base;          /* Alamat IDT */
+    alamat_virtual_t base;          /* Alamat IDT (pointer-sized) */
 } __attribute__((packed)) idtr_t;
 
 /* Struktur stack frame untuk exception */
@@ -158,11 +158,11 @@ extern void syscall_stub(void);
  *   selector - Segment selector
  *   flags    - Flags
  */
-static void idt_set_gate(tak_bertanda8_t num, tak_bertanda32_t base,
+static void idt_set_gate(tak_bertanda8_t num, uintptr_t base,
                          tak_bertanda16_t selector, tak_bertanda8_t flags)
 {
-    idt[num].base_low = base & 0xFFFF;
-    idt[num].base_high = (base >> 16) & 0xFFFF;
+    idt[num].base_low = (tak_bertanda16_t)(base & 0xFFFF);
+    idt[num].base_high = (tak_bertanda16_t)((base >> 16) & 0xFFFF);
     idt[num].selector = selector;
     idt[num].reserved = 0;
     idt[num].flags = flags;
@@ -176,7 +176,7 @@ static void idt_set_gate(tak_bertanda8_t num, tak_bertanda32_t base,
 static void idt_load(void)
 {
     idtr.limit = sizeof(idt) - 1;
-    idtr.base = (tak_bertanda32_t)&idt;
+    idtr.base = (alamat_virtual_t)(uintptr_t)&idt;
 
     __asm__ __volatile__("lidt %0" : : "m"(idtr));
 }
@@ -223,96 +223,133 @@ status_t interupsi_init(void)
     /* Clear IDT */
     kernel_memset(&idt, 0, sizeof(idt));
 
-    /* Set exception handlers (ISR 0-31) */
-    idt_set_gate(0, (tak_bertanda32_t)isr_stub_0, SELECTOR_KERNEL_CODE,
-                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 | IDT_FLAG_TYPE_INTERRUPT);
-    idt_set_gate(1, (tak_bertanda32_t)isr_stub_1, SELECTOR_KERNEL_CODE,
-                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 | IDT_FLAG_TYPE_INTERRUPT);
-    idt_set_gate(2, (tak_bertanda32_t)isr_stub_2, SELECTOR_KERNEL_CODE,
-                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 | IDT_FLAG_TYPE_INTERRUPT);
-    idt_set_gate(3, (tak_bertanda32_t)isr_stub_3, SELECTOR_KERNEL_CODE,
+    /* Set exception handlers (ISR 0-31) menggunakan uintptr_t */
+    idt_set_gate(0, (uintptr_t)isr_stub_0, SELECTOR_KERNEL_CODE,
+                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 |
+                 IDT_FLAG_TYPE_INTERRUPT);
+    idt_set_gate(1, (uintptr_t)isr_stub_1, SELECTOR_KERNEL_CODE,
+                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 |
+                 IDT_FLAG_TYPE_INTERRUPT);
+    idt_set_gate(2, (uintptr_t)isr_stub_2, SELECTOR_KERNEL_CODE,
+                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 |
+                 IDT_FLAG_TYPE_INTERRUPT);
+    idt_set_gate(3, (uintptr_t)isr_stub_3, SELECTOR_KERNEL_CODE,
                  IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 | IDT_FLAG_TYPE_TRAP);
-    idt_set_gate(4, (tak_bertanda32_t)isr_stub_4, SELECTOR_KERNEL_CODE,
-                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 | IDT_FLAG_TYPE_INTERRUPT);
-    idt_set_gate(5, (tak_bertanda32_t)isr_stub_5, SELECTOR_KERNEL_CODE,
-                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 | IDT_FLAG_TYPE_INTERRUPT);
-    idt_set_gate(6, (tak_bertanda32_t)isr_stub_6, SELECTOR_KERNEL_CODE,
-                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 | IDT_FLAG_TYPE_INTERRUPT);
-    idt_set_gate(7, (tak_bertanda32_t)isr_stub_7, SELECTOR_KERNEL_CODE,
-                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 | IDT_FLAG_TYPE_INTERRUPT);
-    idt_set_gate(8, (tak_bertanda32_t)isr_stub_8, SELECTOR_KERNEL_CODE,
-                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 | IDT_FLAG_TYPE_INTERRUPT);
-    idt_set_gate(9, (tak_bertanda32_t)isr_stub_9, SELECTOR_KERNEL_CODE,
-                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 | IDT_FLAG_TYPE_INTERRUPT);
-    idt_set_gate(10, (tak_bertanda32_t)isr_stub_10, SELECTOR_KERNEL_CODE,
-                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 | IDT_FLAG_TYPE_INTERRUPT);
-    idt_set_gate(11, (tak_bertanda32_t)isr_stub_11, SELECTOR_KERNEL_CODE,
-                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 | IDT_FLAG_TYPE_INTERRUPT);
-    idt_set_gate(12, (tak_bertanda32_t)isr_stub_12, SELECTOR_KERNEL_CODE,
-                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 | IDT_FLAG_TYPE_INTERRUPT);
-    idt_set_gate(13, (tak_bertanda32_t)isr_stub_13, SELECTOR_KERNEL_CODE,
-                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 | IDT_FLAG_TYPE_INTERRUPT);
-    idt_set_gate(14, (tak_bertanda32_t)isr_stub_14, SELECTOR_KERNEL_CODE,
-                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 | IDT_FLAG_TYPE_INTERRUPT);
-    idt_set_gate(15, (tak_bertanda32_t)isr_stub_15, SELECTOR_KERNEL_CODE,
-                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 | IDT_FLAG_TYPE_INTERRUPT);
-    idt_set_gate(16, (tak_bertanda32_t)isr_stub_16, SELECTOR_KERNEL_CODE,
-                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 | IDT_FLAG_TYPE_INTERRUPT);
-    idt_set_gate(17, (tak_bertanda32_t)isr_stub_17, SELECTOR_KERNEL_CODE,
-                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 | IDT_FLAG_TYPE_INTERRUPT);
-    idt_set_gate(18, (tak_bertanda32_t)isr_stub_18, SELECTOR_KERNEL_CODE,
-                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 | IDT_FLAG_TYPE_INTERRUPT);
-    idt_set_gate(19, (tak_bertanda32_t)isr_stub_19, SELECTOR_KERNEL_CODE,
-                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 | IDT_FLAG_TYPE_INTERRUPT);
-    idt_set_gate(20, (tak_bertanda32_t)isr_stub_20, SELECTOR_KERNEL_CODE,
-                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 | IDT_FLAG_TYPE_INTERRUPT);
+    idt_set_gate(4, (uintptr_t)isr_stub_4, SELECTOR_KERNEL_CODE,
+                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 |
+                 IDT_FLAG_TYPE_INTERRUPT);
+    idt_set_gate(5, (uintptr_t)isr_stub_5, SELECTOR_KERNEL_CODE,
+                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 |
+                 IDT_FLAG_TYPE_INTERRUPT);
+    idt_set_gate(6, (uintptr_t)isr_stub_6, SELECTOR_KERNEL_CODE,
+                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 |
+                 IDT_FLAG_TYPE_INTERRUPT);
+    idt_set_gate(7, (uintptr_t)isr_stub_7, SELECTOR_KERNEL_CODE,
+                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 |
+                 IDT_FLAG_TYPE_INTERRUPT);
+    idt_set_gate(8, (uintptr_t)isr_stub_8, SELECTOR_KERNEL_CODE,
+                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 |
+                 IDT_FLAG_TYPE_INTERRUPT);
+    idt_set_gate(9, (uintptr_t)isr_stub_9, SELECTOR_KERNEL_CODE,
+                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 |
+                 IDT_FLAG_TYPE_INTERRUPT);
+    idt_set_gate(10, (uintptr_t)isr_stub_10, SELECTOR_KERNEL_CODE,
+                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 |
+                 IDT_FLAG_TYPE_INTERRUPT);
+    idt_set_gate(11, (uintptr_t)isr_stub_11, SELECTOR_KERNEL_CODE,
+                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 |
+                 IDT_FLAG_TYPE_INTERRUPT);
+    idt_set_gate(12, (uintptr_t)isr_stub_12, SELECTOR_KERNEL_CODE,
+                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 |
+                 IDT_FLAG_TYPE_INTERRUPT);
+    idt_set_gate(13, (uintptr_t)isr_stub_13, SELECTOR_KERNEL_CODE,
+                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 |
+                 IDT_FLAG_TYPE_INTERRUPT);
+    idt_set_gate(14, (uintptr_t)isr_stub_14, SELECTOR_KERNEL_CODE,
+                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 |
+                 IDT_FLAG_TYPE_INTERRUPT);
+    idt_set_gate(15, (uintptr_t)isr_stub_15, SELECTOR_KERNEL_CODE,
+                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 |
+                 IDT_FLAG_TYPE_INTERRUPT);
+    idt_set_gate(16, (uintptr_t)isr_stub_16, SELECTOR_KERNEL_CODE,
+                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 |
+                 IDT_FLAG_TYPE_INTERRUPT);
+    idt_set_gate(17, (uintptr_t)isr_stub_17, SELECTOR_KERNEL_CODE,
+                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 |
+                 IDT_FLAG_TYPE_INTERRUPT);
+    idt_set_gate(18, (uintptr_t)isr_stub_18, SELECTOR_KERNEL_CODE,
+                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 |
+                 IDT_FLAG_TYPE_INTERRUPT);
+    idt_set_gate(19, (uintptr_t)isr_stub_19, SELECTOR_KERNEL_CODE,
+                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 |
+                 IDT_FLAG_TYPE_INTERRUPT);
+    idt_set_gate(20, (uintptr_t)isr_stub_20, SELECTOR_KERNEL_CODE,
+                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 |
+                 IDT_FLAG_TYPE_INTERRUPT);
 
     /* Reserved 21-31 */
     for (i = 21; i < 32; i++) {
-        idt_set_gate((tak_bertanda8_t)i, (tak_bertanda32_t)isr_stub_0,
+        idt_set_gate((tak_bertanda8_t)i, (uintptr_t)isr_stub_0,
                      SELECTOR_KERNEL_CODE,
                      IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 |
                      IDT_FLAG_TYPE_INTERRUPT);
     }
 
-    /* Set IRQ handlers (ISR 32-47) */
-    idt_set_gate(32, (tak_bertanda32_t)irq_stub_0, SELECTOR_KERNEL_CODE,
-                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 | IDT_FLAG_TYPE_INTERRUPT);
-    idt_set_gate(33, (tak_bertanda32_t)irq_stub_1, SELECTOR_KERNEL_CODE,
-                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 | IDT_FLAG_TYPE_INTERRUPT);
-    idt_set_gate(34, (tak_bertanda32_t)irq_stub_2, SELECTOR_KERNEL_CODE,
-                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 | IDT_FLAG_TYPE_INTERRUPT);
-    idt_set_gate(35, (tak_bertanda32_t)irq_stub_3, SELECTOR_KERNEL_CODE,
-                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 | IDT_FLAG_TYPE_INTERRUPT);
-    idt_set_gate(36, (tak_bertanda32_t)irq_stub_4, SELECTOR_KERNEL_CODE,
-                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 | IDT_FLAG_TYPE_INTERRUPT);
-    idt_set_gate(37, (tak_bertanda32_t)irq_stub_5, SELECTOR_KERNEL_CODE,
-                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 | IDT_FLAG_TYPE_INTERRUPT);
-    idt_set_gate(38, (tak_bertanda32_t)irq_stub_6, SELECTOR_KERNEL_CODE,
-                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 | IDT_FLAG_TYPE_INTERRUPT);
-    idt_set_gate(39, (tak_bertanda32_t)irq_stub_7, SELECTOR_KERNEL_CODE,
-                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 | IDT_FLAG_TYPE_INTERRUPT);
-    idt_set_gate(40, (tak_bertanda32_t)irq_stub_8, SELECTOR_KERNEL_CODE,
-                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 | IDT_FLAG_TYPE_INTERRUPT);
-    idt_set_gate(41, (tak_bertanda32_t)irq_stub_9, SELECTOR_KERNEL_CODE,
-                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 | IDT_FLAG_TYPE_INTERRUPT);
-    idt_set_gate(42, (tak_bertanda32_t)irq_stub_10, SELECTOR_KERNEL_CODE,
-                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 | IDT_FLAG_TYPE_INTERRUPT);
-    idt_set_gate(43, (tak_bertanda32_t)irq_stub_11, SELECTOR_KERNEL_CODE,
-                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 | IDT_FLAG_TYPE_INTERRUPT);
-    idt_set_gate(44, (tak_bertanda32_t)irq_stub_12, SELECTOR_KERNEL_CODE,
-                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 | IDT_FLAG_TYPE_INTERRUPT);
-    idt_set_gate(45, (tak_bertanda32_t)irq_stub_13, SELECTOR_KERNEL_CODE,
-                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 | IDT_FLAG_TYPE_INTERRUPT);
-    idt_set_gate(46, (tak_bertanda32_t)irq_stub_14, SELECTOR_KERNEL_CODE,
-                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 | IDT_FLAG_TYPE_INTERRUPT);
-    idt_set_gate(47, (tak_bertanda32_t)irq_stub_15, SELECTOR_KERNEL_CODE,
-                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 | IDT_FLAG_TYPE_INTERRUPT);
+    /* Set IRQ handlers (ISR 32-47) menggunakan uintptr_t */
+    idt_set_gate(32, (uintptr_t)irq_stub_0, SELECTOR_KERNEL_CODE,
+                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 |
+                 IDT_FLAG_TYPE_INTERRUPT);
+    idt_set_gate(33, (uintptr_t)irq_stub_1, SELECTOR_KERNEL_CODE,
+                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 |
+                 IDT_FLAG_TYPE_INTERRUPT);
+    idt_set_gate(34, (uintptr_t)irq_stub_2, SELECTOR_KERNEL_CODE,
+                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 |
+                 IDT_FLAG_TYPE_INTERRUPT);
+    idt_set_gate(35, (uintptr_t)irq_stub_3, SELECTOR_KERNEL_CODE,
+                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 |
+                 IDT_FLAG_TYPE_INTERRUPT);
+    idt_set_gate(36, (uintptr_t)irq_stub_4, SELECTOR_KERNEL_CODE,
+                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 |
+                 IDT_FLAG_TYPE_INTERRUPT);
+    idt_set_gate(37, (uintptr_t)irq_stub_5, SELECTOR_KERNEL_CODE,
+                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 |
+                 IDT_FLAG_TYPE_INTERRUPT);
+    idt_set_gate(38, (uintptr_t)irq_stub_6, SELECTOR_KERNEL_CODE,
+                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 |
+                 IDT_FLAG_TYPE_INTERRUPT);
+    idt_set_gate(39, (uintptr_t)irq_stub_7, SELECTOR_KERNEL_CODE,
+                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 |
+                 IDT_FLAG_TYPE_INTERRUPT);
+    idt_set_gate(40, (uintptr_t)irq_stub_8, SELECTOR_KERNEL_CODE,
+                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 |
+                 IDT_FLAG_TYPE_INTERRUPT);
+    idt_set_gate(41, (uintptr_t)irq_stub_9, SELECTOR_KERNEL_CODE,
+                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 |
+                 IDT_FLAG_TYPE_INTERRUPT);
+    idt_set_gate(42, (uintptr_t)irq_stub_10, SELECTOR_KERNEL_CODE,
+                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 |
+                 IDT_FLAG_TYPE_INTERRUPT);
+    idt_set_gate(43, (uintptr_t)irq_stub_11, SELECTOR_KERNEL_CODE,
+                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 |
+                 IDT_FLAG_TYPE_INTERRUPT);
+    idt_set_gate(44, (uintptr_t)irq_stub_12, SELECTOR_KERNEL_CODE,
+                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 |
+                 IDT_FLAG_TYPE_INTERRUPT);
+    idt_set_gate(45, (uintptr_t)irq_stub_13, SELECTOR_KERNEL_CODE,
+                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 |
+                 IDT_FLAG_TYPE_INTERRUPT);
+    idt_set_gate(46, (uintptr_t)irq_stub_14, SELECTOR_KERNEL_CODE,
+                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 |
+                 IDT_FLAG_TYPE_INTERRUPT);
+    idt_set_gate(47, (uintptr_t)irq_stub_15, SELECTOR_KERNEL_CODE,
+                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_0 |
+                 IDT_FLAG_TYPE_INTERRUPT);
 
     /* Set syscall handler (ISR 128) */
-    idt_set_gate(VEKTOR_SYSCALL, (tak_bertanda32_t)syscall_stub,
+    idt_set_gate(VEKTOR_SYSCALL, (uintptr_t)syscall_stub,
                  SELECTOR_KERNEL_CODE,
-                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_3 | IDT_FLAG_TYPE_INTERRUPT);
+                 IDT_FLAG_PRESENT | IDT_FLAG_DPL_3 |
+                 IDT_FLAG_TYPE_INTERRUPT);
 
     /* Inisialisasi handler default */
     for (i = 0; i < 32; i++) {

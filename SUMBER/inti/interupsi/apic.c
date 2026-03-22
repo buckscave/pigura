@@ -6,7 +6,7 @@
  * Berkas ini berisi implementasi driver untuk Local APIC dan I/O APIC
  * yang merupakan interrupt controller modern pada sistem x86.
  *
- * Versi: 1.0
+ * Versi: 1.1
  * Tanggal: 2025
  */
 
@@ -40,7 +40,7 @@
 #define LAPIC_ICR_HIGH          0x310   /* Interrupt Command (high) */
 #define LAPIC_LVT_TIMER         0x320   /* Local Vector Table - Timer */
 #define LAPIC_LVT_THERMAL       0x330   /* Local Vector Table - Thermal */
-#define LAPIC_LVT_PERF          0x340   /* Local Vector Table - Performance */
+#define LAPIC_LVT_PERF          0x340   /* Local Vector Table - Perf */
 #define LAPIC_LVT_LINT0         0x350   /* Local Vector Table - LINT0 */
 #define LAPIC_LVT_LINT1         0x360   /* Local Vector Table - LINT1 */
 #define LAPIC_LVT_ERROR         0x370   /* Local Vector Table - Error */
@@ -69,7 +69,7 @@
 /* Delivery modes */
 #define APIC_DM_FIXED           0x000   /* Fixed delivery */
 #define APIC_DM_LOWEST          0x100   /* Lowest priority */
-#define APIC_DM_SMI             0x200   /* System Management Interrupt */
+#define APIC_DM_SMI             0x200   /* System Management Intr */
 #define APIC_DM_NMI             0x400   /* Non-Maskable Interrupt */
 #define APIC_DM_INIT            0x500   /* INIT */
 #define APIC_DM_EXTINT          0x700   /* External Interrupt */
@@ -102,7 +102,7 @@
 /* I/O APIC descriptor */
 typedef struct {
     tak_bertanda32_t id;            /* IOAPIC ID */
-    tak_bertanda32_t base;          /* Base address */
+    alamat_virtual_t base;          /* Base address (pointer-sized) */
     tak_bertanda32_t gsi_base;      /* Global System Interrupt base */
     tak_bertanda32_t gsi_count;     /* Number of GSI */
     bool_t present;                 /* Is present */
@@ -112,7 +112,7 @@ typedef struct {
 typedef struct {
     bool_t lapic_present;
     bool_t ioapic_present;
-    tak_bertanda32_t lapic_base;
+    alamat_virtual_t lapic_base;    /* Base address (pointer-sized) */
     tak_bertanda32_t lapic_id;
     tak_bertanda32_t lapic_version;
     tak_bertanda32_t cpu_count;
@@ -151,7 +151,9 @@ static bool_t apic_initialized = SALAH;
  */
 static inline tak_bertanda32_t lapic_read(tak_bertanda32_t reg)
 {
-    return *((volatile tak_bertanda32_t *)(apic.lapic_base + reg));
+    volatile tak_bertanda32_t *ptr;
+    ptr = (volatile tak_bertanda32_t *)(apic.lapic_base + reg);
+    return *ptr;
 }
 
 /*
@@ -165,7 +167,9 @@ static inline tak_bertanda32_t lapic_read(tak_bertanda32_t reg)
  */
 static inline void lapic_write(tak_bertanda32_t reg, tak_bertanda32_t value)
 {
-    *((volatile tak_bertanda32_t *)(apic.lapic_base + reg)) = value;
+    volatile tak_bertanda32_t *ptr;
+    ptr = (volatile tak_bertanda32_t *)(apic.lapic_base + reg);
+    *ptr = value;
 }
 
 /*
@@ -248,7 +252,7 @@ static bool_t detect_local_apic(void)
  *
  * Return: Alamat base Local APIC
  */
-static tak_bertanda32_t get_lapic_base(void)
+static alamat_virtual_t get_lapic_base(void)
 {
     tak_bertanda32_t low, high;
 
@@ -258,7 +262,7 @@ static tak_bertanda32_t get_lapic_base(void)
         : "c"(LAPIC_BASE_MSR)
     );
 
-    return low & 0xFFFFF000UL;
+    return (alamat_virtual_t)(low & 0xFFFFF000UL);
 }
 
 /*
@@ -269,9 +273,9 @@ static tak_bertanda32_t get_lapic_base(void)
  * Parameter:
  *   base - Alamat base baru
  */
-static void set_lapic_base(tak_bertanda32_t base)
+static void set_lapic_base(alamat_virtual_t base)
 {
-    tak_bertanda32_t low = (base & 0xFFFFF000UL) | 0x800;  /* Enable bit */
+    tak_bertanda32_t low = ((tak_bertanda32_t)base & 0xFFFFF000UL) | 0x800;
 
     __asm__ __volatile__(
         "wrmsr"
@@ -290,7 +294,7 @@ static void detect_ioapic(void)
 {
     /* Default I/O APIC at 0xFEC00000 */
     apic.ioapic[0].id = 0;
-    apic.ioapic[0].base = IOAPIC_BASE_DEFAULT;
+    apic.ioapic[0].base = (alamat_virtual_t)IOAPIC_BASE_DEFAULT;
     apic.ioapic[0].gsi_base = 0;
     apic.ioapic[0].present = BENAR;
 
@@ -342,11 +346,12 @@ status_t apic_init(void)
     apic.lapic_base = get_lapic_base();
 
     if (apic.lapic_base == 0) {
-        apic.lapic_base = LAPIC_BASE_DEFAULT;
+        apic.lapic_base = (alamat_virtual_t)LAPIC_BASE_DEFAULT;
         set_lapic_base(apic.lapic_base | 0x800);  /* Enable */
     }
 
-    kernel_printf("[APIC] Local APIC base: 0x%08lX\n", apic.lapic_base);
+    kernel_printf("[APIC] Local APIC base: 0x%lX\n",
+                  (ukuran_t)apic.lapic_base);
 
     /* Get LAPIC ID and version */
     apic.lapic_id = lapic_read(LAPIC_ID) >> 24;
@@ -375,8 +380,9 @@ status_t apic_init(void)
     detect_ioapic();
 
     if (apic.ioapic_present) {
-        kernel_printf("[APIC] I/O APIC found at 0x%08lX (%lu GSIs)\n",
-                      apic.ioapic[0].base, apic.ioapic[0].gsi_count);
+        kernel_printf("[APIC] I/O APIC found at 0x%lX (%lu GSIs)\n",
+                      (ukuran_t)apic.ioapic[0].base,
+                      apic.ioapic[0].gsi_count);
     }
 
     apic.cpu_count = 1;  /* TODO: Detect dari ACPI */
@@ -494,7 +500,8 @@ void lapic_send_ipi(tak_bertanda32_t dest, tak_bertanda32_t vector,
 void lapic_send_broadcast(tak_bertanda32_t vector, tak_bertanda32_t mode)
 {
     lapic_write(LAPIC_ICR_HIGH, 0xFF << 24);
-    lapic_write(LAPIC_ICR_LOW, vector | mode | (1 << 14) | (1 << 18) | (1 << 19));
+    lapic_write(LAPIC_ICR_LOW, vector | mode | (1 << 14) | (1 << 18) |
+                                (1 << 19));
 
     while (lapic_read(LAPIC_ICR_LOW) & (1 << 12)) {
         cpu_nop();
@@ -549,8 +556,8 @@ void lapic_timer_stop(void)
  * Return: Status operasi
  */
 status_t ioapic_set_routing(tak_bertanda32_t gsi, tak_bertanda32_t vector,
-                            tak_bertanda32_t delivery, tak_bertanda32_t trigger,
-                            bool_t mask)
+                            tak_bertanda32_t delivery,
+                            tak_bertanda32_t trigger, bool_t mask)
 {
     tak_bertanda32_t ioapic_id;
     tak_bertanda32_t pin;
@@ -709,7 +716,8 @@ void apic_print_status(void)
                   apic.ioapic_present ? "Ya" : "Tidak");
 
     if (apic.lapic_present) {
-        kernel_printf("  LAPIC base:     0x%08lX\n", apic.lapic_base);
+        kernel_printf("  LAPIC base:     0x%lX\n",
+                      (ukuran_t)apic.lapic_base);
         kernel_printf("  LAPIC ID:       %lu\n", apic.lapic_id);
         kernel_printf("  LAPIC Version:  %lu\n", apic.lapic_version);
         kernel_printf("  TPR:            0x%02lX\n", lapic_get_tpr());
@@ -722,10 +730,11 @@ void apic_print_status(void)
 
         for (i = 0; i < apic.ioapic_count; i++) {
             if (apic.ioapic[i].present) {
-                kernel_printf("    IOAPIC %lu: ID=%lu, Base=0x%08lX, GSI=%lu-%lu\n",
+                kernel_printf("    IOAPIC %lu: ID=%lu, Base=0x%lX, "
+                              "GSI=%lu-%lu\n",
                               i,
                               apic.ioapic[i].id,
-                              apic.ioapic[i].base,
+                              (ukuran_t)apic.ioapic[i].base,
                               apic.ioapic[i].gsi_base,
                               apic.ioapic[i].gsi_base +
                               apic.ioapic[i].gsi_count - 1);

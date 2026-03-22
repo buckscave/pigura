@@ -7,7 +7,10 @@
  * timer hardware, termasuk PIT (Programmable Interval Timer) dan
  * sistem tick counter.
  *
- * Versi: 1.0
+ * KEPATUHAN STANDAR:
+ * - C90 (ANSI C89) dengan POSIX Safe Functions
+ *
+ * Versi: 2.0
  * Tanggal: 2025
  */
 
@@ -66,6 +69,15 @@ static void (*timer_handler)(void) = NULL;
 
 /* Timer state */
 static bool_t timer_initialized = SALAH;
+
+/*
+ * ============================================================================
+ * FORWARD DECLARATIONS
+ * ============================================================================
+ */
+
+/* Forward declaration untuk hal_timer_delay */
+static void hal_timer_delay_internal(tak_bertanda32_t microseconds);
 
 /*
  * ============================================================================
@@ -153,6 +165,35 @@ static void pit_delay_ms(tak_bertanda32_t milliseconds)
 }
 
 /*
+ * hal_timer_delay_internal
+ * ------------------------
+ * Busy-wait delay dalam mikrodetik.
+ *
+ * Parameter:
+ *   microseconds - Jumlah mikrodetik
+ */
+static void hal_timer_delay_internal(tak_bertanda32_t microseconds)
+{
+    tak_bertanda32_t i;
+    tak_bertanda32_t iterations;
+    tak_bertanda32_t freq_khz;
+
+    /* Estimasi: kira-kira 1 I/O delay = ~1 microsecond pada CPU modern */
+    /* Skala dengan frekuensi CPU */
+    iterations = microseconds;
+
+    /* Faktor penyesuaian berdasarkan frekuensi CPU */
+    freq_khz = g_hal_state.cpu.freq_khz;
+    if (freq_khz > 1000000) {
+        iterations *= (freq_khz / 1000000);
+    }
+
+    for (i = 0; i < iterations; i++) {
+        io_delay();
+    }
+}
+
+/*
  * timer_isr
  * ---------
  * Interrupt Service Routine untuk timer.
@@ -162,6 +203,11 @@ static void timer_isr(void)
 {
     /* Increment tick counter */
     timer_ticks++;
+
+    /* Update state */
+    g_hal_state.timer.ticks = timer_ticks;
+    g_hal_state.uptime_ticks = timer_ticks;
+    g_hal_state.uptime_sec = timer_ticks / TIMER_FREQUENCY;
 
     /* Panggil handler jika ada */
     if (timer_handler != NULL) {
@@ -198,8 +244,10 @@ status_t hal_timer_init(void)
     /* Set informasi timer */
     info->frequency = TIMER_FREQUENCY;
     info->resolution_ns = 1000000000UL / TIMER_FREQUENCY;
+    info->ticks = 0;
     info->supports_one_shot = BENAR;
     info->supports_periodic = BENAR;
+    info->supports_64bit = BENAR;
 
     /* Set handler untuk timer interrupt (IRQ 0) */
     hal_interrupt_set_handler(VEKTOR_TIMER - VEKTOR_IRQ_MULAI,
@@ -209,6 +257,27 @@ status_t hal_timer_init(void)
     hal_interrupt_unmask(0);
 
     timer_initialized = BENAR;
+
+    return STATUS_BERHASIL;
+}
+
+/*
+ * hal_timer_get_info
+ * ------------------
+ * Dapatkan informasi timer.
+ *
+ * Parameter:
+ *   info - Pointer ke buffer
+ *
+ * Return: Status operasi
+ */
+status_t hal_timer_get_info(hal_timer_info_t *info)
+{
+    if (info == NULL) {
+        return STATUS_PARAM_NULL;
+    }
+
+    kernel_memcpy(info, &g_hal_state.timer, sizeof(hal_timer_info_t));
 
     return STATUS_BERHASIL;
 }
@@ -244,6 +313,16 @@ tak_bertanda64_t hal_timer_get_uptime(void)
 }
 
 /*
+ * hal_timer_get_uptime_ms
+ * -----------------------
+ * Dapatkan uptime sistem dalam milidetik.
+ */
+tak_bertanda64_t hal_timer_get_uptime_ms(void)
+{
+    return (timer_ticks * 1000UL) / TIMER_FREQUENCY;
+}
+
+/*
  * hal_timer_sleep
  * ---------------
  * Sleep untuk durasi tertentu.
@@ -252,11 +331,21 @@ void hal_timer_sleep(tak_bertanda32_t milliseconds)
 {
     if (!timer_initialized) {
         /* Fallback ke busy delay jika timer belum siap */
-        hal_timer_delay(milliseconds * 1000);
+        hal_timer_delay_internal(milliseconds * 1000);
         return;
     }
 
     pit_delay_ms(milliseconds);
+}
+
+/*
+ * hal_timer_sleep_us
+ * ------------------
+ * Sleep dalam mikrodetik.
+ */
+void hal_timer_sleep_us(tak_bertanda32_t microseconds)
+{
+    hal_timer_delay_internal(microseconds);
 }
 
 /*
@@ -266,21 +355,7 @@ void hal_timer_sleep(tak_bertanda32_t milliseconds)
  */
 void hal_timer_delay(tak_bertanda32_t microseconds)
 {
-    tak_bertanda32_t i;
-    tak_bertanda32_t iterations;
-
-    /* Estimasi: kira-kira 1 I/O delay = ~1 microsecond pada CPU modern */
-    /* Skala dengan frekuensi CPU */
-    iterations = microseconds;
-
-    /* Faktor penyesuaian berdasarkan frekuensi CPU */
-    if (g_hal_state.cpu.freq_mhz > 1000) {
-        iterations *= (g_hal_state.cpu.freq_mhz / 1000);
-    }
-
-    for (i = 0; i < iterations; i++) {
-        io_delay();
-    }
+    hal_timer_delay_internal(microseconds);
 }
 
 /*
@@ -293,12 +368,25 @@ status_t hal_timer_set_handler(void (*handler)(void))
     tak_bertanda32_t flags;
 
     /* Disable interrupt saat mengubah handler */
-    IRQ_DISABLE_SAVE(flags);
+    flags = hal_cpu_save_interrupts();
 
     timer_handler = handler;
 
-    IRQ_RESTORE(flags);
+    hal_cpu_restore_interrupts(flags);
 
+    return STATUS_BERHASIL;
+}
+
+/*
+ * hal_timer_calibrate
+ * -------------------
+ * Kalibrasi timer.
+ *
+ * Return: Status operasi
+ */
+status_t hal_timer_calibrate(void)
+{
+    /* Timer sudah dikalibrasi saat init */
     return STATUS_BERHASIL;
 }
 
@@ -362,8 +450,10 @@ tak_bertanda64_t hal_timer_ms_to_ticks(tak_bertanda64_t milliseconds)
  */
 tak_bertanda64_t hal_timer_get_ns(void)
 {
-    tak_bertanda64_t ticks = timer_ticks;
+    tak_bertanda64_t ticks;
     tak_bertanda64_t ns;
+
+    ticks = timer_ticks;
 
     /* Konversi tick ke nanodetik */
     ns = (ticks * 1000000000UL) / TIMER_FREQUENCY;
@@ -371,7 +461,7 @@ tak_bertanda64_t hal_timer_get_ns(void)
     /* Tambahkan offset dari counter PIT untuk presisi lebih */
     {
         tak_bertanda16_t pit_count = pit_read_count();
-        tak_bertanda16_t pit_reload = TIMER_DIVISOR;
+        tak_bertanda16_t pit_reload = (tak_bertanda16_t)TIMER_DIVISOR;
         tak_bertanda32_t ns_per_tick = 1000000000UL / TIMER_FREQUENCY;
 
         /* Counter menurun, jadi kurangi dari reload */
@@ -379,40 +469,4 @@ tak_bertanda64_t hal_timer_get_ns(void)
     }
 
     return ns;
-}
-
-/*
- * hal_timer_calibration
- * ---------------------
- * Kalibrasi timer untuk presisi lebih tinggi.
- * Menggunakan TSC untuk mendapatkan timing yang lebih akurat.
- *
- * Return: Status operasi
- */
-status_t hal_timer_calibration(void)
-{
-    tak_bertanda64_t tsc_start;
-    tak_bertanda64_t tsc_end;
-    tak_bertanda64_t tsc_frequency;
-    tak_bertanda32_t i;
-
-    /* Baca TSC awal */
-    __asm__ __volatile__("rdtsc" : "=A"(tsc_start));
-
-    /* Tunggu beberapa tick */
-    for (i = 0; i < TIMER_FREQUENCY / 10; i++) {
-        /* Busy wait */
-    }
-
-    /* Baca TSC akhir */
-    __asm__ __volatile__("rdtsc" : "=A"(tsc_end));
-
-    /* Hitung frekuensi TSC */
-    tsc_frequency = tsc_end - tsc_start;
-    tsc_frequency *= TIMER_FREQUENCY;
-
-    /* Gunakan frekuensi TSC untuk timing yang lebih akurat jika perlu */
-    /* Untuk sekarang, kita gunakan PIT saja */
-
-    return STATUS_BERHASIL;
 }

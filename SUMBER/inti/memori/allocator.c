@@ -7,7 +7,7 @@
  * alokasi objek-objek kernel dengan ukuran tetap menggunakan
  * teknik slab allocation.
  *
- * Versi: 1.0
+ * Versi: 1.1
  * Tanggal: 2025
  */
 
@@ -585,7 +585,7 @@ void kmem_cache_free(kmem_cache_t *cache, void *obj)
 
     /* Cari slab yang berisi objek ini */
     /* Objek berada dalam range slab */
-    slab = (slab_t *)((tak_bertanda32_t)obj & ~(UKURAN_HALAMAN - 1));
+    slab = (slab_t *)((uintptr_t)obj & ~(UKURAN_HALAMAN - 1));
 
     if (slab->magic != SLAB_MAGIC) {
         kernel_printf("[SLAB] ERROR: Invalid slab for object %p\n", obj);

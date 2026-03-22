@@ -6,7 +6,7 @@
  * Berkas ini berisi implementasi handler untuk berbagai exception
  * CPU seperti divide error, page fault, general protection fault, dll.
  *
- * Versi: 1.0
+ * Versi: 1.1
  * Tanggal: 2025
  */
 
@@ -254,7 +254,8 @@ static void decode_page_fault_error(tak_bertanda32_t error_code,
                                     tak_bertanda32_t cr2)
 {
     kernel_printf("  Page Fault Analysis:\n");
-    kernel_printf("    Faulting Address: 0x%08lX\n", cr2);
+    kernel_printf("    Faulting Address: 0x%08lX\n",
+                  (ukuran_t)cr2);
     kernel_printf("    Page Present: %s\n",
                   (error_code & 0x01) ? "Ya" : "Tidak");
     kernel_printf("    Operation: %s\n",
@@ -297,7 +298,8 @@ static void decode_segment_error(tak_bertanda32_t error_code)
         case 3: kernel_printf("IDT\n"); break;
     }
 
-    kernel_printf("    Selector Index: %lu\n", error_code >> 3);
+    kernel_printf("    Selector Index: %lu\n",
+                  (ukuran_t)(error_code >> 3));
 }
 
 /*
@@ -316,7 +318,7 @@ void exception_divide_error_handler(register_context_t *ctx)
     exception_counter[0]++;
 
     kernel_printf("\n[EXCEPTION] Divide Error (#DE)\n");
-    kernel_printf("  EIP: 0x%08lX\n", ctx->eip);
+    kernel_printf("  EIP: 0x%08lX\n", (ukuran_t)ctx->eip);
 
     /* Coba recovery atau panic */
     kernel_panic_exception(ctx);
@@ -329,12 +331,18 @@ void exception_divide_error_handler(register_context_t *ctx)
  */
 void exception_invalid_opcode_handler(register_context_t *ctx)
 {
+    tak_bertanda8_t opcode;
+    tak_bertanda8_t *eip_ptr;
+
     exception_counter[6]++;
 
     kernel_printf("\n[EXCEPTION] Invalid Opcode (#UD)\n");
-    kernel_printf("  EIP: 0x%08lX\n", ctx->eip);
-    kernel_printf("  Opcode byte: 0x%02X\n",
-                  *((tak_bertanda8_t *)ctx->eip));
+    kernel_printf("  EIP: 0x%08lX\n", (ukuran_t)ctx->eip);
+
+    /* Cast melalui uintptr_t untuk menghindari warning */
+    eip_ptr = (tak_bertanda8_t *)(uintptr_t)ctx->eip;
+    opcode = *eip_ptr;
+    kernel_printf("  Opcode byte: 0x%02X\n", opcode);
 
     kernel_panic_exception(ctx);
 }
@@ -365,7 +373,7 @@ void exception_gpf_handler(register_context_t *ctx)
     exception_counter[13]++;
 
     kernel_printf("\n[EXCEPTION] General Protection Fault (#GP)\n");
-    kernel_printf("  EIP: 0x%08lX\n", ctx->eip);
+    kernel_printf("  EIP: 0x%08lX\n", (ukuran_t)ctx->eip);
 
     if (ctx->err_code != 0) {
         decode_segment_error(ctx->err_code);
@@ -389,7 +397,7 @@ void exception_page_fault_handler(register_context_t *ctx)
 
     kernel_printf("\n[EXCEPTION] Page Fault (#PF)\n");
     decode_page_fault_error(ctx->err_code, cr2);
-    kernel_printf("  EIP: 0x%08lX\n", ctx->eip);
+    kernel_printf("  EIP: 0x%08lX\n", (ukuran_t)ctx->eip);
 
     /* Cek apakah ini recoverable */
     if (page_fault_handler_active) {
@@ -492,7 +500,8 @@ void exception_print_stats(void)
         if (exception_counter[i] > 0) {
             const exception_info_t *info = get_exception_info(i);
             kernel_printf("  #%02lu %-25s: %lu\n",
-                          i, info->nama, exception_counter[i]);
+                          (ukuran_t)i, info->nama,
+                          (ukuran_t)exception_counter[i]);
         }
     }
 

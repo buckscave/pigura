@@ -7,7 +7,10 @@
  * deteksi dan alokasi memori fisik dasar. Alokasi memori yang lebih
  * kompleks ditangani oleh subsistem memori utama.
  *
- * Versi: 1.0
+ * KEPATUHAN STANDAR:
+ * - C90 (ANSI C89) dengan POSIX Safe Functions
+ *
+ * Versi: 2.0
  * Tanggal: 2025
  */
 
@@ -66,7 +69,7 @@ static memori_region_t memori_regions[32];
 static tak_bertanda32_t region_count = 0;
 
 /* Memory bitmap */
-static memori_bitmap_t memori_bitmap = {0};
+static memori_bitmap_t memori_bitmap;
 
 /* State */
 static bool_t memori_initialized = SALAH;
@@ -85,10 +88,10 @@ static bool_t memori_initialized = SALAH;
  * Parameter:
  *   index - Indeks bit
  */
-static inline void bitmap_set_bit(tak_bertanda64_t index)
+static void bitmap_set_bit(tak_bertanda64_t index)
 {
-    tak_bertanda32_t word = index / 32;
-    tak_bertanda32_t bit = index % 32;
+    tak_bertanda32_t word = (tak_bertanda32_t)(index / 32);
+    tak_bertanda32_t bit = (tak_bertanda32_t)(index % 32);
     memori_bitmap.bitmap[word] |= (1UL << bit);
 }
 
@@ -100,10 +103,10 @@ static inline void bitmap_set_bit(tak_bertanda64_t index)
  * Parameter:
  *   index - Indeks bit
  */
-static inline void bitmap_clear_bit(tak_bertanda64_t index)
+static void bitmap_clear_bit(tak_bertanda64_t index)
 {
-    tak_bertanda32_t word = index / 32;
-    tak_bertanda32_t bit = index % 32;
+    tak_bertanda32_t word = (tak_bertanda32_t)(index / 32);
+    tak_bertanda32_t bit = (tak_bertanda32_t)(index % 32);
     memori_bitmap.bitmap[word] &= ~(1UL << bit);
 }
 
@@ -117,10 +120,10 @@ static inline void bitmap_clear_bit(tak_bertanda64_t index)
  *
  * Return: 1 jika set, 0 jika clear
  */
-static inline bool_t bitmap_test_bit(tak_bertanda64_t index)
+static bool_t bitmap_test_bit(tak_bertanda64_t index)
 {
-    tak_bertanda32_t word = index / 32;
-    tak_bertanda32_t bit = index % 32;
+    tak_bertanda32_t word = (tak_bertanda32_t)(index / 32);
+    tak_bertanda32_t bit = (tak_bertanda32_t)(index % 32);
     return (memori_bitmap.bitmap[word] & (1UL << bit)) ? BENAR : SALAH;
 }
 
@@ -138,6 +141,7 @@ static status_t parse_multiboot_mmap(multiboot_info_t *bootinfo)
 {
     mmap_entry_t *entry;
     tak_bertanda32_t i;
+    uintptr_t mmap_end;
 
     if (!(bootinfo->flags & MULTIBOOT_FLAG_MMAP)) {
         /* Tidak ada memory map, gunakan mem_lower/mem_upper */
@@ -147,7 +151,7 @@ static status_t parse_multiboot_mmap(multiboot_info_t *bootinfo)
 
         memori_regions[1].mulai = 0x100000;  /* 1 MB */
         memori_regions[1].akhir = 0x100000 +
-                                 (bootinfo->mem_upper * 1024);
+                                 ((alamat_fisik_t)bootinfo->mem_upper * 1024);
         memori_regions[1].tipe = MMAP_TYPE_RAM;
 
         region_count = 2;
@@ -155,11 +159,11 @@ static status_t parse_multiboot_mmap(multiboot_info_t *bootinfo)
     }
 
     /* Parse memory map entries */
-    entry = (mmap_entry_t *)bootinfo->mmap_addr;
+    entry = (mmap_entry_t *)(uintptr_t)bootinfo->mmap_addr;
+    mmap_end = (uintptr_t)bootinfo->mmap_addr + bootinfo->mmap_length;
     i = 0;
 
-    while ((tak_bertanda32_t)entry < bootinfo->mmap_addr +
-                                     bootinfo->mmap_length) {
+    while ((uintptr_t)entry < mmap_end) {
         if (i >= 32) {
             break;
         }
@@ -168,7 +172,7 @@ static status_t parse_multiboot_mmap(multiboot_info_t *bootinfo)
         memori_regions[i].akhir = entry->base_addr + entry->length;
         memori_regions[i].tipe = entry->type;
 
-        entry = (mmap_entry_t *)((tak_bertanda8_t *)entry +
+        entry = (mmap_entry_t *)((uintptr_t)entry +
                                  entry->size + sizeof(entry->size));
         i++;
     }
@@ -226,7 +230,7 @@ static status_t init_memory_bitmap(tak_bertanda64_t total_pages)
     memori_bitmap.bitmap = (tak_bertanda32_t *)0x100000;
 
     /* Clear bitmap */
-    for (i = 0; i < bitmap_size / sizeof(tak_bertanda32_t); i++) {
+    for (i = 0; i < (tak_bertanda32_t)(bitmap_size / sizeof(tak_bertanda32_t)); i++) {
         memori_bitmap.bitmap[i] = 0xFFFFFFFF;  /* Semua digunakan dulu */
     }
 
@@ -246,7 +250,7 @@ static status_t init_memory_bitmap(tak_bertanda64_t total_pages)
 
             for (j = (tak_bertanda32_t)start_page;
                  j < (tak_bertanda32_t)end_page &&
-                 j < total_pages; j++) {
+                 j < (tak_bertanda32_t)total_pages; j++) {
                 bitmap_clear_bit(j);
                 memori_bitmap.free_pages++;
             }
@@ -257,7 +261,7 @@ static status_t init_memory_bitmap(tak_bertanda64_t total_pages)
     /* Kernel: 1 MB - 4 MB (default) */
     for (i = 0x100000 / UKURAN_HALAMAN;
          i < 0x400000 / UKURAN_HALAMAN &&
-         i < total_pages; i++) {
+         i < (tak_bertanda32_t)total_pages; i++) {
         if (!bitmap_test_bit(i)) {
             bitmap_set_bit(i);
             memori_bitmap.free_pages--;
@@ -296,7 +300,7 @@ status_t hal_memory_init(void *bootinfo)
     }
 
     if (bootinfo == NULL) {
-        return STATUS_PARAM_INVALID;
+        return STATUS_PARAM_NULL;
     }
 
     /* Parse memory map */
@@ -309,8 +313,8 @@ status_t hal_memory_init(void *bootinfo)
 
     if (total_memory < MINIMUM_MEMORY) {
         kernel_printf("[HAL] Memori tidak cukup: %lu MB (minimum: %lu MB)\n",
-                      total_memory / (1024 * 1024),
-                      MINIMUM_MEMORY / (1024 * 1024));
+                      (ukuran_t)(total_memory / (1024 * 1024)),
+                      (ukuran_t)(MINIMUM_MEMORY / (1024 * 1024)));
         return STATUS_MEMORI_HABIS;
     }
 
@@ -325,16 +329,19 @@ status_t hal_memory_init(void *bootinfo)
     /* Set informasi memori */
     info->total_bytes = total_memory;
     info->available_bytes = memori_bitmap.free_pages * UKURAN_HALAMAN;
+    info->used_bytes = total_memory - info->available_bytes;
     info->page_size = UKURAN_HALAMAN;
     info->page_count = total_pages;
+    info->free_pages = memori_bitmap.free_pages;
     info->has_pae = SALAH;  /* Akan di-deteksi nanti */
     info->has_nx = SALAH;   /* Akan di-deteksi nanti */
+    info->has_pse = SALAH;  /* Akan di-deteksi nanti */
 
     memori_initialized = BENAR;
 
     kernel_printf("[HAL] Memori: %lu MB total, %lu MB tersedia\n",
-                  total_memory / (1024 * 1024),
-                  info->available_bytes / (1024 * 1024));
+                  (ukuran_t)(total_memory / (1024 * 1024)),
+                  (ukuran_t)(info->available_bytes / (1024 * 1024)));
 
     return STATUS_BERHASIL;
 }
@@ -347,7 +354,7 @@ status_t hal_memory_init(void *bootinfo)
 status_t hal_memory_get_info(hal_memory_info_t *info)
 {
     if (info == NULL) {
-        return STATUS_PARAM_INVALID;
+        return STATUS_PARAM_NULL;
     }
 
     if (!memori_initialized) {
@@ -377,6 +384,18 @@ tak_bertanda64_t hal_memory_get_free_pages(void)
 tak_bertanda64_t hal_memory_get_total_pages(void)
 {
     return memori_bitmap.total_pages;
+}
+
+/*
+ * hal_memory_get_page_size
+ * ------------------------
+ * Dapatkan ukuran halaman.
+ *
+ * Return: Ukuran halaman dalam byte
+ */
+tak_bertanda32_t hal_memory_get_page_size(void)
+{
+    return UKURAN_HALAMAN;
 }
 
 /*
@@ -442,7 +461,7 @@ status_t hal_memory_free_page(alamat_fisik_t addr)
     if (!bitmap_test_bit(index)) {
         /* Double free! */
         kernel_printf("[HAL] PERINGATAN: Double free pada alamat 0x%lX\n",
-                      addr);
+                      (ukuran_t)addr);
         return STATUS_GAGAL;
     }
 
@@ -517,11 +536,62 @@ status_t hal_memory_free_pages(alamat_fisik_t addr, tak_bertanda32_t count)
 
     /* Free satu per satu */
     for (i = 0; i < count; i++) {
-        status = hal_memory_free_page(addr + (i * UKURAN_HALAMAN));
+        status = hal_memory_free_page(addr + ((alamat_fisik_t)i * UKURAN_HALAMAN));
         if (status != STATUS_BERHASIL) {
             return status;
         }
     }
 
     return STATUS_BERHASIL;
+}
+
+/*
+ * hal_memory_map_page
+ * -------------------
+ * Map halaman fisik ke alamat virtual.
+ *
+ * Parameter:
+ *   vaddr - Alamat virtual
+ *   paddr - Alamat fisik
+ *   flags - Flag mapping
+ *
+ * Return: Status operasi
+ */
+status_t hal_memory_map_page(alamat_virtual_t vaddr, alamat_fisik_t paddr,
+                              tak_bertanda32_t flags)
+{
+    /* Delegasikan ke paging subsystem */
+    return paging_map_page(vaddr, paddr, flags);
+}
+
+/*
+ * hal_memory_unmap_page
+ * ---------------------
+ * Unmap halaman dari alamat virtual.
+ *
+ * Parameter:
+ *   vaddr - Alamat virtual
+ *
+ * Return: Status operasi
+ */
+status_t hal_memory_unmap_page(alamat_virtual_t vaddr)
+{
+    /* Delegasikan ke paging subsystem */
+    return paging_unmap_page(vaddr);
+}
+
+/*
+ * hal_memory_get_physical
+ * -----------------------
+ * Dapatkan alamat fisik dari alamat virtual.
+ *
+ * Parameter:
+ *   vaddr - Alamat virtual
+ *
+ * Return: Alamat fisik, atau 0 jika tidak mapped
+ */
+alamat_fisik_t hal_memory_get_physical(alamat_virtual_t vaddr)
+{
+    /* Delegasikan ke paging subsystem */
+    return paging_get_physical(vaddr);
 }

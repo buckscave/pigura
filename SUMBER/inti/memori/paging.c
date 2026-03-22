@@ -6,11 +6,14 @@
  * Berkas ini berisi implementasi fungsi-fungsi untuk mengelola
  * page tables, page directory, dan operasi paging pada x86.
  *
- * Versi: 1.0
+ * Versi: 1.1
  * Tanggal: 2025
  */
 
 #include "../kernel.h"
+
+/* Forward declaration untuk compatibility dengan kernel.h */
+typedef struct page_directory page_directory_t;
 
 /*
  * ============================================================================
@@ -76,9 +79,9 @@ typedef struct {
 } __attribute__((aligned(PAGE_SIZE_4KB))) page_table_t;
 
 /* Page Directory */
-typedef struct {
+struct page_directory {
     pde_t entries[ENTRIES_PER_DIR];
-} __attribute__((aligned(PAGE_SIZE_4KB))) page_directory_t;
+} __attribute__((aligned(PAGE_SIZE_4KB)));
 
 /*
  * ============================================================================
@@ -278,7 +281,7 @@ status_t paging_init(tak_bertanda64_t mem_size)
 
     /* Load page directory */
     current_page_dir = kernel_page_dir;
-    cpu_write_cr3((tak_bertanda32_t)kernel_page_dir);
+    cpu_write_cr3((uintptr_t)kernel_page_dir);
 
     /* Enable paging */
     {
@@ -290,7 +293,7 @@ status_t paging_init(tak_bertanda64_t mem_size)
     paging_initialized = BENAR;
 
     kernel_printf("[PAGING] Enabled - Kernel dir at 0x%08lX\n",
-                  (alamat_ptr_t)kernel_page_dir);
+                  (uintptr_t)kernel_page_dir);
 
     return STATUS_BERHASIL;
 }
@@ -504,7 +507,7 @@ status_t paging_switch_directory(page_directory_t *dir)
     }
 
     current_page_dir = dir;
-    cpu_write_cr3((tak_bertanda32_t)dir);
+    cpu_write_cr3((uintptr_t)dir);
 
     return STATUS_BERHASIL;
 }

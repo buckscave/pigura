@@ -120,8 +120,9 @@ static status_t parse_memory_map(multiboot_info_t *bootinfo)
                       total / 1024);
     } else {
         /* Parse memory map */
-        mmap = (mmap_entry_t *)bootinfo->mmap_addr;
-        mmap_end = (mmap_entry_t *)(bootinfo->mmap_addr + bootinfo->mmap_length);
+        mmap = (mmap_entry_t *)(uintptr_t)bootinfo->mmap_addr;
+        mmap_end = (mmap_entry_t *)(uintptr_t)
+            (bootinfo->mmap_addr + bootinfo->mmap_length);
 
         kernel_printf("[MEM] Memory map at 0x%08lX, length %lu:\n",
                       bootinfo->mmap_addr, bootinfo->mmap_length);
@@ -333,8 +334,8 @@ status_t memori_init(multiboot_info_t *bootinfo)
 
     /* Add memory regions dari memory map */
     if (bootinfo != NULL && (bootinfo->flags & MULTIBOOT_FLAG_MMAP)) {
-        mmap_entry_t *mmap = (mmap_entry_t *)bootinfo->mmap_addr;
-        mmap_entry_t *mmap_end = (mmap_entry_t *)
+        mmap_entry_t *mmap = (mmap_entry_t *)(uintptr_t)bootinfo->mmap_addr;
+        mmap_entry_t *mmap_end = (mmap_entry_t *)(uintptr_t)
             (bootinfo->mmap_addr + bootinfo->mmap_length);
 
         while (mmap < mmap_end) {
@@ -347,9 +348,9 @@ status_t memori_init(multiboot_info_t *bootinfo)
         }
     } else {
         /* Gunakan mem_lower dan mem_upper */
-        pmm_add_region(0, bootinfo->mem_lower * 1024UL, MEMORY_TYPE_USABLE);
+        pmm_add_region(0, bootinfo->mem_lower * 1024UL, MMAP_TYPE_RAM);
         pmm_add_region(0x100000, 0x100000 + bootinfo->mem_upper * 1024UL,
-                       MEMORY_TYPE_USABLE);
+                       MMAP_TYPE_RAM);
     }
 
     /* Reserve kernel memory */

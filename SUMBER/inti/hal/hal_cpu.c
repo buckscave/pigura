@@ -6,7 +6,10 @@
  * Berkas ini berisi implementasi fungsi-fungsi yang berkaitan dengan
  * operasi CPU seperti deteksi CPU, kontrol interrupt, dan operasi cache.
  *
- * Versi: 1.0
+ * KEPATUHAN STANDAR:
+ * - C90 (ANSI C89) dengan POSIX Safe Functions
+ *
+ * Versi: 2.0
  * Tanggal: 2025
  */
 
@@ -19,66 +22,66 @@
  * ============================================================================
  */
 
-/* CPUID feature flags */
-#define CPUID_FEAT_EDX_FPU      (1 << 0)
-#define CPUID_FEAT_EDX_VME      (1 << 1)
-#define CPUID_FEAT_EDX_DE       (1 << 2)
-#define CPUID_FEAT_EDX_PSE      (1 << 3)
-#define CPUID_FEAT_EDX_TSC      (1 << 4)
-#define CPUID_FEAT_EDX_MSR      (1 << 5)
-#define CPUID_FEAT_EDX_PAE      (1 << 6)
-#define CPUID_FEAT_EDX_MCE      (1 << 7)
-#define CPUID_FEAT_EDX_CX8      (1 << 8)
-#define CPUID_FEAT_EDX_APIC     (1 << 9)
-#define CPUID_FEAT_EDX_SEP      (1 << 11)
-#define CPUID_FEAT_EDX_MTRR     (1 << 12)
-#define CPUID_FEAT_EDX_PGE      (1 << 13)
-#define CPUID_FEAT_EDX_MCA      (1 << 14)
-#define CPUID_FEAT_EDX_CMOV     (1 << 15)
-#define CPUID_FEAT_EDX_PAT      (1 << 16)
-#define CPUID_FEAT_EDX_PSE36    (1 << 17)
-#define CPUID_FEAT_EDX_PSN      (1 << 18)
-#define CPUID_FEAT_EDX_CLFSH    (1 << 19)
-#define CPUID_FEAT_EDX_DS       (1 << 21)
-#define CPUID_FEAT_EDX_ACPI     (1 << 22)
-#define CPUID_FEAT_EDX_MMX      (1 << 23)
-#define CPUID_FEAT_EDX_FXSR     (1 << 24)
-#define CPUID_FEAT_EDX_SSE      (1 << 25)
-#define CPUID_FEAT_EDX_SSE2     (1 << 26)
-#define CPUID_FEAT_EDX_SS       (1 << 27)
-#define CPUID_FEAT_EDX_HTT      (1 << 28)
-#define CPUID_FEAT_EDX_TM       (1 << 29)
-#define CPUID_FEAT_EDX_IA64     (1 << 30)
-#define CPUID_FEAT_EDX_PBE      (1 << 31)
+/* CPUID feature flags - EDX */
+#define CPUID_FEAT_EDX_FPU      (1U << 0)
+#define CPUID_FEAT_EDX_VME      (1U << 1)
+#define CPUID_FEAT_EDX_DE       (1U << 2)
+#define CPUID_FEAT_EDX_PSE      (1U << 3)
+#define CPUID_FEAT_EDX_TSC      (1U << 4)
+#define CPUID_FEAT_EDX_MSR      (1U << 5)
+#define CPUID_FEAT_EDX_PAE      (1U << 6)
+#define CPUID_FEAT_EDX_MCE      (1U << 7)
+#define CPUID_FEAT_EDX_CX8      (1U << 8)
+#define CPUID_FEAT_EDX_APIC     (1U << 9)
+#define CPUID_FEAT_EDX_SEP      (1U << 11)
+#define CPUID_FEAT_EDX_MTRR     (1U << 12)
+#define CPUID_FEAT_EDX_PGE      (1U << 13)
+#define CPUID_FEAT_EDX_MCA      (1U << 14)
+#define CPUID_FEAT_EDX_CMOV     (1U << 15)
+#define CPUID_FEAT_EDX_PAT      (1U << 16)
+#define CPUID_FEAT_EDX_PSE36    (1U << 17)
+#define CPUID_FEAT_EDX_PSN      (1U << 18)
+#define CPUID_FEAT_EDX_CLFSH    (1U << 19)
+#define CPUID_FEAT_EDX_DS       (1U << 21)
+#define CPUID_FEAT_EDX_ACPI     (1U << 22)
+#define CPUID_FEAT_EDX_MMX      (1U << 23)
+#define CPUID_FEAT_EDX_FXSR     (1U << 24)
+#define CPUID_FEAT_EDX_SSE      (1U << 25)
+#define CPUID_FEAT_EDX_SSE2     (1U << 26)
+#define CPUID_FEAT_EDX_SS       (1U << 27)
+#define CPUID_FEAT_EDX_HTT      (1U << 28)
+#define CPUID_FEAT_EDX_TM       (1U << 29)
+#define CPUID_FEAT_EDX_IA64     (1U << 30)
+#define CPUID_FEAT_EDX_PBE      (1U << 31)
 
-/* CPUID extended feature flags */
-#define CPUID_FEAT_ECX_SSE3     (1 << 0)
-#define CPUID_FEAT_ECX_PCLMUL   (1 << 1)
-#define CPUID_FEAT_ECX_DTES64   (1 << 2)
-#define CPUID_FEAT_ECX_MONITOR  (1 << 3)
-#define CPUID_FEAT_ECX_DS_CPL   (1 << 4)
-#define CPUID_FEAT_ECX_VMX      (1 << 5)
-#define CPUID_FEAT_ECX_SMX      (1 << 6)
-#define CPUID_FEAT_ECX_EST      (1 << 7)
-#define CPUID_FEAT_ECX_TM2      (1 << 8)
-#define CPUID_FEAT_ECX_SSSE3    (1 << 9)
-#define CPUID_FEAT_ECX_CID      (1 << 10)
-#define CPUID_FEAT_ECX_FMA      (1 << 12)
-#define CPUID_FEAT_ECX_CX16     (1 << 13)
-#define CPUID_FEAT_ECX_XTPR     (1 << 14)
-#define CPUID_FEAT_ECX_PDCM     (1 << 15)
-#define CPUID_FEAT_ECX_PCID     (1 << 17)
-#define CPUID_FEAT_ECX_DCA      (1 << 18)
-#define CPUID_FEAT_ECX_SSE41    (1 << 19)
-#define CPUID_FEAT_ECX_SSE42    (1 << 20)
-#define CPUID_FEAT_ECX_X2APIC   (1 << 21)
-#define CPUID_FEAT_ECX_MOVBE    (1 << 22)
-#define CPUID_FEAT_ECX_POPCNT   (1 << 23)
-#define CPUID_FEAT_ECX_TSC_DL   (1 << 24)
-#define CPUID_FEAT_ECX_AES      (1 << 25)
-#define CPUID_FEAT_ECX_XSAVE    (1 << 26)
-#define CPUID_FEAT_ECX_OSXSAVE  (1 << 27)
-#define CPUID_FEAT_ECX_AVX      (1 << 28)
+/* CPUID extended feature flags - ECX */
+#define CPUID_FEAT_ECX_SSE3     (1U << 0)
+#define CPUID_FEAT_ECX_PCLMUL   (1U << 1)
+#define CPUID_FEAT_ECX_DTES64   (1U << 2)
+#define CPUID_FEAT_ECX_MONITOR  (1U << 3)
+#define CPUID_FEAT_ECX_DS_CPL   (1U << 4)
+#define CPUID_FEAT_ECX_VMX      (1U << 5)
+#define CPUID_FEAT_ECX_SMX      (1U << 6)
+#define CPUID_FEAT_ECX_EST      (1U << 7)
+#define CPUID_FEAT_ECX_TM2      (1U << 8)
+#define CPUID_FEAT_ECX_SSSE3    (1U << 9)
+#define CPUID_FEAT_ECX_CID      (1U << 10)
+#define CPUID_FEAT_ECX_FMA      (1U << 12)
+#define CPUID_FEAT_ECX_CX16     (1U << 13)
+#define CPUID_FEAT_ECX_XTPR     (1U << 14)
+#define CPUID_FEAT_ECX_PDCM     (1U << 15)
+#define CPUID_FEAT_ECX_PCID     (1U << 17)
+#define CPUID_FEAT_ECX_DCA      (1U << 18)
+#define CPUID_FEAT_ECX_SSE41    (1U << 19)
+#define CPUID_FEAT_ECX_SSE42    (1U << 20)
+#define CPUID_FEAT_ECX_X2APIC   (1U << 21)
+#define CPUID_FEAT_ECX_MOVBE    (1U << 22)
+#define CPUID_FEAT_ECX_POPCNT   (1U << 23)
+#define CPUID_FEAT_ECX_TSC_DL   (1U << 24)
+#define CPUID_FEAT_ECX_AES      (1U << 25)
+#define CPUID_FEAT_ECX_XSAVE    (1U << 26)
+#define CPUID_FEAT_ECX_OSXSAVE  (1U << 27)
+#define CPUID_FEAT_ECX_AVX      (1U << 28)
 
 /*
  * ============================================================================
@@ -208,6 +211,7 @@ static void cpu_detect_features(hal_cpu_info_t *info)
 
     /* Simpan feature flags */
     info->features = res.edx;
+    info->features_ext = res.ecx;
 
     /* Deteksi family, model, stepping */
     info->stepping = res.eax & 0xF;
@@ -244,20 +248,26 @@ static void cpu_detect_cache(hal_cpu_info_t *info)
     /* Gunakan leaf 0x80000005 untuk L1 cache (AMD) atau leaf 2 (Intel) */
     cpuid(0x80000005, 0, &res);
 
-    info->cache_l1 = ((res.ecx >> 24) & 0xFF) * 1024; /* L1 data cache */
+    /* L1 data cache (dalam KB) */
+    info->cache_l1_data = ((res.ecx >> 24) & 0xFF) * 1024;
+    /* L1 instruction cache (dalam KB) */
+    info->cache_l1_inst = ((res.edx >> 24) & 0xFF) * 1024;
 
     /* Gunakan leaf 0x80000006 untuk L2 dan L3 cache */
     cpuid(0x80000006, 0, &res);
 
-    info->cache_l2 = ((res.ecx >> 16) & 0xFFFF) * 1024; /* L2 cache */
-    info->cache_l3 = ((res.edx >> 18) & 0x3FFF) * 512 * 1024; /* L3 cache */
+    /* L2 cache (dalam KB) */
+    info->cache_l2 = ((res.ecx >> 16) & 0xFFFF) * 1024;
+    /* L3 cache (dalam KB) */
+    info->cache_l3 = ((res.edx >> 18) & 0x3FFF) * 512 * 1024;
 
-    /* Jika tidak ada informasi dari extended leaf, gunakan leaf 2 */
-    if (info->cache_l1 == 0) {
+    /* Jika tidak ada informasi dari extended leaf, gunakan default */
+    if (info->cache_l1_data == 0) {
         /* Default untuk Intel */
-        info->cache_l1 = 32 * 1024;  /* 32 KB */
-        info->cache_l2 = 256 * 1024; /* 256 KB */
-        info->cache_l3 = 8 * 1024 * 1024; /* 8 MB */
+        info->cache_l1_data = 32 * 1024;   /* 32 KB */
+        info->cache_l1_inst = 32 * 1024;   /* 32 KB */
+        info->cache_l2 = 256 * 1024;       /* 256 KB */
+        info->cache_l3 = 8 * 1024 * 1024;  /* 8 MB */
     }
 }
 
@@ -269,13 +279,15 @@ static void cpu_detect_cache(hal_cpu_info_t *info)
  */
 static void cpu_detect_frequency(hal_cpu_info_t *info)
 {
-    tak_bertanda64_t tsc_start, tsc_end;
+    tak_bertanda64_t tsc_start;
+    tak_bertanda64_t tsc_end;
     tak_bertanda32_t i;
+    tak_bertanda32_t freq_khz;
 
     /* Baca TSC awal */
     __asm__ __volatile__("rdtsc" : "=A"(tsc_start));
 
-    /* Delay kira-kira 50ms menggunakan PIT */
+    /* Delay kira-kira 50ms menggunakan busy wait */
     for (i = 0; i < 5000000; i++) {
         __asm__ __volatile__("nop");
     }
@@ -283,15 +295,17 @@ static void cpu_detect_frequency(hal_cpu_info_t *info)
     /* Baca TSC akhir */
     __asm__ __volatile__("rdtsc" : "=A"(tsc_end));
 
-    /* Estimasi frekuensi (sangat kasar) */
-    info->freq_mhz = (tak_bertanda32_t)((tsc_end - tsc_start) / 50000);
+    /* Estimasi frekuensi dalam kHz (sangat kasar) */
+    freq_khz = (tak_bertanda32_t)((tsc_end - tsc_start) / 50);
 
     /* Batasi ke nilai yang wajar jika estimasi terlalu jauh */
-    if (info->freq_mhz < 100) {
-        info->freq_mhz = 1000; /* Default 1 GHz */
-    } else if (info->freq_mhz > 10000) {
-        info->freq_mhz = 3000; /* Default 3 GHz */
+    if (freq_khz < 100000) {
+        freq_khz = 1000000;     /* Default 1 GHz */
+    } else if (freq_khz > 10000000) {
+        freq_khz = 3000000;     /* Default 3 GHz */
     }
+
+    info->freq_khz = freq_khz;
 }
 
 /*
@@ -430,7 +444,7 @@ tak_bertanda32_t hal_cpu_get_id(void)
 status_t hal_cpu_get_info(hal_cpu_info_t *info)
 {
     if (info == NULL) {
-        return STATUS_PARAM_INVALID;
+        return STATUS_PARAM_NULL;
     }
 
     kernel_memcpy(info, &cpu_info_local, sizeof(hal_cpu_info_t));
@@ -521,7 +535,7 @@ void hal_cpu_cache_disable(void)
     cr0 = cpu_read_cr0();
 
     /* Set CD (Cache Disable) dan NW (Not Write-through) bits */
-    cr0 |= (1 << 30) | (1 << 29);
+    cr0 |= (1U << 30) | (1U << 29);
 
     cpu_write_cr0(cr0);
 
@@ -544,7 +558,7 @@ void hal_cpu_cache_enable(void)
     cr0 = cpu_read_cr0();
 
     /* Clear CD dan NW bits */
-    cr0 &= ~((1 << 30) | (1 << 29));
+    cr0 &= ~((1U << 30) | (1U << 29));
 
     cpu_write_cr0(cr0);
 }

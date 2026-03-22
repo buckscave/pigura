@@ -6,11 +6,14 @@
  * Berkas ini berisi implementasi fungsi-fungsi utilitas string dan memory
  * yang digunakan di seluruh kernel.
  *
- * Versi: 1.0
+ * KEPATUHAN STANDAR:
+ * - C90 (ANSI C89) dengan POSIX Safe Functions
+ *
+ * Versi: 2.0
  * Tanggal: 2025
  */
 
-#include "kernel.h"
+#include "../kernel.h"
 
 /*
  * ============================================================================
@@ -157,6 +160,98 @@ int kernel_memcmp(const void *s1, const void *s2, ukuran_t n)
 }
 
 /*
+ * kernel_memchr
+ * -------------
+ * Cari karakter dalam memory.
+ *
+ * Parameter:
+ *   s - Buffer
+ *   c - Karakter yang dicari
+ *   n - Jumlah byte
+ *
+ * Return: Pointer ke karakter, atau NULL jika tidak ditemukan
+ */
+void *kernel_memchr(const void *s, int c, ukuran_t n)
+{
+    const tak_bertanda8_t *p;
+    ukuran_t i;
+
+    if (s == NULL || n == 0) {
+        return NULL;
+    }
+
+    p = (const tak_bertanda8_t *)s;
+
+    for (i = 0; i < n; i++) {
+        if (p[i] == (tak_bertanda8_t)c) {
+            return (void *)(p + i);
+        }
+    }
+
+    return NULL;
+}
+
+/*
+ * kernel_memset32
+ * ---------------
+ * Set memory dengan 32-bit value.
+ *
+ * Parameter:
+ *   s   - Buffer
+ *   val - Nilai 32-bit
+ *   n   - Jumlah dword
+ *
+ * Return: Pointer ke s
+ */
+void *kernel_memset32(void *s, tak_bertanda32_t val, ukuran_t n)
+{
+    tak_bertanda32_t *ptr;
+    ukuran_t i;
+
+    if (s == NULL || n == 0) {
+        return s;
+    }
+
+    ptr = (tak_bertanda32_t *)s;
+
+    for (i = 0; i < n; i++) {
+        ptr[i] = val;
+    }
+
+    return s;
+}
+
+/*
+ * kernel_memset64
+ * ---------------
+ * Set memory dengan 64-bit value.
+ *
+ * Parameter:
+ *   s   - Buffer
+ *   val - Nilai 64-bit
+ *   n   - Jumlah qword
+ *
+ * Return: Pointer ke s
+ */
+void *kernel_memset64(void *s, tak_bertanda64_t val, ukuran_t n)
+{
+    tak_bertanda64_t *ptr;
+    ukuran_t i;
+
+    if (s == NULL || n == 0) {
+        return s;
+    }
+
+    ptr = (tak_bertanda64_t *)s;
+
+    for (i = 0; i < n; i++) {
+        ptr[i] = val;
+    }
+
+    return s;
+}
+
+/*
  * ============================================================================
  * FUNGSI STRING (STRING FUNCTIONS)
  * ============================================================================
@@ -189,6 +284,62 @@ ukuran_t kernel_strlen(const char *s)
 }
 
 /*
+ * kernel_strnlen
+ * --------------
+ * Hitung panjang string dengan batas.
+ *
+ * Parameter:
+ *   s      - String
+ *   maxlen - Panjang maksimum
+ *
+ * Return: Panjang string
+ */
+ukuran_t kernel_strnlen(const char *s, ukuran_t maxlen)
+{
+    ukuran_t len;
+
+    if (s == NULL || maxlen == 0) {
+        return 0;
+    }
+
+    len = 0;
+    while (len < maxlen && s[len] != '\0') {
+        len++;
+    }
+
+    return len;
+}
+
+/*
+ * kernel_strcpy
+ * -------------
+ * Copy string.
+ *
+ * Parameter:
+ *   dest - Buffer tujuan
+ *   src  - String sumber
+ *
+ * Return: Pointer ke dest
+ */
+char *kernel_strcpy(char *dest, const char *src)
+{
+    ukuran_t i;
+
+    if (dest == NULL || src == NULL) {
+        return dest;
+    }
+
+    i = 0;
+    while (src[i] != '\0') {
+        dest[i] = src[i];
+        i++;
+    }
+    dest[i] = '\0';
+
+    return dest;
+}
+
+/*
  * kernel_strncpy
  * --------------
  * Copy string dengan batas.
@@ -215,6 +366,67 @@ char *kernel_strncpy(char *dest, const char *src, ukuran_t n)
     for (; i < n; i++) {
         dest[i] = '\0';
     }
+
+    return dest;
+}
+
+/*
+ * kernel_strcat
+ * -------------
+ * Concatenate string.
+ *
+ * Parameter:
+ *   dest - Buffer tujuan
+ *   src  - String sumber
+ *
+ * Return: Pointer ke dest
+ */
+char *kernel_strcat(char *dest, const char *src)
+{
+    ukuran_t dest_len;
+    ukuran_t i;
+
+    if (dest == NULL || src == NULL) {
+        return dest;
+    }
+
+    dest_len = kernel_strlen(dest);
+
+    for (i = 0; src[i] != '\0'; i++) {
+        dest[dest_len + i] = src[i];
+    }
+    dest[dest_len + i] = '\0';
+
+    return dest;
+}
+
+/*
+ * kernel_strncat
+ * --------------
+ * Concatenate string dengan batas.
+ *
+ * Parameter:
+ *   dest - Buffer tujuan
+ *   src  - String sumber
+ *   n    - Ukuran buffer tersisa
+ *
+ * Return: Pointer ke dest
+ */
+char *kernel_strncat(char *dest, const char *src, ukuran_t n)
+{
+    ukuran_t dest_len;
+    ukuran_t i;
+
+    if (dest == NULL || src == NULL || n == 0) {
+        return dest;
+    }
+
+    dest_len = kernel_strlen(dest);
+
+    for (i = 0; i < n && src[i] != '\0'; i++) {
+        dest[dest_len + i] = src[i];
+    }
+    dest[dest_len + i] = '\0';
 
     return dest;
 }
@@ -280,6 +492,214 @@ int kernel_strncmp(const char *s1, const char *s2, ukuran_t n)
     }
 
     return 0;
+}
+
+/*
+ * kernel_strcasecmp
+ * -----------------
+ * Compare dua string (case insensitive).
+ *
+ * Parameter:
+ *   s1 - String pertama
+ *   s2 - String kedua
+ *
+ * Return: 0 jika sama
+ */
+int kernel_strcasecmp(const char *s1, const char *s2)
+{
+    if (s1 == NULL || s2 == NULL) {
+        if (s1 == s2) {
+            return 0;
+        }
+        return (s1 == NULL) ? -1 : 1;
+    }
+
+    while (*s1 && *s2) {
+        char c1 = *s1;
+        char c2 = *s2;
+
+        /* Konversi ke lowercase */
+        if (c1 >= 'A' && c1 <= 'Z') {
+            c1 = c1 + ('a' - 'A');
+        }
+        if (c2 >= 'A' && c2 <= 'Z') {
+            c2 = c2 + ('a' - 'A');
+        }
+
+        if (c1 != c2) {
+            return (tak_bertanda8_t)c1 - (tak_bertanda8_t)c2;
+        }
+
+        s1++;
+        s2++;
+    }
+
+    return (tak_bertanda8_t)*s1 - (tak_bertanda8_t)*s2;
+}
+
+/*
+ * kernel_strchr
+ * -------------
+ * Cari karakter dalam string.
+ *
+ * Parameter:
+ *   s - String
+ *   c - Karakter
+ *
+ * Return: Pointer ke karakter, atau NULL
+ */
+char *kernel_strchr(const char *s, int c)
+{
+    if (s == NULL) {
+        return NULL;
+    }
+
+    while (*s != '\0') {
+        if (*s == (char)c) {
+            return (char *)s;
+        }
+        s++;
+    }
+
+    /* Cek untuk null terminator */
+    if (c == '\0') {
+        return (char *)s;
+    }
+
+    return NULL;
+}
+
+/*
+ * kernel_strrchr
+ * --------------
+ * Cari karakter terakhir dalam string.
+ *
+ * Parameter:
+ *   s - String
+ *   c - Karakter
+ *
+ * Return: Pointer ke karakter, atau NULL
+ */
+char *kernel_strrchr(const char *s, int c)
+{
+    const char *last;
+
+    if (s == NULL) {
+        return NULL;
+    }
+
+    last = NULL;
+
+    while (*s != '\0') {
+        if (*s == (char)c) {
+            last = s;
+        }
+        s++;
+    }
+
+    /* Cek untuk null terminator */
+    if (c == '\0') {
+        return (char *)s;
+    }
+
+    return (char *)last;
+}
+
+/*
+ * kernel_strstr
+ * -------------
+ * Cari substring dalam string.
+ *
+ * Parameter:
+ *   haystack - String sumber
+ *   needle   - Substring yang dicari
+ *
+ * Return: Pointer ke substring, atau NULL
+ */
+char *kernel_strstr(const char *haystack, const char *needle)
+{
+    ukuran_t needle_len;
+
+    if (haystack == NULL || needle == NULL) {
+        return NULL;
+    }
+
+    if (*needle == '\0') {
+        return (char *)haystack;
+    }
+
+    needle_len = kernel_strlen(needle);
+
+    while (*haystack != '\0') {
+        if (*haystack == *needle) {
+            if (kernel_strncmp(haystack, needle, needle_len) == 0) {
+                return (char *)haystack;
+            }
+        }
+        haystack++;
+    }
+
+    return NULL;
+}
+
+/*
+ * kernel_strdup
+ * -------------
+ * Duplikasi string (harus di-free).
+ *
+ * Parameter:
+ *   s - String
+ *
+ * Return: Pointer ke string baru, atau NULL
+ */
+char *kernel_strdup(const char *s)
+{
+    ukuran_t len;
+    char *dup;
+
+    if (s == NULL) {
+        return NULL;
+    }
+
+    len = kernel_strlen(s);
+    dup = (char *)kmalloc(len + 1);
+
+    if (dup != NULL) {
+        kernel_strcpy(dup, s);
+    }
+
+    return dup;
+}
+
+/*
+ * kernel_strndup
+ * --------------
+ * Duplikasi string dengan batas.
+ *
+ * Parameter:
+ *   s - String
+ *   n - Panjang maksimum
+ *
+ * Return: Pointer ke string baru, atau NULL
+ */
+char *kernel_strndup(const char *s, ukuran_t n)
+{
+    ukuran_t len;
+    char *dup;
+
+    if (s == NULL) {
+        return NULL;
+    }
+
+    len = kernel_strnlen(s, n);
+    dup = (char *)kmalloc(len + 1);
+
+    if (dup != NULL) {
+        kernel_strncpy(dup, s, len);
+        dup[len] = '\0';
+    }
+
+    return dup;
 }
 
 /*
@@ -509,7 +929,7 @@ static int internal_vsnprintf(char *str, ukuran_t size,
                             printf_putchar(&state, '0');
                             printf_putchar(&state, 'x');
                             printf_print_num(&state,
-                                             (tak_bertanda64_t)(ukuran_t)ptr,
+                                             (tak_bertanda64_t)(uintptr_t)ptr,
                                              16, 8, '0', 0, 0);
                             break;
                         }
@@ -551,8 +971,6 @@ static int internal_vsnprintf(char *str, ukuran_t size,
     return state.total;
 }
 
-
-
 /*
  * ============================================================================
  * FUNGSI OUTPUT KERNEL (KERNEL OUTPUT FUNCTIONS)
@@ -591,6 +1009,8 @@ int kernel_printk(int level, const char *format, ...)
     va_list ap;
     char buffer[1024];
     int ret;
+    tak_bertanda8_t old_fg;
+    tak_bertanda8_t old_bg;
 
     if (level > CONFIG_LOG_LEVEL) {
         return 0;
@@ -603,10 +1023,72 @@ int kernel_printk(int level, const char *format, ...)
     if (ret > 0) {
         switch (level) {
             case LOG_ERROR:
-                hal_console_print_error(buffer);
+                /* Print dengan warna merah untuk error */
+                hal_console_set_color(VGA_MERAH, VGA_HITAM);
+                hal_console_puts(buffer);
+                hal_console_set_color(VGA_ABU_ABU, VGA_HITAM);
                 break;
             case LOG_WARN:
-                hal_console_print_warning(buffer);
+                /* Print dengan warna kuning untuk warning */
+                hal_console_set_color(VGA_KUNING, VGA_HITAM);
+                hal_console_puts(buffer);
+                hal_console_set_color(VGA_ABU_ABU, VGA_HITAM);
+                break;
+            default:
+                hal_console_puts(buffer);
+                break;
+        }
+    }
+
+    return ret;
+}
+
+/*
+ * kernel_vprintf
+ * --------------
+ * Print formatted string dengan va_list.
+ */
+int kernel_vprintf(const char *format, va_list args)
+{
+    char buffer[1024];
+    int ret;
+
+    ret = internal_vsnprintf(buffer, sizeof(buffer), format, args);
+
+    if (ret > 0) {
+        hal_console_puts(buffer);
+    }
+
+    return ret;
+}
+
+/*
+ * kernel_vprintk
+ * --------------
+ * Print ke kernel log dengan va_list.
+ */
+int kernel_vprintk(int level, const char *format, va_list args)
+{
+    char buffer[1024];
+    int ret;
+
+    if (level > CONFIG_LOG_LEVEL) {
+        return 0;
+    }
+
+    ret = internal_vsnprintf(buffer, sizeof(buffer), format, args);
+
+    if (ret > 0) {
+        switch (level) {
+            case LOG_ERROR:
+                hal_console_set_color(VGA_MERAH, VGA_HITAM);
+                hal_console_puts(buffer);
+                hal_console_set_color(VGA_ABU_ABU, VGA_HITAM);
+                break;
+            case LOG_WARN:
+                hal_console_set_color(VGA_KUNING, VGA_HITAM);
+                hal_console_puts(buffer);
+                hal_console_set_color(VGA_ABU_ABU, VGA_HITAM);
                 break;
             default:
                 hal_console_puts(buffer);
@@ -775,4 +1257,39 @@ const char *kernel_get_arch(void)
 const char *kernel_get_version(void)
 {
     return PIGURA_VERSI_STRING;
+}
+
+/*
+ * kernel_get_hostname
+ * -------------------
+ * Dapatkan hostname sistem.
+ */
+const char *kernel_get_hostname(void)
+{
+    return g_info_sistem.hostname;
+}
+
+/*
+ * kernel_set_hostname
+ * -------------------
+ * Set hostname sistem.
+ */
+status_t kernel_set_hostname(const char *hostname)
+{
+    ukuran_t len;
+
+    if (hostname == NULL) {
+        return STATUS_PARAM_NULL;
+    }
+
+    len = kernel_strlen(hostname);
+    if (len == 0 || len >= sizeof(g_info_sistem.hostname)) {
+        return STATUS_PARAM_UKURAN;
+    }
+
+    kernel_strncpy(g_info_sistem.hostname, hostname,
+                   sizeof(g_info_sistem.hostname) - 1);
+    g_info_sistem.hostname[sizeof(g_info_sistem.hostname) - 1] = '\0';
+
+    return STATUS_BERHASIL;
 }
