@@ -12,6 +12,7 @@
  */
 
 #include "../../inti/kernel.h"
+#include "cpu_x86.h"
 
 /*
  * ============================================================================
@@ -174,7 +175,7 @@ status_t hal_init(void)
     _init_pit(FREKUENSI_TIMER);
 
     /* Set flag inisialisasi */
-    g_hal_state_x86.initialized = BENAR;
+    g_hal_state_x86.status = HAL_STATUS_READY;
     g_hal_diinisialisasi = BENAR;
 
     kernel_printf("[HAL-x86] HAL siap\n");
@@ -198,7 +199,7 @@ status_t hal_shutdown(void)
     /* Disable interrupt */
     hal_cpu_disable_interrupts();
 
-    g_hal_state_x86.initialized = SALAH;
+    g_hal_state_x86.status = HAL_STATUS_UNINITIALIZED;
     g_hal_diinisialisasi = SALAH;
 
     return STATUS_BERHASIL;
@@ -534,15 +535,15 @@ void hal_timer_delay(tak_bertanda32_t mikrodetik)
     tak_bertanda64_t start;
     tak_bertanda64_t end;
     tak_bertanda64_t delay_cycls;
-    tak_bertanda32_t freq_mhz;
+    tak_bertanda32_t freq_khz;
 
-    freq_mhz = g_hal_state_x86.cpu.freq_mhz;
-    if (freq_mhz == 0) {
-        freq_mhz = 1000;
+    freq_khz = g_hal_state_x86.cpu.freq_khz;
+    if (freq_khz == 0) {
+        freq_khz = 1000;
     }
 
     start = g_timer_ticks;
-    delay_cycls = (tak_bertanda64_t)freq_mhz * mikrodetik;
+    delay_cycls = (tak_bertanda64_t)freq_khz * mikrodetik;
 
     do {
         end = g_timer_ticks;
