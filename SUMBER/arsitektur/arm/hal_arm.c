@@ -10,6 +10,7 @@
  * Versi: 1.0
  */
 
+#include "../../inti/kernel.h"
 #include "../../inti/types.h"
 #include "../../inti/konstanta.h"
 #include "../../inti/hal/hal.h"
@@ -65,7 +66,7 @@ status_t hal_init(void)
     }
 
     /* Mark sebagai initialized */
-    g_hal_state.initialized = BENAR;
+    g_hal_state.status = HAL_STATUS_READY;
 
     return STATUS_BERHASIL;
 }
@@ -83,7 +84,7 @@ status_t hal_shutdown(void)
     hal_cpu_disable_interrupts();
 
     /* Mark sebagai tidak initialized */
-    g_hal_state.initialized = SALAH;
+    g_hal_state.status = HAL_STATUS_UNINITIALIZED;
 
     return STATUS_BERHASIL;
 }
@@ -109,7 +110,7 @@ const hal_state_t *hal_get_state(void)
  */
 bool_t hal_is_initialized(void)
 {
-    return g_hal_state.initialized;
+    return (g_hal_state.status == HAL_STATUS_READY) ? BENAR : SALAH;
 }
 
 /*
