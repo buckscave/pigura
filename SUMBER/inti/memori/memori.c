@@ -241,14 +241,14 @@ static void reserve_kernel_memory(multiboot_info_t *bootinfo)
 
     /* Hitung ukuran kernel dari modules atau gunakan default */
     if (bootinfo != NULL && (bootinfo->flags & MULTIBOOT_FLAG_MODS)) {
-        module_t *mods = (module_t *)bootinfo->mods_addr;
+        module_t *mods = (module_t *)(uintptr_t)bootinfo->mods_addr;
         if (bootinfo->mods_count > 0) {
             kernel_end = mods[0].mod_end;
         } else {
-            kernel_end = kernel_start + (1 * 1024 * 1024);  /* 1 MB default */
+            kernel_end = kernel_start + (1 * 1024 * 1024);  /* 1 MB */
         }
     } else {
-        kernel_end = kernel_start + (1 * 1024 * 1024);  /* 1 MB default */
+        kernel_end = kernel_start + (1 * 1024 * 1024);  /* 1 MB */
     }
 
     kernel_size = kernel_end - kernel_start;

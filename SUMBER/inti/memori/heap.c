@@ -429,7 +429,7 @@ void kfree(void *ptr)
         heap_stats.free_errors++;
         spinlock_buka(&kernel_heap.lock);
         kernel_printf("[HEAP] WARNING: Invalid free at 0x%08lX\n",
-                      (alamat_ptr_t)ptr);
+                      (uintptr_t)ptr);
         return;
     }
 
@@ -437,7 +437,7 @@ void kfree(void *ptr)
         heap_stats.free_errors++;
         spinlock_buka(&kernel_heap.lock);
         kernel_printf("[HEAP] WARNING: Double free at 0x%08lX\n",
-                      (alamat_ptr_t)ptr);
+                      (uintptr_t)ptr);
         return;
     }
 

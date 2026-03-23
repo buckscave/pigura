@@ -1803,7 +1803,7 @@ void allocator_print_stats(void);
  * ===========================================================================
  */
 
-#if defined(ARSITEKTUR_ARM32) || defined(ARSITEKTUR_ARM64)
+#if defined(ARSITEKTUR_ARM) || defined(ARSITEKTUR_ARMV7) || defined(ARSITEKTUR_ARM64)
 
 /* Hentikan CPU */
 #define cpu_halt() \
@@ -1833,6 +1833,6 @@ void allocator_print_stats(void);
 #define cpu_isb() \
     do { __asm__ __volatile__("isb sy"); } while (0)
 
-#endif /* ARSITEKTUR_ARM32 || ARSITEKTUR_ARM64 */
+#endif /* ARSITEKTUR_ARM || ARSITEKTUR_ARMV7 || ARSITEKTUR_ARM64 */
 
 #endif /* INTI_KERNEL_H */

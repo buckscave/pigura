@@ -122,6 +122,10 @@ typedef tak_bertanda32_t offset_halaman_t;
     typedef tanda32_t intptr_t;
 #endif
 
+/* Alias untuk menyimpan pointer sebagai integer (bahasa Indonesia) */
+typedef uintptr_t alamat_ptr_t;
+typedef intptr_t jarak_ptr_t;
+
 /*
  * ===========================================================================
  * TIPE INTEGER PORTABEL (PORTABLE INTEGER TYPES)

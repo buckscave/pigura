@@ -50,13 +50,17 @@
     #define SUPPORT_LONG_MODE 1
     #define SUPPORT_SEGMENTASI 0
 
-#elif defined(ARSITEKTUR_ARM32)
+#elif defined(ARSITEKTUR_ARM) || defined(ARSITEKTUR_ARMV7)
+    /* ARM 32-bit (ARMv7-A atau ARM generik) */
     #define NAMA_ARSITEKTUR "arm"
     #define NAMA_ARSITEKTUR_LENGKAP "ARM (32-bit)"
     #define LEBAR_BIT 32
     #define PAGING_32BIT 1
     #define SUPPORT_MMU_ARM 1
     #define SUPPORT_VFP 1
+    #ifdef ARSITEKTUR_ARMV7
+        #define SUPPORT_NEON 1
+    #endif
 
 #elif defined(ARSITEKTUR_ARM64)
     #define NAMA_ARSITEKTUR "arm64"

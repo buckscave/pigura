@@ -17,6 +17,13 @@
 #include "../kernel.h"
 
 /*
+ * Untuk arsitektur x86/x86_64, include header CPU-specific
+ */
+#if defined(ARSITEKTUR_X86) || defined(ARSITEKTUR_X86_64)
+#include "../arsitektur/x86/cpu_x86.h"
+#endif
+
+/*
  * ============================================================================
  * VARIABEL GLOBAL (GLOBAL VARIABLES)
  * ============================================================================

@@ -90,7 +90,7 @@ static bool_t pmm_initialized = SALAH;
  * Parameter:
  *   index - Index halaman
  */
-static inline void bitmap_set(tak_bertanda64_t index)
+static void bitmap_set(tak_bertanda64_t index)
 {
     tak_bertanda32_t word = index / BITS_PER_WORD;
     tak_bertanda32_t bit = index % BITS_PER_WORD;
@@ -105,7 +105,7 @@ static inline void bitmap_set(tak_bertanda64_t index)
  * Parameter:
  *   index - Index halaman
  */
-static inline void bitmap_clear(tak_bertanda64_t index)
+static void bitmap_clear(tak_bertanda64_t index)
 {
     tak_bertanda32_t word = index / BITS_PER_WORD;
     tak_bertanda32_t bit = index % BITS_PER_WORD;
@@ -122,7 +122,7 @@ static inline void bitmap_clear(tak_bertanda64_t index)
  *
  * Return: BENAR jika bit set (digunakan)
  */
-static inline bool_t bitmap_test(tak_bertanda64_t index)
+static bool_t bitmap_test(tak_bertanda64_t index)
 {
     tak_bertanda32_t word = index / BITS_PER_WORD;
     tak_bertanda32_t bit = index % BITS_PER_WORD;

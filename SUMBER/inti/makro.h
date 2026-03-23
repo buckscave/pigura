@@ -5,13 +5,14 @@
  *
  * Berkas ini berisi makro-makro umum yang digunakan di seluruh kernel.
  * Makro dasar (alignment, bitwise, min/max) ada di types.h.
+ * Makro atribut compiler ada di config.h.
  *
  * KEPATUHAN STANDAR:
  * - C90 (ANSI C89) dengan POSIX Safe Functions
  * - Tidak menggunakan fitur C99/C11
  * - Tidak menggunakan 'static inline'
  *
- * Versi: 2.0
+ * Versi: 2.2
  * Tanggal: 2025
  */
 
@@ -25,12 +26,14 @@
  */
 
 #include "types.h"
+#include "config.h"
 
 /*
  * ===========================================================================
  * CATATAN PENTING
  * ===========================================================================
  * Makro alignment, bitwise, min/max sudah didefinisikan di types.h.
+ * Makro atribut compiler sudah didefinisikan di config.h.
  * File ini hanya berisi makro tambahan yang spesifik untuk operasi kernel.
  */
 
@@ -282,18 +285,6 @@ typedef struct {
  * ===========================================================================
  */
 
-/* Cek apakah nilai dalam rentang [min, maks] (inklusif) */
-#define DALAM_RENTANG(val, min, maks) \
-    (((val) >= (min)) && ((val) <= (maks)))
-
-/* Cek apakah nilai dalam rentang [min, maks) (setengah terbuka) */
-#define DALAM_RENTANG_TERBUKA(val, min, maks) \
-    (((val) >= (min)) && ((val) < (maks)))
-
-/* Cek apakah index valid dalam array */
-#define INDEX_VALID(idx, arr) \
-    DALAM_RENTANG_TERBUKA(idx, 0, ARRAY_UKURAN(arr))
-
 /* Cek apakah pointer dalam range */
 #define PTR_IN_RANGE(ptr, mulai, akhir) \
     (((uintptr_t)(ptr) >= (uintptr_t)(mulai)) && \
@@ -301,25 +292,70 @@ typedef struct {
 
 /*
  * ===========================================================================
- * MAKRO SECTION DAN ATTRIBUTE
+ * MAKRO UNTUK MULTI-ARSITEKTUR
  * ===========================================================================
  */
 
-/* Section attributes */
-#define SECTION(s) __attribute__((section(s)))
+/* Makro untuk memilih kode berdasarkan arsitektur */
+#if defined(ARSITEKTUR_X86) || defined(ARSITEKTUR_X86_64)
+    #define ARSITEKTUR_X86_FAMILY 1
+#endif
 
-/* Function attributes */
-#define NOINLINE __attribute__((noinline))
-#define MURNI __attribute__((pure))
-#define KONSTAN __attribute__((const))
-#define PACKED __attribute__((packed))
-#define ALIGNED(n) __attribute__((aligned(n)))
-#define DIGUNAKAN __attribute__((used))
-#define USANG __attribute__((deprecated))
-#define LEMAH __attribute__((weak))
+#if defined(ARSITEKTUR_ARM) || defined(ARSITEKTUR_ARMV7) || defined(ARSITEKTUR_ARM64)
+    #define ARSITEKTUR_ARM_FAMILY 1
+#endif
 
-/* Constructor/Destructor */
-#define KONSTRUKTOR __attribute__((constructor))
-#define DESTRUKTOR __attribute__((destructor))
+/* Makro untuk mendeklarasikan fungsi arsitektur-spesifik */
+#define ARSITEKTUR_FUNC(nama) arch_##nama
+
+/*
+ * ===========================================================================
+ * MAKRO OPERASI ARITMATIKA AMAN (SAFE ARITHMETIC MACROS)
+ * ===========================================================================
+ * CATATAN: Menggunakan __typeof__ (GCC extension) karena C89 tidak memiliki
+ * typeof. Ini didukung oleh GCC dan kompatibel dengan Pigura C90.
+ */
+
+/* Cek overflow penjumlahan */
+#define TAMBAH_OVERFLOW(a, b, hasil) \
+    __builtin_add_overflow((a), (b), (hasil))
+
+/* Cek overflow pengurangan */
+#define KURANG_OVERFLOW(a, b, hasil) \
+    __builtin_sub_overflow((a), (b), (hasil))
+
+/* Cek overflow perkalian */
+#define KALI_OVERFLOW(a, b, hasil) \
+    __builtin_mul_overflow((a), (b), (hasil))
+
+/*
+ * Makro alternatif jika builtin tidak tersedia:
+ * 
+ * #define TAMBAH_OVERFLOW(a, b, hasil) \
+ *     ((b) > 0 && (a) > ((__typeof__(a))~0 - (b)) ? 1 : \
+ *      ((*(hasil) = (a) + (b)), 0))
+ *
+ * #define KURANG_OVERFLOW(a, b, hasil) \
+ *     ((b) > 0 && (a) < ((__typeof__(a))0 + (b)) ? 1 : \
+ *      ((*(hasil) = (a) - (b)), 0))
+ *
+ * #define KALI_OVERFLOW(a, b, hasil) \
+ *     __builtin_mul_overflow((a), (b), (hasil))
+ */
+
+/*
+ * ===========================================================================
+ * MAKRO PARAMETER TIDAK DIGUNAKAN
+ * ===========================================================================
+ */
+
+/* Makro untuk menandai parameter tidak digunakan */
+#ifndef TIDAK_DIGUNAKAN_PARAM
+#define TIDAK_DIGUNAKAN_PARAM(param) ((void)(param))
+#endif
+
+#ifndef TIDAK_DIGUNAKAN
+#define TIDAK_DIGUNAKAN(expr) ((void)(expr))
+#endif
 
 #endif /* INTI_MAKRO_H */

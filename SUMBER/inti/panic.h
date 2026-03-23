@@ -12,7 +12,7 @@
  * - Tidak menggunakan fitur C99/C11
  * - Semua fungsi dideklarasikan secara eksplisit
  *
- * Versi: 2.0
+ * Versi: 2.2
  * Tanggal: 2025
  */
 
@@ -88,34 +88,21 @@
 
 /*
  * ===========================================================================
- * STRUKTUR DATA PANIC (PANIC DATA STRUCTURES)
+ * STRUKTUR DATA REGISTER CONTEXT - MULTI-ARSITEKTUR
  * ===========================================================================
- * Struktur data untuk menyimpan informasi panic.
+ * Struktur untuk menyimpan konteks register saat exception.
+ * Implementasi berbeda untuk setiap arsitektur.
+ * 
+ * CATATAN PENTING: Kondisional harus EXCLUSIVE (mutually exclusive)
+ * Gunakan #if ... #elif ... #elif ... #else ... #endif
  */
 
-/* Struktur informasi panic */
-typedef struct {
-    tak_bertanda16_t kode;              /* Kode error */
-    tak_bertanda16_t bendera;           /* Flag tambahan */
-    tak_bertanda32_t baris;             /* Nomor baris */
-    char file[PANIC_FILE_MAX];          /* Nama file */
-    char fungsi[PANIC_FUNC_MAX];        /* Nama fungsi */
-    char pesan[PANIC_PESAN_MAX];        /* Pesan error */
-    uintptr_t alamat_fault;             /* Alamat fault */
-    tak_bertanda32_t error_code;        /* Error code CPU */
-    tak_bertanda32_t nomor_vector;      /* Nomor vector interrupt */
-    tak_bertanda64_t timestamp;         /* Waktu panic */
-    pid_t pid;                          /* PID proses */
-    tid_t tid;                          /* TID thread */
-} panic_info_t;
+/* -------------------------------------------------------------------------
+ * ARSITEKTUR x86 (32-bit)
+ * ------------------------------------------------------------------------- */
+#if defined(ARSITEKTUR_X86)
 
-/* Forward declaration */
-struct register_context;
-
-/* Struktur konteks register untuk exception x86 */
-typedef struct register_context register_context_t;
-
-struct register_context {
+typedef struct register_context {
     /* Segment registers */
     tak_bertanda32_t gs;
     tak_bertanda32_t fs;
@@ -145,13 +132,120 @@ struct register_context {
     /* User stack (only for privilege change) */
     tak_bertanda32_t useresp;
     tak_bertanda32_t ss;
-};
+} register_context_t;
+
+/* -------------------------------------------------------------------------
+ * ARSITEKTUR x86_64 (64-bit)
+ * ------------------------------------------------------------------------- */
+#elif defined(ARSITEKTUR_X86_64)
+
+typedef struct register_context {
+    /* General purpose registers */
+    tak_bertanda64_t rax;
+    tak_bertanda64_t rbx;
+    tak_bertanda64_t rcx;
+    tak_bertanda64_t rdx;
+    tak_bertanda64_t rsi;
+    tak_bertanda64_t rdi;
+    tak_bertanda64_t rbp;
+    tak_bertanda64_t rsp;
+    tak_bertanda64_t r8;
+    tak_bertanda64_t r9;
+    tak_bertanda64_t r10;
+    tak_bertanda64_t r11;
+    tak_bertanda64_t r12;
+    tak_bertanda64_t r13;
+    tak_bertanda64_t r14;
+    tak_bertanda64_t r15;
+
+    /* Interrupt info */
+    tak_bertanda64_t int_no;
+    tak_bertanda64_t err_code;
+
+    /* Control flow */
+    tak_bertanda64_t rip;
+    tak_bertanda64_t cs;
+    tak_bertanda64_t rflags;
+    tak_bertanda64_t rsp_user;
+    tak_bertanda64_t ss;
+} register_context_t;
+
+/* -------------------------------------------------------------------------
+ * ARSITEKTUR ARM64 (AArch64)
+ * ------------------------------------------------------------------------- */
+#elif defined(ARSITEKTUR_ARM64)
+
+typedef struct register_context {
+    /* General purpose registers x0-x30 */
+    tak_bertanda64_t x[31];
+    tak_bertanda64_t sp;         /* Stack pointer */
+    tak_bertanda64_t pc;         /* Program counter */
+    tak_bertanda64_t pstate;     /* Processor state */
+    
+    /* Exception info */
+    tak_bertanda32_t exception_type;
+    tak_bertanda32_t fault_address;
+} register_context_t;
+
+/* -------------------------------------------------------------------------
+ * ARSITEKTUR ARM / ARMv7 (32-bit)
+ * ------------------------------------------------------------------------- */
+#elif defined(ARSITEKTUR_ARM) || defined(ARSITEKTUR_ARMV7)
+
+typedef struct register_context {
+    /* General purpose registers r0-r15 (PC is r15) */
+    tak_bertanda32_t r[16];
+    tak_bertanda32_t cpsr;       /* Current program status register */
+    tak_bertanda32_t spsr;       /* Saved program status register */
+    
+    /* Exception info */
+    tak_bertanda32_t exception_type;
+    tak_bertanda32_t fault_address;
+} register_context_t;
+
+/* -------------------------------------------------------------------------
+ * ARSITEKTUR TIDAK DIKENAL - FALLBACK
+ * ------------------------------------------------------------------------- */
+#else
+
+typedef struct register_context {
+    tak_bertanda64_t pc;         /* Program counter */
+    tak_bertanda64_t sp;         /* Stack pointer */
+    tak_bertanda32_t exception_no;
+    tak_bertanda32_t error_code;
+    tak_bertanda64_t reserved[16];
+} register_context_t;
+
+#endif /* ARSITEKTUR */
+
+/*
+ * ===========================================================================
+ * STRUKTUR DATA PANIC (PANIC DATA STRUCTURES)
+ * ===========================================================================
+ * Struktur data untuk menyimpan informasi panic.
+ */
 
 /* Struktur informasi stack frame */
 typedef struct {
-    uintptr_t eip;
-    uintptr_t ebp;
+    uintptr_t pc;
+    uintptr_t fp;
 } stack_frame_t;
+
+/* Struktur informasi panic */
+typedef struct {
+    tak_bertanda16_t kode;              /* Kode error */
+    tak_bertanda16_t bendera;           /* Flag tambahan */
+    tak_bertanda32_t baris;             /* Nomor baris */
+    char file[PANIC_FILE_MAX];          /* Nama file */
+    char fungsi[PANIC_FUNC_MAX];        /* Nama fungsi */
+    char pesan[PANIC_PESAN_MAX];        /* Pesan error */
+    uintptr_t alamat_fault;             /* Alamat fault */
+    tak_bertanda32_t error_code;        /* Error code CPU */
+    tak_bertanda32_t nomor_vector;      /* Nomor vector interrupt */
+    tak_bertanda64_t timestamp;         /* Waktu panic */
+    pid_t pid;                          /* PID proses */
+    tid_t tid;                          /* TID thread */
+} panic_info_t;
 
 /* Flag untuk panic_info_t */
 #define PANIC_FLAG_DUMP_REGISTERS 0x0001
@@ -289,7 +383,7 @@ void panic_dump_register(const register_context_t *ctx);
  * Tampilkan dump stack memory.
  *
  * Parameter:
- *   esp  - Pointer stack
+ *   esp   - Pointer stack
  *   depth - Jumlah frame yang ditampilkan
  */
 void panic_dump_stack(uintptr_t esp, int depth);
@@ -300,10 +394,10 @@ void panic_dump_stack(uintptr_t esp, int depth);
  * Tampilkan stack trace (call stack).
  *
  * Parameter:
- *   ebp   - Frame pointer awal
+ *   fp    - Frame pointer awal
  *   depth - Jumlah frame maksimum
  */
-void panic_dump_stack_trace(uintptr_t ebp, int depth);
+void panic_dump_stack_trace(uintptr_t fp, int depth);
 
 /*
  * panic_dump_memory
@@ -472,10 +566,10 @@ bool_t panic_is_active(void);
  * ------------
  * Panic untuk index di luar batas.
  */
-#define PANIC_BOUNDS(idx, min, maks) \
+#define PANIC_BOUNDS(idx, min_val, maks_val) \
     kernel_panic(__FILE__, __LINE__, \
                  "Index di luar batas: %ld (valid: %ld-%ld)", \
-                 (long)(idx), (long)(min), (long)(maks))
+                 (long)(idx), (long)(min_val), (long)(maks_val))
 
 /*
  * PANIC_OVERFLOW
@@ -553,12 +647,12 @@ bool_t panic_is_active(void);
  * ------------
  * Verifikasi nilai dalam rentang.
  */
-#define VERIFY_RANGE(val, min, maks) \
+#define VERIFY_RANGE(val, min_val, maks_val) \
     do { \
-        if ((val) < (min) || (val) > (maks)) { \
+        if ((val) < (min_val) || (val) > (maks_val)) { \
             kernel_panic_kode(PANIC_KODE_ASSERT, __FILE__, __LINE__, \
                               "Nilai di luar rentang: %ld (valid: %ld-%ld)", \
-                              (long)(val), (long)(min), (long)(maks)); \
+                              (long)(val), (long)(min_val), (long)(maks_val)); \
         } \
     } while (0)
 
@@ -615,13 +709,13 @@ bool_t panic_is_active(void);
  * ------------
  * Assertion nilai dalam rentang.
  */
-#define ASSERT_RANGE(val, min, maks) \
+#define ASSERT_RANGE(val, min_val, maks_val) \
     do { \
-        if ((val) < (min) || (val) > (maks)) { \
+        if ((val) < (min_val) || (val) > (maks_val)) { \
             kernel_panic_fungsi(PANIC_KODE_ASSERT, __FILE__, __LINE__, \
                                 __func__, \
                                 "Nilai di luar rentang: %ld (valid: %ld-%ld)", \
-                                (long)(val), (long)(min), (long)(maks)); \
+                                (long)(val), (long)(min_val), (long)(maks_val)); \
         } \
     } while (0)
 
@@ -715,7 +809,7 @@ bool_t panic_is_active(void);
 #define ASSERT(expr) TIDAK_DIGUNAKAN(expr)
 #define ASSERT_MSG(expr, msg) TIDAK_DIGUNAKAN(expr)
 #define ASSERT_PTR(ptr) TIDAK_DIGUNAKAN(ptr)
-#define ASSERT_RANGE(val, min, maks) TIDAK_DIGUNAKAN(val)
+#define ASSERT_RANGE(val, min_val, maks_val) TIDAK_DIGUNAKAN(val)
 #define ASSERT_EQ(a, b) do { TIDAK_DIGUNAKAN(a); TIDAK_DIGUNAKAN(b); } while (0)
 #define ASSERT_NE(a, b) do { TIDAK_DIGUNAKAN(a); TIDAK_DIGUNAKAN(b); } while (0)
 #define ASSERT_LT(a, b) do { TIDAK_DIGUNAKAN(a); TIDAK_DIGUNAKAN(b); } while (0)
