@@ -11,11 +11,41 @@
  * - Tidak menggunakan fitur C99/C11
  * - Semua fungsi dideklarasikan secara eksplisit
  *
- * Versi: 2.0
+ * Versi: 2.1
  * Tanggal: 2025
  */
 
 #include "../kernel.h"
+
+/*
+ * ===========================================================================
+ * DEKLARASI FORWARD (FORWARD DECLARATIONS)
+ * ===========================================================================
+ */
+
+/* Deklarasi fungsi PIC dari pic.c */
+extern void pic_send_eoi(tak_bertanda32_t irq);
+
+/*
+ * ===========================================================================
+ * MAKRO HELPER UNTUK MULTI-ARSITEKTUR
+ * ===========================================================================
+ */
+
+/* Makro untuk mendapatkan instruction pointer sesuai arsitektur */
+#if defined(ARSITEKTUR_X86)
+#define GET_IP(ctx) ((ctx)->eip)
+#define IP_FORMAT "EIP: 0x%08lX"
+#define IP_CAST(val) ((tak_bertanda64_t)(val))
+#elif defined(ARSITEKTUR_X86_64)
+#define GET_IP(ctx) ((ctx)->rip)
+#define IP_FORMAT "RIP: 0x%016llX"
+#define IP_CAST(val) (val)
+#else
+#define GET_IP(ctx) ((ctx)->pc)
+#define IP_FORMAT "PC: 0x%016llX"
+#define IP_CAST(val) (val)
+#endif
 
 /*
  * ============================================================================
@@ -204,22 +234,47 @@ static void exception_cetak_konteks(const register_context_t *ctx)
 {
     kernel_printf("\nKonteks Exception:\n");
     kernel_printf("  Exception: %s (#%lu)\n",
-                  exception_dapat_nama(ctx->int_no), ctx->int_no);
+                  exception_dapat_nama((tak_bertanda32_t)ctx->int_no), 
+                  (tak_bertanda64_t)ctx->int_no);
 
-    if (exception_punya_kode_error(ctx->int_no)) {
-        kernel_printf("  Kode Error: 0x%08lX\n", ctx->err_code);
+    if (exception_punya_kode_error((tak_bertanda32_t)ctx->int_no)) {
+        kernel_printf("  Kode Error: 0x%08lX\n", (tak_bertanda64_t)ctx->err_code);
     }
 
     kernel_printf("\nRegister:\n");
+
+#if defined(ARSITEKTUR_X86)
+    /* x86 (32-bit) register names */
     kernel_printf("  EAX=0x%08lX  EBX=0x%08lX  ECX=0x%08lX  EDX=0x%08lX\n",
-                  ctx->eax, ctx->ebx, ctx->ecx, ctx->edx);
+                  (tak_bertanda64_t)ctx->eax, (tak_bertanda64_t)ctx->ebx,
+                  (tak_bertanda64_t)ctx->ecx, (tak_bertanda64_t)ctx->edx);
     kernel_printf("  ESI=0x%08lX  EDI=0x%08lX  EBP=0x%08lX  ESP=0x%08lX\n",
-                  ctx->esi, ctx->edi, ctx->ebp, ctx->esp);
-    kernel_printf("  EIP=0x%08lX  EFLAGS=0x%08lX\n", ctx->eip, ctx->eflags);
+                  (tak_bertanda64_t)ctx->esi, (tak_bertanda64_t)ctx->edi,
+                  (tak_bertanda64_t)ctx->ebp, (tak_bertanda64_t)ctx->esp);
+    kernel_printf("  EIP=0x%08lX  EFLAGS=0x%08lX\n", 
+                  (tak_bertanda64_t)ctx->eip, (tak_bertanda64_t)ctx->eflags);
     kernel_printf("  CS=0x%04lX  DS=0x%04lX  ES=0x%04lX\n",
-                  ctx->cs, ctx->ds, ctx->es);
+                  (tak_bertanda64_t)ctx->cs, (tak_bertanda64_t)ctx->ds,
+                  (tak_bertanda64_t)ctx->es);
     kernel_printf("  FS=0x%04lX  GS=0x%04lX  SS=0x%04lX\n",
-                  ctx->fs, ctx->gs, ctx->ss);
+                  (tak_bertanda64_t)ctx->fs, (tak_bertanda64_t)ctx->gs,
+                  (tak_bertanda64_t)ctx->ss);
+#elif defined(ARSITEKTUR_X86_64)
+    /* x86_64 (64-bit) register names */
+    kernel_printf("  RAX=0x%016llX  RBX=0x%016llX\n", ctx->rax, ctx->rbx);
+    kernel_printf("  RCX=0x%016llX  RDX=0x%016llX\n", ctx->rcx, ctx->rdx);
+    kernel_printf("  RSI=0x%016llX  RDI=0x%016llX\n", ctx->rsi, ctx->rdi);
+    kernel_printf("  RBP=0x%016llX  RSP=0x%016llX\n", ctx->rbp, ctx->rsp);
+    kernel_printf("  R8 =0x%016llX  R9 =0x%016llX\n", ctx->r8, ctx->r9);
+    kernel_printf("  R10=0x%016llX  R11=0x%016llX\n", ctx->r10, ctx->r11);
+    kernel_printf("  R12=0x%016llX  R13=0x%016llX\n", ctx->r12, ctx->r13);
+    kernel_printf("  R14=0x%016llX  R15=0x%016llX\n", ctx->r14, ctx->r15);
+    kernel_printf("  RIP=0x%016llX  RFLAGS=0x%016llX\n", ctx->rip, ctx->rflags);
+    kernel_printf("  CS=0x%04llX  SS=0x%04llX\n", ctx->cs, ctx->ss);
+#else
+    /* Fallback untuk arsitektur lain */
+    kernel_printf("  PC=0x%016llX  SP=0x%016llX\n", ctx->pc, ctx->sp);
+#endif
 }
 
 /*
@@ -939,14 +994,15 @@ void isr_print_handlers(void)
 void isr_exception_handler_default(register_context_t *ctx)
 {
     if (ctx == NULL) {
-        kernel_panic("Exception dengan konteks NULL");
+        kernel_panic(__FILE__, __LINE__, "Exception dengan konteks NULL");
         return;
     }
 
     exception_cetak_konteks(ctx);
 
-    if (exception_punya_kode_error(ctx->int_no)) {
-        exception_decode_kode_error(ctx->int_no, ctx->err_code);
+    if (exception_punya_kode_error((tak_bertanda32_t)ctx->int_no)) {
+        exception_decode_kode_error((tak_bertanda32_t)ctx->int_no, 
+                                     (tak_bertanda32_t)ctx->err_code);
     }
 
     kernel_panic_exception(ctx);
@@ -964,7 +1020,7 @@ void isr_divide_error_handler(register_context_t *ctx)
     }
 
     kernel_printf("\nKESALAHAN: Pembagian dengan nol!\n");
-    kernel_printf("EIP: 0x%08lX\n", ctx->eip);
+    kernel_printf(IP_FORMAT "\n", IP_CAST(GET_IP(ctx)));
     isr_exception_handler_default(ctx);
 }
 
@@ -1016,7 +1072,7 @@ void isr_overflow_handler(register_context_t *ctx)
     }
 
     kernel_printf("\nKESALAHAN: Overflow!\n");
-    kernel_printf("EIP: 0x%08lX\n", ctx->eip);
+    kernel_printf(IP_FORMAT "\n", IP_CAST(GET_IP(ctx)));
     isr_exception_handler_default(ctx);
 }
 
@@ -1032,7 +1088,7 @@ void isr_bound_handler(register_context_t *ctx)
     }
 
     kernel_printf("\nKESALAHAN: Rentang BOUND terlampaui!\n");
-    kernel_printf("EIP: 0x%08lX\n", ctx->eip);
+    kernel_printf(IP_FORMAT "\n", IP_CAST(GET_IP(ctx)));
     isr_exception_handler_default(ctx);
 }
 
@@ -1048,7 +1104,7 @@ void isr_invalid_opcode_handler(register_context_t *ctx)
     }
 
     kernel_printf("\nKESALAHAN: Opcode tidak valid!\n");
-    kernel_printf("EIP: 0x%08lX\n", ctx->eip);
+    kernel_printf(IP_FORMAT "\n", IP_CAST(GET_IP(ctx)));
     isr_exception_handler_default(ctx);
 }
 
@@ -1064,7 +1120,7 @@ void isr_device_not_available_handler(register_context_t *ctx)
     }
 
     kernel_printf("\nKESALAHAN: Perangkat tidak tersedia!\n");
-    kernel_printf("EIP: 0x%08lX\n", ctx->eip);
+    kernel_printf(IP_FORMAT "\n", IP_CAST(GET_IP(ctx)));
     isr_exception_handler_default(ctx);
 }
 
@@ -1079,10 +1135,10 @@ void isr_double_fault_handler(register_context_t *ctx)
 
     if (ctx != NULL) {
         exception_cetak_konteks(ctx);
-        exception_decode_kode_error(8, ctx->err_code);
+        exception_decode_kode_error(8, (tak_bertanda32_t)ctx->err_code);
     }
 
-    kernel_panic("Double fault terjadi");
+    kernel_panic(__FILE__, __LINE__, "Double fault terjadi");
 }
 
 /*
@@ -1098,7 +1154,7 @@ void isr_invalid_tss_handler(register_context_t *ctx)
 
     kernel_printf("\nKESALAHAN: TSS tidak valid!\n");
     exception_cetak_konteks(ctx);
-    exception_decode_kode_error(10, ctx->err_code);
+    exception_decode_kode_error(10, (tak_bertanda32_t)ctx->err_code);
     kernel_panic_exception(ctx);
 }
 
@@ -1115,7 +1171,7 @@ void isr_segment_not_present_handler(register_context_t *ctx)
 
     kernel_printf("\nKESALAHAN: Segment tidak hadir!\n");
     exception_cetak_konteks(ctx);
-    exception_decode_kode_error(11, ctx->err_code);
+    exception_decode_kode_error(11, (tak_bertanda32_t)ctx->err_code);
     kernel_panic_exception(ctx);
 }
 
@@ -1132,7 +1188,7 @@ void isr_stack_segment_handler(register_context_t *ctx)
 
     kernel_printf("\nKESALAHAN: Kesalahan segment stack!\n");
     exception_cetak_konteks(ctx);
-    exception_decode_kode_error(12, ctx->err_code);
+    exception_decode_kode_error(12, (tak_bertanda32_t)ctx->err_code);
     kernel_panic_exception(ctx);
 }
 
@@ -1149,7 +1205,7 @@ void isr_general_protection_handler(register_context_t *ctx)
 
     kernel_printf("\nKESALAHAN: Kesalahan proteksi umum!\n");
     exception_cetak_konteks(ctx);
-    exception_decode_kode_error(13, ctx->err_code);
+    exception_decode_kode_error(13, (tak_bertanda32_t)ctx->err_code);
     kernel_panic_exception(ctx);
 }
 
@@ -1166,7 +1222,7 @@ void isr_page_fault_handler(register_context_t *ctx)
 
     kernel_printf("\nKESALAHAN: Kesalahan halaman!\n");
     exception_cetak_konteks(ctx);
-    exception_decode_kode_error(14, ctx->err_code);
+    exception_decode_kode_error(14, (tak_bertanda32_t)ctx->err_code);
     kernel_panic_exception(ctx);
 }
 
@@ -1182,7 +1238,7 @@ void isr_fpu_handler(register_context_t *ctx)
     }
 
     kernel_printf("\nKESALAHAN: x87 FPU error!\n");
-    kernel_printf("EIP: 0x%08lX\n", ctx->eip);
+    kernel_printf(IP_FORMAT "\n", IP_CAST(GET_IP(ctx)));
     isr_exception_handler_default(ctx);
 }
 
@@ -1199,7 +1255,7 @@ void isr_alignment_check_handler(register_context_t *ctx)
 
     kernel_printf("\nKESALAHAN: Cek alignment!\n");
     exception_cetak_konteks(ctx);
-    exception_decode_kode_error(17, ctx->err_code);
+    exception_decode_kode_error(17, (tak_bertanda32_t)ctx->err_code);
     kernel_panic_exception(ctx);
 }
 
@@ -1216,7 +1272,7 @@ void isr_machine_check_handler(register_context_t *ctx)
         exception_cetak_konteks(ctx);
     }
 
-    kernel_panic("Machine check exception");
+    kernel_panic(__FILE__, __LINE__, "Machine check exception");
 }
 
 /*
@@ -1231,7 +1287,7 @@ void isr_simd_handler(register_context_t *ctx)
     }
 
     kernel_printf("\nKESALAHAN: SIMD exception!\n");
-    kernel_printf("EIP: 0x%08lX\n", ctx->eip);
+    kernel_printf(IP_FORMAT "\n", IP_CAST(GET_IP(ctx)));
     isr_exception_handler_default(ctx);
 }
 
@@ -1265,7 +1321,7 @@ void isr_keyboard_handler(register_context_t *ctx)
     TIDAK_DIGUNAKAN_PARAM(ctx);
 
     /* Baca scancode dari keyboard controller */
-    hal_port_inb(PORT_KEYBOARD_DATA);
+    (void)hal_io_read_8(PORT_KEYBOARD_DATA);
 
     /* Kirim EOI */
     pic_send_eoi(1);
@@ -1307,8 +1363,8 @@ void isr_rtc_handler(register_context_t *ctx)
     TIDAK_DIGUNAKAN_PARAM(ctx);
 
     /* Baca register RTC untuk clear interrupt */
-    hal_port_outb(PORT_CMOS_INDEX, 0x0C);
-    hal_port_inb(PORT_CMOS_DATA);
+    hal_io_write_8(PORT_CMOS_INDEX, 0x0C);
+    (void)hal_io_read_8(PORT_CMOS_DATA);
 
     /* Kirim EOI */
     pic_send_eoi(8);
@@ -1403,20 +1459,20 @@ bool_t isr_is_spurious(tak_bertanda32_t irq)
 
     /* Baca In-Service Register */
     if (irq < 8) {
-        hal_port_outb(PIC1_COMMAND, 0x0B);
-        isr_val = hal_port_inb(PIC1_COMMAND);
-        hal_port_outb(PIC1_COMMAND, 0x0A);
-        irr = hal_port_inb(PIC1_COMMAND);
+        hal_io_write_8(PIC1_COMMAND, 0x0B);
+        isr_val = hal_io_read_8(PIC1_COMMAND);
+        hal_io_write_8(PIC1_COMMAND, 0x0A);
+        irr = hal_io_read_8(PIC1_COMMAND);
 
         /* Jika bit tidak set di ISR dan IRR, ini spurious */
         if (!(isr_val & (1 << irq)) && !(irr & (1 << irq))) {
             return BENAR;
         }
     } else {
-        hal_port_outb(PIC2_COMMAND, 0x0B);
-        isr_val = hal_port_inb(PIC2_COMMAND);
-        hal_port_outb(PIC2_COMMAND, 0x0A);
-        irr = hal_port_inb(PIC2_COMMAND);
+        hal_io_write_8(PIC2_COMMAND, 0x0B);
+        isr_val = hal_io_read_8(PIC2_COMMAND);
+        hal_io_write_8(PIC2_COMMAND, 0x0A);
+        irr = hal_io_read_8(PIC2_COMMAND);
 
         irq -= 8;
         if (!(isr_val & (1 << irq)) && !(irr & (1 << irq))) {
