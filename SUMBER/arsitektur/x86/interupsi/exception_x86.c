@@ -36,6 +36,35 @@
 
 /*
  * ============================================================================
+ * STRUKTUR DATA
+ * ============================================================================
+ */
+
+/* Interrupt frame untuk exception handling */
+struct int_frame {
+    tak_bertanda32_t gs;            /* GS segment */
+    tak_bertanda32_t fs;            /* FS segment */
+    tak_bertanda32_t es;            /* ES segment */
+    tak_bertanda32_t ds;            /* DS segment */
+    tak_bertanda32_t edi;           /* Register edi */
+    tak_bertanda32_t esi;           /* Register esi */
+    tak_bertanda32_t ebp;           /* Register ebp */
+    tak_bertanda32_t esp_kolon;     /* ESP yang disimpan */
+    tak_bertanda32_t ebx;           /* Register ebx */
+    tak_bertanda32_t edx;           /* Register edx */
+    tak_bertanda32_t ecx;           /* Register ecx */
+    tak_bertanda32_t eax;           /* Register eax */
+    tak_bertanda32_t int_no;        /* Nomor interrupt */
+    tak_bertanda32_t err_code;      /* Kode error */
+    tak_bertanda32_t eip;           /* Instruction pointer */
+    tak_bertanda32_t cs;            /* Code segment */
+    tak_bertanda32_t eflags;        /* Flags register */
+    tak_bertanda32_t esp;           /* Stack pointer user */
+    tak_bertanda32_t ss;            /* Stack segment */
+} __attribute__((packed));
+
+/*
+ * ============================================================================
  * VARIABEL GLOBAL
  * ============================================================================
  */
@@ -229,12 +258,12 @@ void exception_handler_umum(struct int_frame *frame)
     _print_frame(frame);
 
     /* Info khusus untuk page fault */
-    if (nomor == IDT_VEKTOR_PF) {
+    if (nomor == VEKTOR_PF) {
         _print_page_fault_info(frame);
     }
 
     /* Info khusus untuk GPF */
-    if (nomor == IDT_VEKTOR_GP) {
+    if (nomor == VEKTOR_GP) {
         _print_gpf_info(frame);
     }
 

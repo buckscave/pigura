@@ -358,6 +358,7 @@ void segment_set_kernel(void)
  */
 void segment_set_user(tak_bertanda16_t kode, tak_bertanda16_t data)
 {
+    (void)kode; /* Code selector tidak perlu di-set secara manual */
     segment_set_ds(data);
     segment_set_es(data);
     segment_set_fs(data);

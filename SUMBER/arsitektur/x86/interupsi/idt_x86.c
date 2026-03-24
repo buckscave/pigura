@@ -18,8 +18,13 @@
  * =============================================================================
  */
 
-#include <stdint.h>
-#include <stddef.h>
+#include "../../../inti/kernel.h"
+
+/* Type aliases untuk kompatibilitas dengan kode yang menggunakan stdint.h */
+typedef tak_bertanda8_t  uint8_t;
+typedef tak_bertanda16_t uint16_t;
+typedef tak_bertanda32_t uint32_t;
+typedef tak_bertanda64_t uint64_t;
 
 /* =============================================================================
  * KONSTANTA
@@ -347,9 +352,8 @@ int idt_init(void)
  */
 int idt_set_handler(uint8_t vektor, handler_interrupt_t handler)
 {
-    if (vektor >= IDT_JUMLAH_ENTRY) {
-        return -1;
-    }
+    /* vektor adalah uint8_t, selalu < 256, jadi valid */
+    (void)vektor;
 
     g_handler[vektor] = handler;
 
@@ -375,9 +379,8 @@ int idt_set_handler(uint8_t vektor, handler_interrupt_t handler)
  */
 handler_interrupt_t idt_get_handler(uint8_t vektor)
 {
-    if (vektor >= IDT_JUMLAH_ENTRY) {
-        return (handler_interrupt_t)0;
-    }
+    /* vektor adalah uint8_t, selalu < 256, jadi valid */
+    (void)vektor;
 
     return g_handler[vektor];
 }
@@ -434,9 +437,8 @@ int idt_set_gate(uint8_t vektor, uint32_t handler,
 {
     uint8_t flags;
 
-    if (vektor >= IDT_JUMLAH_ENTRY) {
-        return -1;
-    }
+    /* vektor adalah uint8_t, selalu < 256, jadi valid */
+    (void)vektor;
 
     /* Build flags */
     flags = IDT_FLAG_PRESENT | IDT_FLAG_GATETYPE_INT;
@@ -446,3 +448,4 @@ int idt_set_gate(uint8_t vektor, uint32_t handler,
 
     return 0;
 }
+

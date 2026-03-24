@@ -20,8 +20,13 @@
  * =============================================================================
  */
 
-#include <stdint.h>
-#include <stddef.h>
+#include "../../../inti/kernel.h"
+
+/* Type aliases untuk kompatibilitas dengan kode yang menggunakan stdint.h */
+typedef tak_bertanda8_t  uint8_t;
+typedef tak_bertanda16_t uint16_t;
+typedef tak_bertanda32_t uint32_t;
+typedef tak_bertanda64_t uint64_t;
 
 /* =============================================================================
  * KONSTANTA
@@ -51,7 +56,7 @@
 #define GDT_AKSES_RING3         0x60    /* Privilege level 3 */
 #define GDT_AKSES_SISTEM        0x10    /* System segment */
 #define GDT_AKSES_KODE          0x0A    /* Code segment */
-#define GDB_AKSES_DATA          0x02    /* Data segment */
+#define GDT_AKSES_DATA          0x02    /* Data segment */
 #define GDT_AKSES_TSS           0x09    /* TSS segment */
 
 /* Flag granularity */
@@ -236,7 +241,7 @@ static void _buat_data_kernel(void)
     akses = GDT_AKSES_ADA           /* Present */
           | GDT_AKSES_RING0         /* Ring 0 */
           | GDT_AKSES_SISTEM        /* System segment */
-          | GDB_AKSES_DATA          /* Data segment */
+          | GDT_AKSES_DATA          /* Data segment */
           | GDT_DATA_TULIS;         /* Writable */
 
     gran = GDT_GRAN_4KB              /* Granularitas 4 KB */
@@ -283,7 +288,7 @@ static void _buat_data_user(void)
     akses = GDT_AKSES_ADA           /* Present */
           | GDT_AKSES_RING3         /* Ring 3 */
           | GDT_AKSES_SISTEM        /* System segment */
-          | GDB_AKSES_DATA          /* Data segment */
+          | GDT_AKSES_DATA          /* Data segment */
           | GDT_DATA_TULIS;         /* Writable */
 
     gran = GDT_GRAN_4KB              /* Granularitas 4 KB */

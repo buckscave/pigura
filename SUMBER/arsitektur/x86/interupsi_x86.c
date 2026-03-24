@@ -79,8 +79,8 @@ struct interupsi_frame {
     tak_bertanda32_t ss;            /* Stack segment */
 } __attribute__((packed));
 
-/* Tipe handler interupsi */
-typedef void (*handler_interupsi_t)(struct interupsi_frame *);
+/* Tipe handler interupsi internal (berbeda dari types.h) */
+typedef void (*handler_interupsi_frame_t)(struct interupsi_frame *);
 
 /* Nama exception */
 struct nama_exception {
@@ -103,7 +103,7 @@ static struct idt_entry g_idt[JUMLAH_VEKTOR]
 static struct idt_ptr g_idt_ptr;
 
 /* Tabel handler interupsi */
-static handler_interupsi_t g_handler_interupsi[JUMLAH_VEKTOR];
+static handler_interupsi_frame_t g_handler_interupsi[JUMLAH_VEKTOR];
 
 /* Tabel handler IRQ */
 static void (*g_handler_irq[JUMLAH_IRQ_PIC])(void);
@@ -250,7 +250,7 @@ static void _idt_set_entry(tak_bertanda32_t nomor,
 static void _idt_load(void)
 {
     g_idt_ptr.batas = (tak_bertanda16_t)(sizeof(g_idt) - 1);
-    g_idt_ptr.alamat = (tak_bertanda32_t)&g_idt;
+    g_idt_ptr.alamat = (tak_bertanda32_t)(uintptr_t)&g_idt;
 
     __asm__ __volatile__(
         "lidt %0\n\t"
@@ -530,7 +530,7 @@ static void _handler_irq_umum(struct interupsi_frame *frame)
  */
 void _dispatcher_interupsi(struct interupsi_frame *frame)
 {
-    handler_interupsi_t handler;
+    handler_interupsi_frame_t handler;
 
     if (frame == NULL) {
         return;
@@ -587,69 +587,69 @@ status_t interupsi_x86_init(void)
     kernel_memset(&g_interupsi_counter, 0, sizeof(g_interupsi_counter));
 
     /* Setup exception handlers (ISR 0-31) */
-    _idt_set_entry(0, (tak_bertanda32_t)isr_0,
+    _idt_set_entry(0, (tak_bertanda32_t)(uintptr_t)isr_0,
                    SELECTOR_KERNEL_CODE, IDT_FLAG_PRESENT | 0x0E);
-    _idt_set_entry(1, (tak_bertanda32_t)isr_1,
+    _idt_set_entry(1, (tak_bertanda32_t)(uintptr_t)isr_1,
                    SELECTOR_KERNEL_CODE, IDT_FLAG_PRESENT | 0x0E);
-    _idt_set_entry(2, (tak_bertanda32_t)isr_2,
+    _idt_set_entry(2, (tak_bertanda32_t)(uintptr_t)isr_2,
                    SELECTOR_KERNEL_CODE, IDT_FLAG_PRESENT | 0x0E);
-    _idt_set_entry(3, (tak_bertanda32_t)isr_3,
+    _idt_set_entry(3, (tak_bertanda32_t)(uintptr_t)isr_3,
                    SELECTOR_KERNEL_CODE, IDT_FLAG_PRESENT | 0x0E);
-    _idt_set_entry(4, (tak_bertanda32_t)isr_4,
+    _idt_set_entry(4, (tak_bertanda32_t)(uintptr_t)isr_4,
                    SELECTOR_KERNEL_CODE, IDT_FLAG_PRESENT | 0x0E);
-    _idt_set_entry(5, (tak_bertanda32_t)isr_5,
+    _idt_set_entry(5, (tak_bertanda32_t)(uintptr_t)isr_5,
                    SELECTOR_KERNEL_CODE, IDT_FLAG_PRESENT | 0x0E);
-    _idt_set_entry(6, (tak_bertanda32_t)isr_6,
+    _idt_set_entry(6, (tak_bertanda32_t)(uintptr_t)isr_6,
                    SELECTOR_KERNEL_CODE, IDT_FLAG_PRESENT | 0x0E);
-    _idt_set_entry(7, (tak_bertanda32_t)isr_7,
+    _idt_set_entry(7, (tak_bertanda32_t)(uintptr_t)isr_7,
                    SELECTOR_KERNEL_CODE, IDT_FLAG_PRESENT | 0x0E);
-    _idt_set_entry(8, (tak_bertanda32_t)isr_8,
+    _idt_set_entry(8, (tak_bertanda32_t)(uintptr_t)isr_8,
                    SELECTOR_KERNEL_CODE, IDT_FLAG_PRESENT | 0x0E);
-    _idt_set_entry(9, (tak_bertanda32_t)isr_9,
+    _idt_set_entry(9, (tak_bertanda32_t)(uintptr_t)isr_9,
                    SELECTOR_KERNEL_CODE, IDT_FLAG_PRESENT | 0x0E);
-    _idt_set_entry(10, (tak_bertanda32_t)isr_10,
+    _idt_set_entry(10, (tak_bertanda32_t)(uintptr_t)isr_10,
                    SELECTOR_KERNEL_CODE, IDT_FLAG_PRESENT | 0x0E);
-    _idt_set_entry(11, (tak_bertanda32_t)isr_11,
+    _idt_set_entry(11, (tak_bertanda32_t)(uintptr_t)isr_11,
                    SELECTOR_KERNEL_CODE, IDT_FLAG_PRESENT | 0x0E);
-    _idt_set_entry(12, (tak_bertanda32_t)isr_12,
+    _idt_set_entry(12, (tak_bertanda32_t)(uintptr_t)isr_12,
                    SELECTOR_KERNEL_CODE, IDT_FLAG_PRESENT | 0x0E);
-    _idt_set_entry(13, (tak_bertanda32_t)isr_13,
+    _idt_set_entry(13, (tak_bertanda32_t)(uintptr_t)isr_13,
                    SELECTOR_KERNEL_CODE, IDT_FLAG_PRESENT | 0x0E);
-    _idt_set_entry(14, (tak_bertanda32_t)isr_14,
+    _idt_set_entry(14, (tak_bertanda32_t)(uintptr_t)isr_14,
                    SELECTOR_KERNEL_CODE, IDT_FLAG_PRESENT | 0x0E);
-    _idt_set_entry(15, (tak_bertanda32_t)isr_15,
+    _idt_set_entry(15, (tak_bertanda32_t)(uintptr_t)isr_15,
                    SELECTOR_KERNEL_CODE, IDT_FLAG_PRESENT | 0x0E);
-    _idt_set_entry(16, (tak_bertanda32_t)isr_16,
+    _idt_set_entry(16, (tak_bertanda32_t)(uintptr_t)isr_16,
                    SELECTOR_KERNEL_CODE, IDT_FLAG_PRESENT | 0x0E);
-    _idt_set_entry(17, (tak_bertanda32_t)isr_17,
+    _idt_set_entry(17, (tak_bertanda32_t)(uintptr_t)isr_17,
                    SELECTOR_KERNEL_CODE, IDT_FLAG_PRESENT | 0x0E);
-    _idt_set_entry(18, (tak_bertanda32_t)isr_18,
+    _idt_set_entry(18, (tak_bertanda32_t)(uintptr_t)isr_18,
                    SELECTOR_KERNEL_CODE, IDT_FLAG_PRESENT | 0x0E);
-    _idt_set_entry(19, (tak_bertanda32_t)isr_19,
+    _idt_set_entry(19, (tak_bertanda32_t)(uintptr_t)isr_19,
                    SELECTOR_KERNEL_CODE, IDT_FLAG_PRESENT | 0x0E);
-    _idt_set_entry(20, (tak_bertanda32_t)isr_20,
+    _idt_set_entry(20, (tak_bertanda32_t)(uintptr_t)isr_20,
                    SELECTOR_KERNEL_CODE, IDT_FLAG_PRESENT | 0x0E);
-    _idt_set_entry(21, (tak_bertanda32_t)isr_21,
+    _idt_set_entry(21, (tak_bertanda32_t)(uintptr_t)isr_21,
                    SELECTOR_KERNEL_CODE, IDT_FLAG_PRESENT | 0x0E);
-    _idt_set_entry(22, (tak_bertanda32_t)isr_22,
+    _idt_set_entry(22, (tak_bertanda32_t)(uintptr_t)isr_22,
                    SELECTOR_KERNEL_CODE, IDT_FLAG_PRESENT | 0x0E);
-    _idt_set_entry(23, (tak_bertanda32_t)isr_23,
+    _idt_set_entry(23, (tak_bertanda32_t)(uintptr_t)isr_23,
                    SELECTOR_KERNEL_CODE, IDT_FLAG_PRESENT | 0x0E);
-    _idt_set_entry(24, (tak_bertanda32_t)isr_24,
+    _idt_set_entry(24, (tak_bertanda32_t)(uintptr_t)isr_24,
                    SELECTOR_KERNEL_CODE, IDT_FLAG_PRESENT | 0x0E);
-    _idt_set_entry(25, (tak_bertanda32_t)isr_25,
+    _idt_set_entry(25, (tak_bertanda32_t)(uintptr_t)isr_25,
                    SELECTOR_KERNEL_CODE, IDT_FLAG_PRESENT | 0x0E);
-    _idt_set_entry(26, (tak_bertanda32_t)isr_26,
+    _idt_set_entry(26, (tak_bertanda32_t)(uintptr_t)isr_26,
                    SELECTOR_KERNEL_CODE, IDT_FLAG_PRESENT | 0x0E);
-    _idt_set_entry(27, (tak_bertanda32_t)isr_27,
+    _idt_set_entry(27, (tak_bertanda32_t)(uintptr_t)isr_27,
                    SELECTOR_KERNEL_CODE, IDT_FLAG_PRESENT | 0x0E);
-    _idt_set_entry(28, (tak_bertanda32_t)isr_28,
+    _idt_set_entry(28, (tak_bertanda32_t)(uintptr_t)isr_28,
                    SELECTOR_KERNEL_CODE, IDT_FLAG_PRESENT | 0x0E);
-    _idt_set_entry(29, (tak_bertanda32_t)isr_29,
+    _idt_set_entry(29, (tak_bertanda32_t)(uintptr_t)isr_29,
                    SELECTOR_KERNEL_CODE, IDT_FLAG_PRESENT | 0x0E);
-    _idt_set_entry(30, (tak_bertanda32_t)isr_30,
+    _idt_set_entry(30, (tak_bertanda32_t)(uintptr_t)isr_30,
                    SELECTOR_KERNEL_CODE, IDT_FLAG_PRESENT | 0x0E);
-    _idt_set_entry(31, (tak_bertanda32_t)isr_31,
+    _idt_set_entry(31, (tak_bertanda32_t)(uintptr_t)isr_31,
                    SELECTOR_KERNEL_CODE, IDT_FLAG_PRESENT | 0x0E);
 
     /* Setup IRQ handlers (ISR 32-47) */
@@ -657,22 +657,22 @@ status_t interupsi_x86_init(void)
         tak_bertanda32_t isr_addr;
 
         switch (i) {
-            case 0:  isr_addr = (tak_bertanda32_t)irq_0;  break;
-            case 1:  isr_addr = (tak_bertanda32_t)irq_1;  break;
-            case 2:  isr_addr = (tak_bertanda32_t)irq_2;  break;
-            case 3:  isr_addr = (tak_bertanda32_t)irq_3;  break;
-            case 4:  isr_addr = (tak_bertanda32_t)irq_4;  break;
-            case 5:  isr_addr = (tak_bertanda32_t)irq_5;  break;
-            case 6:  isr_addr = (tak_bertanda32_t)irq_6;  break;
-            case 7:  isr_addr = (tak_bertanda32_t)irq_7;  break;
-            case 8:  isr_addr = (tak_bertanda32_t)irq_8;  break;
-            case 9:  isr_addr = (tak_bertanda32_t)irq_9;  break;
-            case 10: isr_addr = (tak_bertanda32_t)irq_10; break;
-            case 11: isr_addr = (tak_bertanda32_t)irq_11; break;
-            case 12: isr_addr = (tak_bertanda32_t)irq_12; break;
-            case 13: isr_addr = (tak_bertanda32_t)irq_13; break;
-            case 14: isr_addr = (tak_bertanda32_t)irq_14; break;
-            case 15: isr_addr = (tak_bertanda32_t)irq_15; break;
+            case 0:  isr_addr = (tak_bertanda32_t)(uintptr_t)irq_0;  break;
+            case 1:  isr_addr = (tak_bertanda32_t)(uintptr_t)irq_1;  break;
+            case 2:  isr_addr = (tak_bertanda32_t)(uintptr_t)irq_2;  break;
+            case 3:  isr_addr = (tak_bertanda32_t)(uintptr_t)irq_3;  break;
+            case 4:  isr_addr = (tak_bertanda32_t)(uintptr_t)irq_4;  break;
+            case 5:  isr_addr = (tak_bertanda32_t)(uintptr_t)irq_5;  break;
+            case 6:  isr_addr = (tak_bertanda32_t)(uintptr_t)irq_6;  break;
+            case 7:  isr_addr = (tak_bertanda32_t)(uintptr_t)irq_7;  break;
+            case 8:  isr_addr = (tak_bertanda32_t)(uintptr_t)irq_8;  break;
+            case 9:  isr_addr = (tak_bertanda32_t)(uintptr_t)irq_9;  break;
+            case 10: isr_addr = (tak_bertanda32_t)(uintptr_t)irq_10; break;
+            case 11: isr_addr = (tak_bertanda32_t)(uintptr_t)irq_11; break;
+            case 12: isr_addr = (tak_bertanda32_t)(uintptr_t)irq_12; break;
+            case 13: isr_addr = (tak_bertanda32_t)(uintptr_t)irq_13; break;
+            case 14: isr_addr = (tak_bertanda32_t)(uintptr_t)irq_14; break;
+            case 15: isr_addr = (tak_bertanda32_t)(uintptr_t)irq_15; break;
             default: isr_addr = 0; break;
         }
 
@@ -681,7 +681,7 @@ status_t interupsi_x86_init(void)
     }
 
     /* Setup syscall handler (ISR 128) */
-    _idt_set_entry(VEKTOR_SYSCALL, (tak_bertanda32_t)isr_128,
+    _idt_set_entry(VEKTOR_SYSCALL, (tak_bertanda32_t)(uintptr_t)isr_128,
                    SELECTOR_KERNEL_CODE, IDT_FLAG_PRESENT | 0x60 | 0x0E);
 
     /* Fill remaining entries dengan handler default */
@@ -725,7 +725,7 @@ status_t interupsi_x86_init(void)
  *   STATUS_BERHASIL jika berhasil
  */
 status_t interupsi_x86_daftarkan_handler(tak_bertanda32_t vektor,
-                                          handler_interupsi_t handler)
+                                          handler_interupsi_frame_t handler)
 {
     if (vektor >= JUMLAH_VEKTOR) {
         return STATUS_PARAM_INVALID;

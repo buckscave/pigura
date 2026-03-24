@@ -22,11 +22,9 @@
 /* Jumlah maksimum proses */
 #define MAKS_PROSES_SISTEM      64
 
-/* Ukuran stack kernel */
-#define UKURAN_STACK_KERNEL     (8 * 1024)
-
-/* Ukuran stack user */
-#define UKURAN_STACK_USER       (1 * 1024 * 1024)
+/* Ukuran stack sudah didefinisikan di konstanta.h, gunakan nilai dari sana */
+/* #define UKURAN_STACK_KERNEL  - gunakan dari konstanta.h */
+/* #define UKURAN_STACK_USER    - gunakan dari konstanta.h */
 
 /* Alamat kernel */
 #define KERNEL_VIRTUAL_BASE     0xC0000000
@@ -131,8 +129,8 @@ static struct tss g_tss_kernel __attribute__((aligned(16)));
 /* Tabel proses */
 static struct proses_internal g_tabel_proses[MAKS_PROSES_SISTEM];
 
-/* Proses saat ini */
-static struct proses_internal *g_proses_sekarang = NULL;
+/* Proses saat ini (internal, berbeda dengan g_proses_sekarang di kernel.h) */
+static struct proses_internal *g_proses_sekarang_internal = NULL;
 
 /* Proses kernel */
 static struct proses_internal g_proses_kernel;
@@ -180,7 +178,7 @@ static void _tss_init(void)
     kernel_memset(&g_tss_kernel, 0, sizeof(struct tss));
 
     g_tss_kernel.ss0 = SELECTOR_KERNEL_DATA;
-    g_tss_kernel.esp0 = (tak_bertanda32_t)&g_stack_context +
+    g_tss_kernel.esp0 = (tak_bertanda32_t)(uintptr_t)&g_stack_context +
                         sizeof(g_stack_context);
     g_tss_kernel.iomap_base = sizeof(struct tss);
 }
@@ -381,7 +379,7 @@ static tak_bertanda32_t _buat_page_directory(void)
     }
 
     /* Map ke virtual address */
-    pd = (tak_bertanda32_t *)(pd_fisik + KERNEL_VIRTUAL_BASE);
+    pd = (tak_bertanda32_t *)(uintptr_t)(pd_fisik + KERNEL_VIRTUAL_BASE);
 
     /* Clear page directory */
     kernel_memset(pd, 0, UKURAN_HALAMAN);
@@ -389,7 +387,7 @@ static tak_bertanda32_t _buat_page_directory(void)
     /* Copy kernel mapping (entry 768+) */
     for (i = 768; i < 1024; i++) {
         tak_bertanda32_t *kernel_pd;
-        kernel_pd = (tak_bertanda32_t *)cpu_read_cr3();
+        kernel_pd = (tak_bertanda32_t *)(uintptr_t)cpu_read_cr3();
         pd[i] = kernel_pd[i];
     }
 
@@ -432,16 +430,16 @@ static tak_bertanda32_t _alokasi_stack_kernel(void)
     alamat_fisik_t halaman;
     tak_bertanda8_t *stack;
 
-    /* Alokasikan 2 halaman untuk stack kernel */
+    /* Alokasikan stack kernel - gunakan konstanta dari konstanta.h */
     halaman = hal_memory_alloc_pages(2);
     if (halaman == ALAMAT_FISIK_INVALID) {
         return 0;
     }
 
     /* Map ke virtual address */
-    stack = (tak_bertanda8_t *)(halaman + KERNEL_VIRTUAL_BASE);
+    stack = (tak_bertanda8_t *)(uintptr_t)(halaman + KERNEL_VIRTUAL_BASE);
 
-    return (tak_bertanda32_t)(stack + (2 * UKURAN_HALAMAN));
+    return (tak_bertanda32_t)(uintptr_t)(stack + (2 * UKURAN_HALAMAN));
 }
 
 /*
@@ -460,7 +458,7 @@ static void _bebaskan_stack_kernel(tak_bertanda32_t stack_top)
         return;
     }
 
-    halaman = (alamat_fisik_t)(stack_top - (2 * UKURAN_HALAMAN) -
+    halaman = (alamat_fisik_t)((tak_bertanda32_t)(stack_top - (2 * UKURAN_HALAMAN)) -
              KERNEL_VIRTUAL_BASE);
     hal_memory_free_pages(halaman, 2);
 }
@@ -503,7 +501,7 @@ status_t proses_x86_init(void)
     g_proses_kernel.sedang_jalan = BENAR;
     g_proses_kernel.waktu_mulai = 0;
 
-    g_proses_sekarang = &g_proses_kernel;
+    g_proses_sekarang_internal = &g_proses_kernel;
     g_jumlah_proses = 1;
 
     g_proses_diinisialisasi = BENAR;
@@ -592,7 +590,7 @@ pid_t proses_x86_buat(const char *nama, pid_t ppid,
     /* Buat page directory untuk user process */
     if (flags & 0x01) {
         /* User mode flag */
-        proses->pd = (tak_bertanda32_t *)_buat_page_directory();
+        proses->pd = (tak_bertanda32_t *)(uintptr_t)_buat_page_directory();
         if (proses->pd == NULL) {
             _bebaskan_stack_kernel(proses->kernel_stack);
             _dealokasi_proses(proses);
@@ -677,7 +675,7 @@ pid_t proses_x86_buat_dengan_entry(const char *nama,
         /* Alokasi stack user */
         user_stack = ALAMAT_STACK_USER;
 
-        pd_fisik = (tak_bertanda32_t)proses->pd;
+        pd_fisik = (tak_bertanda32_t)(uintptr_t)proses->pd;
         _context_init_user(proses, entry, user_stack, pd_fisik);
     } else {
         _context_init_kernel(proses, entry, proses->kernel_stack);
@@ -740,15 +738,16 @@ status_t proses_x86_exit(pid_t pid, tanda32_t exit_code)
     }
 
     if (proses->pd != NULL) {
-        _hancurkan_page_directory((tak_bertanda32_t)proses->pd);
+        _hancurkan_page_directory((tak_bertanda32_t)(uintptr_t)proses->pd);
     }
 
     /* Update status */
     proses->status = PROSES_STATUS_ZOMBIE;
 
     /* Jika ini proses saat ini, switch ke proses lain */
-    if (g_proses_sekarang == proses) {
-        g_proses_sekarang = &g_proses_kernel;
+    if (g_proses_sekarang_internal == proses) {
+        g_proses_sekarang_internal = &g_proses_kernel;
+        g_proses_sekarang = (proses_t *)&g_proses_kernel;
     }
 
     g_jumlah_proses--;
@@ -783,7 +782,7 @@ status_t proses_x86_switch(pid_t pid_target)
         return STATUS_GAGAL;
     }
 
-    proses_lama = g_proses_sekarang;
+    proses_lama = g_proses_sekarang_internal;
 
     /* Cari proses target */
     if (pid_target == 0) {
@@ -843,7 +842,10 @@ status_t proses_x86_switch(pid_t pid_target)
     _tss_set_kernel_stack(proses_baru->kernel_stack);
 
     /* Update current process */
-    g_proses_sekarang = proses_baru;
+    g_proses_sekarang_internal = proses_baru;
+
+    /* Update global pointer dari kernel.h (cast untuk kompatibilitas) */
+    g_proses_sekarang = (proses_t *)proses_baru;
 
     /* Context switch */
     _context_switch(&proses_lama->context, &proses_baru->context);
@@ -877,7 +879,7 @@ void proses_x86_yield(void)
  */
 struct proses_internal *proses_x86_get_sekarang(void)
 {
-    return g_proses_sekarang;
+    return g_proses_sekarang_internal;
 }
 
 /*
@@ -890,11 +892,11 @@ struct proses_internal *proses_x86_get_sekarang(void)
  */
 pid_t proses_x86_get_pid_sekarang(void)
 {
-    if (g_proses_sekarang == NULL) {
+    if (g_proses_sekarang_internal == NULL) {
         return PID_KERNEL;
     }
 
-    return g_proses_sekarang->pid;
+    return g_proses_sekarang_internal->pid;
 }
 
 /*
@@ -1009,7 +1011,7 @@ void proses_x86_print_daftar(void)
 void proses_x86_jump_usermode(tak_bertanda32_t entry,
                                tak_bertanda32_t stack)
 {
-    _tss_set_kernel_stack(g_proses_sekarang->kernel_stack);
+    _tss_set_kernel_stack(g_proses_sekarang_internal->kernel_stack);
     _jump_to_usermode(entry, stack);
 }
 

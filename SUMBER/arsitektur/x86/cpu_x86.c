@@ -179,11 +179,11 @@
 static hal_cpu_info_t g_info_cpu;
 
 /* Flag CPUID tersedia */
-static bool_t g_cpoid_tersedia = SALAH;
+static bool_t g_cpuid_tersedia = SALAH;
 
 /* Leaf maksimal CPUID */
-static tak_bertanda32_t g_cpoid_max_leaf = 0;
-static tak_bertanda32_t g_cpoid_max_ext = 0;
+static tak_bertanda32_t g_cpuid_max_leaf = 0;
+static tak_bertanda32_t g_cpuid_max_ext = 0;
 
 /*
  * ============================================================================
@@ -298,7 +298,7 @@ static void _baca_vendor(char *vendor)
         return;
     }
 
-    _cpuid(CPUID_LEAF_VENDOR, 0, &g_cpoid_max_leaf, &ebx, &ecx, &edx);
+    _cpuid(CPUID_LEAF_VENDOR, 0, &g_cpuid_max_leaf, &ebx, &ecx, &edx);
 
     /* Vendor string disimpan di EBX, EDX, ECX (urutan aneh) */
     vendor[0] = (char)(ebx & 0xFF);
@@ -408,7 +408,7 @@ static void _baca_fitur(void)
     g_info_cpu.features = edx;
 
     /* Baca extended features jika tersedia */
-    if (g_cpoid_max_ext >= 0x80000001) {
+    if (g_cpuid_max_ext >= 0x80000001) {
         _cpuid(0x80000001, 0, &eax, &ebx, &ecx, &ext_edx);
 
         /* Gabungkan fitur extended */
@@ -438,12 +438,13 @@ static void _baca_cache(void)
 
     /* Default values */
     g_info_cpu.cache_line = 64;
-    g_info_cpu.cache_l1 = 32;
+    g_info_cpu.cache_l1_inst = 32;  /* L1 instruction cache */
+    g_info_cpu.cache_l1_data = 32;  /* L1 data cache */
     g_info_cpu.cache_l2 = 256;
     g_info_cpu.cache_l3 = 8192;
 
     /* Coba baca dari CPUID leaf 0x02 (Intel) */
-    if (g_cpoid_max_leaf >= 2) {
+    if (g_cpuid_max_leaf >= 2) {
         _cpuid(2, 0, &eax, &ebx, &ecx, &edx);
 
         /* Parse cache info (sederhana) */
@@ -452,14 +453,15 @@ static void _baca_cache(void)
     }
 
     /* Coba baca dari extended leaf 0x80000005/6 (AMD) */
-    if (g_cpoid_max_ext >= 0x80000005) {
+    if (g_cpuid_max_ext >= 0x80000005) {
         _cpuid(0x80000005, 0, &eax, &ebx, &ecx, &edx);
 
         /* L1 cache dari ECX (AMD) */
-        g_info_cpu.cache_l1 = ((ecx >> 24) & 0xFF); /* L1 D-cache KB */
+        g_info_cpu.cache_l1_data = ((ecx >> 24) & 0xFF); /* L1 D-cache KB */
+        g_info_cpu.cache_l1_inst = ((ecx >> 8) & 0xFF);  /* L1 I-cache KB */
     }
 
-    if (g_cpoid_max_ext >= 0x80000006) {
+    if (g_cpuid_max_ext >= 0x80000006) {
         _cpuid(0x80000006, 0, &eax, &ebx, &ecx, &edx);
 
         /* L2 cache dari ECX (AMD) */
@@ -484,7 +486,7 @@ static void _deteksi_cores(void)
     g_info_cpu.threads = 1;
 
     /* Intel: leaf 0x0B jika tersedia */
-    if (g_cpoid_max_leaf >= 0x0B) {
+    if (g_cpuid_max_leaf >= 0x0B) {
         _cpuid(0x0B, 0, &eax, &ebx, &ecx, &edx);
         if (ebx & 0xFFFF) {
             g_info_cpu.threads = (tak_bertanda8_t)(ebx & 0xFFFF);
@@ -501,7 +503,7 @@ static void _deteksi_cores(void)
     }
 
     /* AMD: extended leaf 0x80000008 */
-    if (g_cpoid_max_ext >= 0x80000008) {
+    if (g_cpuid_max_ext >= 0x80000008) {
         _cpuid(0x80000008, 0, &eax, &ebx, &ecx, &edx);
         g_info_cpu.cores = (tak_bertanda8_t)((ecx & 0xFF) + 1);
     }
@@ -519,8 +521,8 @@ static void _deteksi_frekuensi(void)
     tak_bertanda32_t ecx;
     tak_bertanda32_t edx;
 
-    /* Default 1 GHz */
-    g_info_cpu.freq_mhz = 1000;
+    /* Default 1 GHz = 1000000 kHz */
+    g_info_cpu.freq_khz = 1000000;
 
     /* Coba baca dari brand string */
     /* Contoh: "Intel(R) Core(TM) i5-7200U CPU @ 2.50GHz" */
@@ -558,13 +560,14 @@ static void _deteksi_frekuensi(void)
                     }
                 }
 
-                g_info_cpu.freq_mhz = ghz_val * 1000 + mhz_val * 100;
+                /* Convert to kHz */
+                g_info_cpu.freq_khz = ghz_val * 1000000 + mhz_val * 100000;
             }
         }
     }
 
     /* Coba baca dari CPUID leaf 0x15 (Intel) */
-    if (g_cpoid_max_leaf >= 0x15) {
+    if (g_cpuid_max_leaf >= 0x15) {
         _cpuid(0x15, 0, &eax, &ebx, &ecx, &edx);
         if (ebx != 0 && eax != 0) {
             /* Core crystal clock frequency */
@@ -573,9 +576,10 @@ static void _deteksi_frekuensi(void)
             tak_bertanda32_t crystal = ecx; /* Hz */
 
             if (denom != 0 && crystal != 0) {
-                g_info_cpu.freq_mhz = 
+                /* Calculate frequency in kHz */
+                g_info_cpu.freq_khz = 
                     (tak_bertanda32_t)((numer * crystal) / 
-                                       (denom * 1000000));
+                                       (denom * 1000));
             }
         }
     }
@@ -648,15 +652,15 @@ status_t hal_cpu_init(void)
     kernel_memset(&g_info_cpu, 0, sizeof(hal_cpu_info_t));
 
     /* Deteksi CPUID support */
-    g_cpoid_tersedia = _deteksi_cpoid();
+    g_cpuid_tersedia = _deteksi_cpoid();
 
-    if (!g_cpoid_tersedia) {
+    if (!g_cpuid_tersedia) {
         kernel_printf("[CPU] CPUID tidak tersedia\n");
         return STATUS_GAGAL;
     }
 
     /* Baca max extended leaf */
-    _cpuid(CPUID_LEAF_EXTENDED, 0, &g_cpoid_max_ext, 
+    _cpuid(CPUID_LEAF_EXTENDED, 0, &g_cpuid_max_ext, 
            NULL, NULL, NULL);
 
     /* Baca informasi CPU */
@@ -667,7 +671,7 @@ status_t hal_cpu_init(void)
     _deteksi_cores();
 
     /* Baca brand string jika tersedia */
-    if (g_cpoid_max_ext >= CPUID_LEAF_BRAND) {
+    if (g_cpuid_max_ext >= CPUID_LEAF_BRAND) {
         _baca_brand(g_info_cpu.brand);
     }
 
@@ -939,7 +943,8 @@ bool_t cpu_has_feature(tak_bertanda32_t fitur)
  */
 tak_bertanda32_t cpu_get_frequency(void)
 {
-    return g_info_cpu.freq_mhz;
+    /* Return frequency in kHz, convert from kHz to MHz for compatibility */
+    return g_info_cpu.freq_khz / 1000;
 }
 
 /*
@@ -977,12 +982,13 @@ void cpu_delay_us(tak_bertanda32_t us)
     tak_bertanda64_t end;
     tak_bertanda64_t delay;
 
-    if (g_info_cpu.freq_mhz == 0) {
+    if (g_info_cpu.freq_khz == 0) {
         return;
     }
 
     start = cpu_read_tsc();
-    delay = (tak_bertanda64_t)g_info_cpu.freq_mhz * us;
+    /* freq_khz is in kHz, so freq_khz * us / 1000 = cycles per us */
+    delay = (tak_bertanda64_t)g_info_cpu.freq_khz * us / 1000;
 
     do {
         end = cpu_read_tsc();

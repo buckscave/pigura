@@ -117,7 +117,7 @@ static tak_bertanda64_t g_halaman_bebas = 0;
 static tak_bertanda64_t g_total_memori = 0;
 
 /* Alamat awal heap kernel */
-static alamat_fisik_t g_heap_mulai = 0;
+static alamat_fisik_t g_heap_mulai __attribute__((unused)) = 0;
 
 /*
  * ============================================================================
@@ -217,11 +217,11 @@ static tak_bertanda64_t _hitung_memori_total(multiboot_info_t *mbi)
         struct mmap_entry_bios *entry;
 
         len = mbi->mmap_length;
-        ptr = (tak_bertanda8_t *)mbi->mmap_addr;
+        ptr = (tak_bertanda8_t *)(uintptr_t)mbi->mmap_addr;
         total = 0;
 
         for (i = 0; i < len; ) {
-            entry = (struct mmap_entry_bios *)ptr;
+            entry = (struct mmap_entry_bios *)(uintptr_t)ptr;
 
             if (entry->tipe == MMAP_TYPE_RAM) {
                 total += entry->panjang;
@@ -274,7 +274,7 @@ static void _setup_identity_mapping(void)
     g_page_directory[0].user = 0;
     g_page_directory[0].besar = 0;
     g_page_directory[0].alamat = 
-        ((tak_bertanda32_t)g_page_table_identitas) >> 12;
+        ((tak_bertanda32_t)(uintptr_t)g_page_table_identitas) >> 12;
 }
 
 /*
@@ -306,7 +306,7 @@ static void _setup_kernel_mapping(void)
     g_page_directory[768].user = 0;
     g_page_directory[768].besar = 0;
     g_page_directory[768].alamat = 
-        ((tak_bertanda32_t)g_page_table_kernel) >> 12;
+        ((tak_bertanda32_t)(uintptr_t)g_page_table_kernel) >> 12;
 }
 
 /*
@@ -319,8 +319,8 @@ static void _aktifkan_paging(void)
     tak_bertanda32_t cr0;
     tak_bertanda32_t cr4;
 
-    /* Set page directory */
-    cpu_write_cr3((tak_bertanda32_t)g_page_directory);
+    /* Set page directory - cast through uintptr_t for x86 */
+    cpu_write_cr3((tak_bertanda32_t)(uintptr_t)g_page_directory);
 
     /* Enable 4 MB pages (PSE) */
     __asm__ __volatile__(
@@ -700,7 +700,7 @@ status_t memori_x86_map_halaman(alamat_virtual_t virt,
             return STATUS_MEMORI_HABIS;
         }
 
-        pt = (struct pte *)(pt_fisik + KERNEL_MULAI_VIRT - 
+        pt = (struct pte *)(uintptr_t)(pt_fisik + KERNEL_MULAI_VIRT - 
              KERNEL_MULAI_FISIK);
         kernel_memset(pt, 0, UKURAN_HALAMAN);
 
@@ -710,7 +710,7 @@ status_t memori_x86_map_halaman(alamat_virtual_t virt,
         g_page_directory[pde_idx].alamat = pt_fisik >> 12;
     } else {
         pt_fisik = g_page_directory[pde_idx].alamat << 12;
-        pt = (struct pte *)(pt_fisik + KERNEL_MULAI_VIRT - 
+        pt = (struct pte *)(uintptr_t)(pt_fisik + KERNEL_MULAI_VIRT - 
              KERNEL_MULAI_FISIK);
     }
 
@@ -752,7 +752,7 @@ status_t memori_x86_unmap_halaman(alamat_virtual_t virt)
     }
 
     pt_fisik = g_page_directory[pde_idx].alamat << 12;
-    pt = (struct pte *)(pt_fisik + KERNEL_MULAI_VIRT - 
+    pt = (struct pte *)(uintptr_t)(pt_fisik + KERNEL_MULAI_VIRT - 
          KERNEL_MULAI_FISIK);
 
     /* Clear entry */
@@ -790,7 +790,7 @@ alamat_fisik_t memori_x86_get_fisik(alamat_virtual_t virt)
     }
 
     pt_fisik = g_page_directory[pde_idx].alamat << 12;
-    pt = (struct pte *)(pt_fisik + KERNEL_MULAI_VIRT - 
+    pt = (struct pte *)(uintptr_t)(pt_fisik + KERNEL_MULAI_VIRT - 
          KERNEL_MULAI_FISIK);
 
     if (!pt[pte_idx].ada) {

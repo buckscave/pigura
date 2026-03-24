@@ -56,6 +56,19 @@ static tak_bertanda32_t g_spurious_irq = 0;
 
 /*
  * ============================================================================
+ * FORWARD DECLARATIONS
+ * ============================================================================
+ */
+
+/* Forward declarations untuk fungsi yang digunakan sebelum didefinisikan */
+static status_t _pic_mask(tak_bertanda32_t irq, tak_bertanda8_t status);
+
+/* Forward declarations untuk fungsi public */
+status_t irq_enable(tak_bertanda32_t irq);
+status_t irq_disable(tak_bertanda32_t irq);
+
+/*
+ * ============================================================================
  * FUNGSI INTERNAL
  * ============================================================================
  */
@@ -388,3 +401,4 @@ void irq_dump_status(void)
 
     kernel_printf("[IRQ] Spurious: %u\n", g_spurious_irq);
 }
+
