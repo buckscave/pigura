@@ -96,6 +96,11 @@
 #define MAKS_THREAD_PER_PROSES CONFIG_MAKS_THREAD
 #define MAKS_FD_PER_PROSES CONFIG_MAKS_FD
 
+/* Alias untuk kompatibilitas dengan proses.h */
+#define PROSES_MAKS MAKS_PROSES
+#define THREAD_MAKS_PER_PROSES MAKS_THREAD_PER_PROSES
+#define FD_MAKS_PER_PROSES MAKS_FD_PER_PROSES
+
 /* Batas argumen */
 #define MAKS_ARGC CONFIG_MAKS_ARGC
 #define MAKS_ARGV_LEN CONFIG_MAKS_ARGV_LEN
@@ -151,6 +156,7 @@
 #define SIGNAL_TERM 15
 #define SIGNAL_STKFLT 16
 #define SIGNAL_CHILD 17
+#define SIGCHLD     SIGNAL_CHILD  /* Alias kompatibilitas POSIX */
 #define SIGNAL_CONT 18
 #define SIGNAL_STOP 19
 #define SIGNAL_TSTP 20
@@ -173,16 +179,30 @@
 
 /*
  * ===========================================================================
- * KONSTANTA INTERUPSI - x86/x86_64 (INTERRUPT CONSTANTS)
+ * KONSTANTA INTERUPSI (INTERRUPT CONSTANTS)
  * ===========================================================================
- * Konstanta untuk sistem interupsi pada arsitektur x86/x86_64.
+ * Konstanta untuk sistem interupsi.
+ * CATATAN: Konstanta spesifik arsitektur ada di dalam guard kondisional.
  */
 
-/* Jumlah vektor interupsi */
+/* Jumlah vektor interupsi - umum untuk semua arsitektur */
 #define JUMLAH_ISR 256
-#define JUMLAH_IRQ 16
-#define JUMLAH_IRQ_APIC 24
 #define JUMLAH_EXCEPTION 32
+
+/* Jumlah IRQ - berbeda per arsitektur */
+#if defined(ARSITEKTUR_X86) || defined(ARSITEKTUR_X86_64)
+    #define JUMLAH_IRQ 16
+    #define JUMLAH_IRQ_APIC 24
+#elif defined(ARSITEKTUR_ARM) || defined(ARSITEKTUR_ARMV7) || defined(ARSITEKTUR_ARM64)
+    #define JUMLAH_IRQ 128  /* ARM GIC mendukung lebih banyak IRQ */
+#endif
+
+/*
+ * ---------------------------------------------------------------------------
+ * KONSTANTA INTERUPSI x86/x86_64
+ * ---------------------------------------------------------------------------
+ */
+#if defined(ARSITEKTUR_X86) || defined(ARSITEKTUR_X86_64)
 
 /* Vektor exception CPU */
 #define VEKTOR_DE 0    /* Divide Error */
@@ -428,11 +448,13 @@
 /* TSS IO bitmap offset */
 #define TSS_IO_BITMAP_OFFSET 102
 
+#endif /* ARSITEKTUR_X86 || ARSITEKTUR_X86_64 */
+
 /*
  * ===========================================================================
  * KONSTANTA SYSCALL (SYSTEM CALL CONSTANTS)
  * ===========================================================================
- * Konstanta untuk system call.
+ * Konstanta untuk system call - berlaku untuk semua arsitektur.
  */
 
 /* Nomor syscall */
@@ -513,6 +535,29 @@
 #define ERROR_OVERFLOW 20
 #define ERROR_PIPE 21
 #define ERROR_RANGE 22
+#define ERROR_NOCHILD 23      /* Tidak ada child proses */
+#define ERROR_AGAIN 24        /* Coba lagi */
+#define ERROR_NOTSUP 25       /* Tidak didukung */
+#define ERROR_ALREADY 26      /* Sudah ada/terjadi */
+
+/*
+ * ===========================================================================
+ * KONSTANTA EXIT STATUS (EXIT STATUS CONSTANTS)
+ * ===========================================================================
+ * Konstanta untuk encoding exit status.
+ */
+
+/* Exit status encoding */
+#define EXIT_SIGNAL_SHIFT       8       /* Shift untuk signal number */
+#define EXIT_SIGNAL_CORE        0x80    /* Flag core dump */
+
+/* Codes untuk si_code (waitid) */
+#define CLD_EXITED      1       /* Child exited normally */
+#define CLD_KILLED      2       /* Child killed by signal */
+#define CLD_DUMPED      3       /* Child dumped core */
+#define CLD_TRAPPED     4       /* Child traced trap */
+#define CLD_STOPPED     5       /* Child stopped */
+#define CLD_CONTINUED   6       /* Child continued */
 
 /*
  * ===========================================================================
@@ -655,13 +700,16 @@
  * Konstanta magic number untuk validasi.
  */
 
-/* Magic number untuk validasi struktur */
+/* Magic number untuk validasi */
 #define MAGIC_KERNEL 0x50494755  /* "PIGU" */
 #define MAGIC_PROSES 0x50524F43  /* "PROC" */
 #define MAGIC_MEMORY 0x4D454D20  /* "MEM " */
 #define MAGIC_FILE 0x46494C45    /* "FILE" */
 #define MAGIC_BUFFER 0x42554646  /* "BUFF" */
 #define MAGIC_HANDLE 0x48414E44  /* "HAND" */
+
+/* Alias untuk kompatibilitas */
+#define PROSES_MAGIC MAGIC_PROSES
 
 /* Signature ELF */
 #define ELF_MAGIC 0x464C457F  /* 0x7F 'E' 'L' 'F' */

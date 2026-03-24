@@ -1,16 +1,25 @@
 /*
  * PIGURA OS - SCHEDULER.C
  * ------------------------
- * Implementasi penjadwalan proses dengan algoritma prioritas.
+ * Implementasi penjadwalan proses dengan algoritma multi-level
+ * feedback queue dan priority scheduling.
  *
- * Berkas ini berisi implementasi scheduler preemptive dengan dukungan
- * multi-level feedback queue dan priority scheduling.
+ * Berkas ini berisi implementasi scheduler preemptive dengan
+ * dukungan untuk prioritas, real-time scheduling, dan load
+ * balancing antar CPU.
  *
- * Versi: 1.0
+ * KEPATUHAN STANDAR:
+ * - C90 (ANSI C89) dengan POSIX Safe Functions
+ * - Tidak menggunakan fitur C99/C11
+ * - Semua fungsi diimplementasikan lengkap
+ * - Batas 80 karakter per baris
+ *
+ * Versi: 3.0
  * Tanggal: 2025
  */
 
 #include "../kernel.h"
+#include "proses.h"
 
 /*
  * ============================================================================
@@ -19,25 +28,27 @@
  */
 
 /* Jumlah antrian prioritas */
-#define JUMLAH_ANTRIAN         4
+#define JUMLAH_ANTRIAN         SCHEDULER_ANTRIAN_JUMLAH
 
-/* Quantum untuk setiap level prioritas */
-#define QUANTUM_REALTIME       20
-#define QUANTUM_TINGGI         15
-#define QUANTUM_NORMAL         10
-#define QUANTUM_RENDAH         5
+/* Interval untuk priority boost (dalam ticks) */
+#define BOOST_INTERVAL         100
 
-/* Faktor bonus untuk nice value */
-#define NICE_DEFAULT           0
-#define NICE_MIN               -20
-#define NICE_MAX               19
+/* Interval untuk load average calculation */
+#define LOAD_AVG_INTERVAL      500
 
-/* Threshold untuk boost priority */
-#define BOOST_THRESHOLD        100
+/* Load average decay factor (fixed point) */
+#define LOAD_AVG_FACTOR        1884    /* e^(5sec/60sec) * 2048 */
+#define LOAD_AVG_SHIFT         11
 
-/* Flag scheduler */
-#define SCHED_FLAG_PREEMPT     0x01
-#define SCHED_FLAG_NEED_RESCHED 0x02
+/* Timeslice bonus untuk interactive tasks */
+#define TIMESLICE_BONUS        5
+#define INTERACTIVE_THRESHOLD  100
+
+/* Starvation threshold */
+#define STARVATION_THRESHOLD   500
+
+/* CPU IDLE threshold */
+#define CPU_IDLE_THRESHOLD     10
 
 /*
  * ============================================================================
@@ -45,24 +56,24 @@
  * ============================================================================
  */
 
-/* Struktur antrian runqueue */
+/* Struktur untuk tracking CPU usage */
 typedef struct {
-    proses_t *head;                 /* Proses pertama dalam antrian */
-    proses_t *tail;                 /* Proses terakhir dalam antrian */
-    tak_bertanda32_t count;         /* Jumlah proses dalam antrian */
-} runqueue_t;
+    tak_bertanda64_t idle_ticks;
+    tak_bertanda64_t total_ticks;
+    tak_bertanda64_t last_update;
+    tak_bertanda32_t load;
+} cpu_usage_t;
 
-/* Struktur scheduler */
+/* Struktur untuk scheduling statistics per CPU */
 typedef struct {
-    runqueue_t antrian[JUMLAH_ANTRIAN]; /* Antrian per prioritas */
-    tak_bertanda32_t total_proses;      /* Total proses runnable */
-    tak_bertanda32_t tick_count;        /* Counter tick */
-    tak_bertanda32_t context_switches;  /* Jumlah context switch */
-    tak_bertanda32_t last_boost;        /* Tick boost terakhir */
-    spinlock_t lock;                    /* Lock untuk thread safety */
-    tak_bertanda32_t flags;             /* Flag scheduler */
-    proses_t *idle_proses;              /* Pointer ke idle proses */
-} scheduler_t;
+    tak_bertanda64_t context_switches;
+    tak_bertanda64_t preemptions;
+    tak_bertanda64_t yields;
+    tak_bertanda64_t timeouts;
+    tak_bertanda64_t migrations;
+    tak_bertanda64_t wakeups;
+    tak_bertanda64_t sleeps;
+} cpu_sched_stats_t;
 
 /*
  * ============================================================================
@@ -70,23 +81,39 @@ typedef struct {
  * ============================================================================
  */
 
-/* State scheduler */
-static scheduler_t sched = {0};
+/* Scheduler state per CPU */
+static scheduler_t g_sched[CPU_MAKS];
+
+/* CPU usage tracking */
+static cpu_usage_t g_cpu_usage[CPU_MAKS];
+
+/* CPU scheduling statistics */
+static cpu_sched_stats_t g_cpu_stats[CPU_MAKS];
+
+/* Global scheduling statistics */
+static struct {
+    tak_bertanda64_t total_switches;
+    tak_bertanda64_t total_preemptions;
+    tak_bertanda64_t total_yields;
+    tak_bertanda64_t total_timeouts;
+    tak_bertanda64_t total_migrations;
+    tak_bertanda64_t boost_count;
+    tak_bertanda64_t migration_attempts;
+    tak_bertanda64_t load_balance_count;
+} g_sched_stats = {0, 0, 0, 0, 0, 0, 0, 0};
+
+/* Load average global */
+static tak_bertanda32_t g_load_avg[3] = {0, 0, 0};
 
 /* Status inisialisasi */
-static bool_t scheduler_initialized = SALAH;
+static bool_t g_scheduler_initialized = SALAH;
 
-/* Statistik scheduler */
-static struct {
-    tak_bertanda64_t switches;
-    tak_bertanda64_t preemptions;
-    tak_bertanda64_t yields;
-    tak_bertanda64_t timeouts;
-} sched_stats = {0};
+/* Idle threads per CPU */
+static thread_t *g_idle_threads[CPU_MAKS];
 
 /*
  * ============================================================================
- * FUNGSI INTERNAL (INTERNAL FUNCTIONS)
+ * FUNGSI INTERNAL RUNQUEUE (INTERNAL RUNQUEUE FUNCTIONS)
  * ============================================================================
  */
 
@@ -103,217 +130,451 @@ static void runqueue_init(runqueue_t *rq)
     if (rq == NULL) {
         return;
     }
-
+    
     rq->head = NULL;
     rq->tail = NULL;
     rq->count = 0;
+    rq->total_time = 0;
 }
 
 /*
  * runqueue_tambah
  * ---------------
- * Tambahkan proses ke akhir runqueue.
+ * Tambahkan thread ke akhir runqueue.
  *
  * Parameter:
  *   rq     - Pointer ke runqueue
- *   proses - Pointer ke proses
+ *   thread - Pointer ke thread
  */
-static void runqueue_tambah(runqueue_t *rq, proses_t *proses)
+static void runqueue_tambah(runqueue_t *rq, thread_t *thread)
 {
-    if (rq == NULL || proses == NULL) {
+    if (rq == NULL || thread == NULL) {
         return;
     }
-
-    proses->next = NULL;
-
+    
+    thread->next = NULL;
+    thread->prev = NULL;
+    
     if (rq->tail == NULL) {
-        rq->head = proses;
-        rq->tail = proses;
-        proses->prev = NULL;
+        rq->head = thread;
+        rq->tail = thread;
     } else {
-        rq->tail->next = proses;
-        proses->prev = rq->tail;
-        rq->tail = proses;
+        rq->tail->next = thread;
+        thread->prev = rq->tail;
+        rq->tail = thread;
     }
+    
+    rq->count++;
+}
 
+/*
+ * runqueue_tambah_depan
+ * ---------------------
+ * Tambahkan thread ke depan runqueue.
+ * CATATAN: Fungsi ini disiapkan untuk penggunaan di masa depan.
+ *
+ * Parameter:
+ *   rq     - Pointer ke runqueue
+ *   thread - Pointer ke thread
+ */
+static void runqueue_tambah_depan(runqueue_t *rq, thread_t *thread)
+    __attribute__((unused));
+static void runqueue_tambah_depan(runqueue_t *rq, thread_t *thread)
+{
+    if (rq == NULL || thread == NULL) {
+        return;
+    }
+    
+    thread->next = NULL;
+    thread->prev = NULL;
+    
+    if (rq->head == NULL) {
+        rq->head = thread;
+        rq->tail = thread;
+    } else {
+        thread->next = rq->head;
+        rq->head->prev = thread;
+        rq->head = thread;
+    }
+    
     rq->count++;
 }
 
 /*
  * runqueue_hapus
  * --------------
- * Hapus proses dari runqueue.
+ * Hapus thread dari runqueue.
  *
  * Parameter:
  *   rq     - Pointer ke runqueue
- *   proses - Pointer ke proses
+ *   thread - Pointer ke thread
  */
-static void runqueue_hapus(runqueue_t *rq, proses_t *proses)
+static void runqueue_hapus(runqueue_t *rq, thread_t *thread)
 {
-    if (rq == NULL || proses == NULL) {
+    if (rq == NULL || thread == NULL) {
         return;
     }
-
-    if (proses->prev != NULL) {
-        proses->prev->next = proses->next;
+    
+    if (thread->prev != NULL) {
+        thread->prev->next = thread->next;
     } else {
-        rq->head = proses->next;
+        rq->head = thread->next;
     }
-
-    if (proses->next != NULL) {
-        proses->next->prev = proses->prev;
+    
+    if (thread->next != NULL) {
+        thread->next->prev = thread->prev;
     } else {
-        rq->tail = proses->prev;
+        rq->tail = thread->prev;
     }
-
-    proses->next = NULL;
-    proses->prev = NULL;
-    rq->count--;
+    
+    thread->next = NULL;
+    thread->prev = NULL;
+    
+    if (rq->count > 0) {
+        rq->count--;
+    }
 }
 
 /*
  * runqueue_ambil
  * --------------
- * Ambil proses pertama dari runqueue.
+ * Ambil thread pertama dari runqueue.
  *
  * Parameter:
  *   rq - Pointer ke runqueue
  *
- * Return: Pointer ke proses, atau NULL jika kosong
+ * Return: Pointer ke thread, atau NULL jika kosong
  */
-static proses_t *runqueue_ambil(runqueue_t *rq)
+static thread_t *runqueue_ambil(runqueue_t *rq)
 {
-    proses_t *proses;
-
+    thread_t *thread;
+    
     if (rq == NULL || rq->head == NULL) {
         return NULL;
     }
-
-    proses = rq->head;
-    runqueue_hapus(rq, proses);
-
-    return proses;
+    
+    thread = rq->head;
+    runqueue_hapus(rq, thread);
+    
+    return thread;
 }
 
 /*
- * dapatkan_quantum
- * ----------------
- * Dapatkan quantum berdasarkan prioritas.
+ * runqueue_peek
+ * -------------
+ * Lihat thread pertama tanpa menghapus.
  *
  * Parameter:
- *   prioritas - Level prioritas
+ *   rq - Pointer ke runqueue
  *
- * Return: Nilai quantum
+ * Return: Pointer ke thread, atau NULL
  */
-static tak_bertanda32_t dapatkan_quantum(prioritas_t prioritas)
+static thread_t *runqueue_peek(runqueue_t *rq)
+    __attribute__((unused));
+static thread_t *runqueue_peek(runqueue_t *rq)
 {
-    switch (prioritas) {
-        case PRIORITAS_REALTIME:
-            return QUANTUM_REALTIME;
-        case PRIORITAS_TINGGI:
-            return QUANTUM_TINGGI;
-        case PRIORITAS_NORMAL:
-            return QUANTUM_NORMAL;
-        case PRIORITAS_RENDAH:
-        default:
-            return QUANTUM_RENDAH;
+    if (rq == NULL) {
+        return NULL;
     }
+    
+    return rq->head;
 }
 
 /*
- * dapatkan_antrian_idx
- * --------------------
- * Dapatkan indeks antrian berdasarkan prioritas.
+ * ============================================================================
+ * FUNGSI INTERNAL SCHEDULER (INTERNAL SCHEDULER FUNCTIONS)
+ * ============================================================================
+ */
+
+/*
+ * dapatkan_scheduler
+ * ------------------
+ * Dapatkan scheduler untuk CPU tertentu.
  *
  * Parameter:
- *   prioritas - Level prioritas
+ *   cpu_id - CPU ID
  *
- * Return: Indeks antrian (0-3)
+ * Return: Pointer ke scheduler
  */
-static tak_bertanda32_t dapatkan_antrian_idx(prioritas_t prioritas)
+static scheduler_t *dapatkan_scheduler(tak_bertanda32_t cpu_id)
+    __attribute__((unused));
+static scheduler_t *dapatkan_scheduler(tak_bertanda32_t cpu_id)
 {
-    switch (prioritas) {
-        case PRIORITAS_REALTIME:
-            return 0;
-        case PRIORITAS_TINGGI:
-            return 1;
-        case PRIORITAS_NORMAL:
-            return 2;
-        case PRIORITAS_RENDAH:
-        default:
-            return 3;
+    if (cpu_id >= CPU_MAKS) {
+        cpu_id = 0;
     }
+    
+    return &g_sched[cpu_id];
+}
+
+/*
+ * dapatkan_cpu_id
+ * ---------------
+ * Dapatkan CPU ID saat ini.
+ *
+ * Return: CPU ID
+ */
+static tak_bertanda32_t dapatkan_cpu_id(void)
+{
+    tak_bertanda32_t cpu_id;
+    
+    cpu_id = hal_cpu_get_id();
+    
+    if (cpu_id >= CPU_MAKS) {
+        cpu_id = 0;
+    }
+    
+    return cpu_id;
+}
+
+/*
+ * hitung_load_avg
+ * ---------------
+ * Hitung load average.
+ */
+static void hitung_load_avg(void)
+{
+    tak_bertanda32_t i;
+    tak_bertanda32_t total_runnable;
+    tak_bertanda32_t new_load;
+    scheduler_t *sched;
+    
+    total_runnable = 0;
+    
+    for (i = 0; i < hal_cpu_get_count() && i < CPU_MAKS; i++) {
+        sched = &g_sched[i];
+        total_runnable += sched->total_threads;
+    }
+    
+    /* Calculate load average dengan exponential decay */
+    new_load = (total_runnable * LOAD_AVG_FACTOR) >> LOAD_AVG_SHIFT;
+    
+    /* 1 minute average */
+    g_load_avg[0] = ((g_load_avg[0] * 1884) + (new_load * 164)) >> 11;
+    
+    /* 5 minute average */
+    g_load_avg[1] = ((g_load_avg[1] * 2017) + (new_load * 31)) >> 11;
+    
+    /* 15 minute average */
+    g_load_avg[2] = ((g_load_avg[2] * 2037) + (new_load * 11)) >> 11;
 }
 
 /*
  * boost_prioritas
  * ---------------
- * Boost prioritas proses yang kelaparan.
+ * Boost prioritas thread yang kelaparan.
  */
 static void boost_prioritas(void)
 {
+    scheduler_t *sched;
+    runqueue_t *rq;
+    thread_t *thread;
+    thread_t *next;
+    tak_bertanda32_t cpu_id;
     tak_bertanda32_t i;
-    proses_t *proses;
-    proses_t *next;
+    tak_bertanda64_t current_time;
+    
+    current_time = hal_timer_get_ticks();
+    
+    for (cpu_id = 0; cpu_id < hal_cpu_get_count() && cpu_id < CPU_MAKS; cpu_id++) {
+        sched = &g_sched[cpu_id];
+        
+        /* Cek apakah perlu boost */
+        if (current_time - sched->last_boost < BOOST_INTERVAL) {
+            continue;
+        }
+        
+        /* Boost thread di antrian rendah ke antrian normal */
+        for (i = PRIORITAS_RENDAH; i < JUMLAH_ANTRIAN; i++) {
+            rq = &sched->antrian[i];
+            
+            thread = rq->head;
+            while (thread != NULL) {
+                next = thread->next;
+                
+                /* Cek starvation */
+                if (current_time - thread->start_time > STARVATION_THRESHOLD) {
+                    /* Pindahkan ke antrian normal */
+                    runqueue_hapus(rq, thread);
+                    
+                    thread->prioritas = PRIORITAS_NORMAL;
+                    thread->quantum = QUANTUM_NORMAL + TIMESLICE_BONUS;
+                    thread->start_time = current_time;
+                    
+                    runqueue_tambah(&sched->antrian[PRIORITAS_NORMAL], thread);
+                }
+                
+                thread = next;
+            }
+        }
+        
+        sched->last_boost = current_time;
+    }
+    
+    g_sched_stats.boost_count++;
+}
 
-    /* Pindahkan semua proses ke antrian normal */
-    for (i = 1; i < JUMLAH_ANTRIAN; i++) {
-        proses = sched.antrian[i].head;
-
-        while (proses != NULL) {
-            next = proses->next;
-
-            runqueue_hapus(&sched.antrian[i], proses);
-            proses->prioritas = PRIORITAS_NORMAL;
-            proses->quantum = QUANTUM_NORMAL;
-            runqueue_tambah(&sched.antrian[2], proses);
-
-            proses = next;
+/*
+ * load_balance_check
+ * ------------------
+ * Cek dan lakukan load balancing antar CPU.
+ */
+static void load_balance_check(void)
+{
+    tak_bertanda32_t cpu_count;
+    tak_bertanda32_t i;
+    tak_bertanda32_t j;
+    tak_bertanda32_t max_load;
+    tak_bertanda32_t min_load;
+    tak_bertanda32_t max_cpu;
+    tak_bertanda32_t min_cpu;
+    scheduler_t *src_sched;
+    scheduler_t *dst_sched;
+    thread_t *thread;
+    
+    cpu_count = hal_cpu_get_count();
+    if (cpu_count < 2 || cpu_count > CPU_MAKS) {
+        (void)j;  /* Suppress unused variable warning */
+        return;
+    }
+    
+    /* Cari CPU dengan load tertinggi dan terendah */
+    max_load = 0;
+    min_load = 0xFFFFFFFF;
+    max_cpu = 0;
+    min_cpu = 0;
+    
+    for (i = 0; i < cpu_count; i++) {
+        if (g_sched[i].total_threads > max_load) {
+            max_load = g_sched[i].total_threads;
+            max_cpu = i;
+        }
+        
+        if (g_sched[i].total_threads < min_load) {
+            min_load = g_sched[i].total_threads;
+            min_cpu = i;
         }
     }
-
-    sched.last_boost = sched.tick_count;
-}
-
-/*
- * cek_boost
- * ---------
- * Cek apakah perlu boost prioritas.
- */
-static void cek_boost(void)
-{
-    if (sched.tick_count - sched.last_boost >= BOOST_THRESHOLD) {
-        boost_prioritas();
+    
+    /* Cek apakah perlu load balancing */
+    if (max_load - min_load < 2) {
+        return;
     }
+    
+    /* Migrasikan thread dari CPU dengan load tinggi */
+    src_sched = &g_sched[max_cpu];
+    dst_sched = &g_sched[min_cpu];
+    
+    /* Cari thread yang bisa dimigrasikan */
+    for (i = 1; i < JUMLAH_ANTRIAN; i++) {
+        if (src_sched->antrian[i].count > 0) {
+            thread = runqueue_ambil(&src_sched->antrian[i]);
+            if (thread != NULL) {
+                /* Update CPU affinity */
+                thread->last_cpu = min_cpu;
+                
+                /* Masukkan ke antrian baru */
+                runqueue_tambah(&dst_sched->antrian[thread->prioritas],
+                               thread);
+                
+                src_sched->total_threads--;
+                dst_sched->total_threads++;
+                
+                g_cpu_stats[max_cpu].migrations++;
+                g_cpu_stats[min_cpu].migrations++;
+                g_sched_stats.total_migrations++;
+                
+                break;
+            }
+        }
+    }
+    
+    g_sched_stats.load_balance_count++;
 }
 
 /*
- * pilih_proses_berikutnya
+ * pilih_thread_berikutnya
  * -----------------------
- * Pilih proses berikutnya untuk dijalankan.
+ * Pilih thread berikutnya untuk dijalankan.
  *
- * Return: Pointer ke proses, atau NULL
+ * Parameter:
+ *   sched - Pointer ke scheduler
+ *
+ * Return: Pointer ke thread, atau NULL
  */
-static proses_t *pilih_proses_berikutnya(void)
+static thread_t *pilih_thread_berikutnya(scheduler_t *sched)
 {
+    thread_t *thread;
     tak_bertanda32_t i;
-    proses_t *proses;
-
+    
+    if (sched == NULL) {
+        return NULL;
+    }
+    
+    /* Prioritas realtime pertama */
+    if (sched->rt_queue.count > 0) {
+        thread = runqueue_ambil(&sched->rt_queue);
+        if (thread != NULL) {
+            return thread;
+        }
+    }
+    
     /* Cari dari antrian prioritas tertinggi */
     for (i = 0; i < JUMLAH_ANTRIAN; i++) {
-        if (sched.antrian[i].count > 0) {
-            proses = runqueue_ambil(&sched.antrian[i]);
-            return proses;
+        if (sched->antrian[i].count > 0) {
+            thread = runqueue_ambil(&sched->antrian[i]);
+            if (thread != NULL) {
+                return thread;
+            }
         }
     }
+    
+    /* Tidak ada thread runnable, kembalikan idle */
+    return sched->idle_thread;
+}
 
-    /* Tidak ada proses runnable, kembalikan idle */
-    return sched.idle_proses;
+/*
+ * update_cpu_usage
+ * ----------------
+ * Update penggunaan CPU.
+ *
+ * Parameter:
+ *   cpu_id - CPU ID
+ *   idle   - Apakah CPU idle
+ */
+static void update_cpu_usage(tak_bertanda32_t cpu_id, bool_t idle)
+{
+    cpu_usage_t *usage;
+    tak_bertanda64_t current_time;
+    tak_bertanda64_t elapsed;
+    
+    if (cpu_id >= CPU_MAKS) {
+        return;
+    }
+    
+    usage = &g_cpu_usage[cpu_id];
+    current_time = hal_timer_get_ticks();
+    
+    elapsed = current_time - usage->last_update;
+    usage->total_ticks += elapsed;
+    
+    if (idle) {
+        usage->idle_ticks += elapsed;
+    }
+    
+    usage->last_update = current_time;
+    
+    /* Hitung load dalam persen */
+    if (usage->total_ticks > 0) {
+        usage->load = (tak_bertanda32_t)
+            ((usage->total_ticks - usage->idle_ticks) * 100 /
+             usage->total_ticks);
+    }
 }
 
 /*
  * ============================================================================
- * FUNGSI PUBLIK (PUBLIC FUNCTIONS)
+ * FUNGSI PUBLIK SCHEDULER (PUBLIC SCHEDULER FUNCTIONS)
  * ============================================================================
  */
 
@@ -327,108 +588,229 @@ static proses_t *pilih_proses_berikutnya(void)
 status_t scheduler_init(void)
 {
     tak_bertanda32_t i;
-
-    if (scheduler_initialized) {
+    tak_bertanda32_t j;
+    tak_bertanda32_t cpu_count;
+    scheduler_t *sched;
+    
+    if (g_scheduler_initialized) {
         return STATUS_SUDAH_ADA;
     }
-
-    /* Reset state */
-    kernel_memset(&sched, 0, sizeof(sched));
-
-    /* Inisialisasi antrian */
-    for (i = 0; i < JUMLAH_ANTRIAN; i++) {
-        runqueue_init(&sched.antrian[i]);
+    
+    /* Reset global state */
+    kernel_memset(g_sched, 0, sizeof(g_sched));
+    kernel_memset(g_cpu_usage, 0, sizeof(g_cpu_usage));
+    kernel_memset(g_cpu_stats, 0, sizeof(g_cpu_stats));
+    kernel_memset(&g_sched_stats, 0, sizeof(g_sched_stats));
+    kernel_memset(g_load_avg, 0, sizeof(g_load_avg));
+    kernel_memset(g_idle_threads, 0, sizeof(g_idle_threads));
+    
+    cpu_count = hal_cpu_get_count();
+    if (cpu_count > CPU_MAKS) {
+        cpu_count = CPU_MAKS;
     }
-
-    /* Init lock */
-    spinlock_init(&sched.lock);
-
-    /* Reset stats */
-    kernel_memset(&sched_stats, 0, sizeof(sched_stats));
-
-    /* Set idle proses */
-    sched.idle_proses = proses_get_idle();
-
-    scheduler_initialized = BENAR;
-
+    
+    /* Inisialisasi scheduler per CPU */
+    for (i = 0; i < cpu_count; i++) {
+        sched = &g_sched[i];
+        
+        /* Init antrian */
+        for (j = 0; j < JUMLAH_ANTRIAN; j++) {
+            runqueue_init(&sched->antrian[j]);
+        }
+        
+        /* Init realtime queue */
+        runqueue_init(&sched->rt_queue);
+        runqueue_init(&sched->dl_queue);
+        
+        /* Init lock */
+        spinlock_init(&sched->lock);
+        
+        /* Init flags */
+        sched->flags = SCHED_FLAG_NONE;
+        
+        /* Init counters */
+        sched->total_proses = 0;
+        sched->total_threads = 0;
+        sched->tick_count = 0;
+        sched->last_boost = 0;
+        sched->boost_interval = BOOST_INTERVAL;
+        sched->cpu_id = i;
+        sched->preempt_count = 0;
+        sched->current_thread = NULL;
+        sched->idle_thread = NULL;
+        
+        /* Init CPU usage */
+        g_cpu_usage[i].idle_ticks = 0;
+        g_cpu_usage[i].total_ticks = 0;
+        g_cpu_usage[i].last_update = hal_timer_get_ticks();
+        g_cpu_usage[i].load = 0;
+    }
+    
+    g_scheduler_initialized = BENAR;
+    
     kernel_printf("[SCHED] Scheduler initialized\n");
+    kernel_printf("        CPUs: %lu, Queues: %d per CPU\n",
+                  (tak_bertanda64_t)cpu_count, JUMLAH_ANTRIAN);
     kernel_printf("        Quantum: RT=%d, HI=%d, NM=%d, LO=%d\n",
                   QUANTUM_REALTIME, QUANTUM_TINGGI,
                   QUANTUM_NORMAL, QUANTUM_RENDAH);
-
+    
     return STATUS_BERHASIL;
 }
 
 /*
- * scheduler_tambah_proses
+ * scheduler_init_cpu
+ * ------------------
+ * Inisialisasi scheduler untuk CPU tertentu.
+ *
+ * Parameter:
+ *   cpu_id - CPU ID
+ *
+ * Return: Status operasi
+ */
+status_t scheduler_init_cpu(tak_bertanda32_t cpu_id)
+{
+    scheduler_t *sched;
+    
+    if (!g_scheduler_initialized) {
+        return STATUS_GAGAL;
+    }
+    
+    if (cpu_id >= CPU_MAKS) {
+        return STATUS_PARAM_INVALID;
+    }
+    
+    sched = &g_sched[cpu_id];
+    
+    /* Buat idle thread untuk CPU ini */
+    g_idle_threads[cpu_id] = thread_alokasi();
+    if (g_idle_threads[cpu_id] == NULL) {
+        return STATUS_MEMORI_HABIS;
+    }
+    
+    g_idle_threads[cpu_id]->pid = 0;
+    g_idle_threads[cpu_id]->tid = cpu_id + 1000;  /* TID khusus idle */
+    g_idle_threads[cpu_id]->status = THREAD_STATUS_SIAP;
+    g_idle_threads[cpu_id]->flags = THREAD_FLAG_KERNEL;
+    g_idle_threads[cpu_id]->prioritas = PRIORITAS_IDLE;
+    g_idle_threads[cpu_id]->quantum = QUANTUM_IDLE;
+    g_idle_threads[cpu_id]->cpu_affinity = (1UL << cpu_id);
+    g_idle_threads[cpu_id]->last_cpu = cpu_id;
+    
+    sched->idle_thread = g_idle_threads[cpu_id];
+    
+    return STATUS_BERHASIL;
+}
+
+/*
+ * scheduler_tambah_thread
  * -----------------------
- * Tambahkan proses ke scheduler.
+ * Tambahkan thread ke scheduler.
  *
  * Parameter:
- *   proses - Pointer ke proses
+ *   thread - Pointer ke thread
  *
  * Return: Status operasi
  */
-status_t scheduler_tambah_proses(proses_t *proses)
+status_t scheduler_tambah_thread(thread_t *thread)
 {
+    scheduler_t *sched;
+    tak_bertanda32_t cpu_id;
     tak_bertanda32_t idx;
-
-    if (!scheduler_initialized || proses == NULL) {
+    
+    if (!g_scheduler_initialized || thread == NULL) {
         return STATUS_PARAM_INVALID;
     }
-
-    spinlock_kunci(&sched.lock);
-
-    /* Dapatkan indeks antrian */
-    idx = dapatkan_antrian_idx(proses->prioritas);
-
-    /* Set quantum */
-    proses->quantum = dapatkan_quantum(proses->prioritas);
-
-    /* Set status */
-    proses->status = PROSES_STATUS_SIAP;
-
-    /* Tambahkan ke antrian */
-    runqueue_tambah(&sched.antrian[idx], proses);
-    sched.total_proses++;
-
-    spinlock_buka(&sched.lock);
-
+    
+    /* Tentukan CPU target */
+    cpu_id = thread->last_cpu;
+    if (cpu_id >= hal_cpu_get_count() || cpu_id >= CPU_MAKS) {
+        cpu_id = dapatkan_cpu_id();
+    }
+    
+    sched = &g_sched[cpu_id];
+    
+    spinlock_kunci(&sched->lock);
+    
+    /* Tentukan antrian berdasarkan prioritas */
+    if (thread->prioritas >= PRIORITAS_REALTIME) {
+        /* Realtime queue */
+        runqueue_tambah(&sched->rt_queue, thread);
+    } else {
+        /* Antrian normal */
+        idx = dapatkan_runqueue_idx(thread->prioritas);
+        if (idx >= JUMLAH_ANTRIAN) {
+            idx = JUMLAH_ANTRIAN - 1;
+        }
+        
+        runqueue_tambah(&sched->antrian[idx], thread);
+    }
+    
+    /* Reset quantum */
+    thread->quantum = dapatkan_quantum(thread->prioritas);
+    thread->status = THREAD_STATUS_SIAP;
+    thread->start_time = hal_timer_get_ticks();
+    
+    sched->total_threads++;
+    
+    spinlock_buka(&sched->lock);
+    
     return STATUS_BERHASIL;
 }
 
 /*
- * scheduler_hapus_proses
+ * scheduler_hapus_thread
  * ----------------------
- * Hapus proses dari scheduler.
+ * Hapus thread dari scheduler.
  *
  * Parameter:
- *   proses - Pointer ke proses
+ *   thread - Pointer ke thread
  *
  * Return: Status operasi
  */
-status_t scheduler_hapus_proses(proses_t *proses)
+status_t scheduler_hapus_thread(thread_t *thread)
 {
+    scheduler_t *sched;
+    tak_bertanda32_t cpu_id;
     tak_bertanda32_t idx;
-
-    if (!scheduler_initialized || proses == NULL) {
+    bool_t found = SALAH;
+    
+    if (!g_scheduler_initialized || thread == NULL) {
         return STATUS_PARAM_INVALID;
     }
-
-    spinlock_kunci(&sched.lock);
-
-    /* Dapatkan indeks antrian */
-    idx = dapatkan_antrian_idx(proses->prioritas);
-
-    /* Hapus dari antrian */
-    runqueue_hapus(&sched.antrian[idx], proses);
-
-    if (sched.total_proses > 0) {
-        sched.total_proses--;
+    
+    cpu_id = thread->last_cpu;
+    if (cpu_id >= CPU_MAKS) {
+        cpu_id = 0;
     }
-
-    spinlock_buka(&sched.lock);
-
+    
+    sched = &g_sched[cpu_id];
+    
+    spinlock_kunci(&sched->lock);
+    
+    /* Cari di realtime queue */
+    if (sched->rt_queue.count > 0) {
+        runqueue_hapus(&sched->rt_queue, thread);
+        found = BENAR;
+    }
+    
+    /* Cari di antrian normal */
+    if (!found) {
+        for (idx = 0; idx < JUMLAH_ANTRIAN; idx++) {
+            if (sched->antrian[idx].count > 0) {
+                runqueue_hapus(&sched->antrian[idx], thread);
+                found = BENAR;
+                break;
+            }
+        }
+    }
+    
+    if (found && sched->total_threads > 0) {
+        sched->total_threads--;
+    }
+    
+    spinlock_buka(&sched->lock);
+    
     return STATUS_BERHASIL;
 }
 
@@ -440,37 +822,60 @@ status_t scheduler_hapus_proses(proses_t *proses)
  */
 void scheduler_tick(void)
 {
-    proses_t *current;
-
-    if (!scheduler_initialized) {
+    scheduler_t *sched;
+    thread_t *current;
+    tak_bertanda32_t cpu_id;
+    
+    if (!g_scheduler_initialized) {
         return;
     }
-
-    sched.tick_count++;
-
-    /* Cek boost */
-    cek_boost();
-
-    /* Cek proses saat ini */
-    current = proses_get_current();
-
-    if (current == NULL || current == sched.idle_proses) {
-        sched.flags |= SCHED_FLAG_NEED_RESCHED;
+    
+    cpu_id = dapatkan_cpu_id();
+    sched = &g_sched[cpu_id];
+    
+    sched->tick_count++;
+    
+    /* Update CPU usage */
+    current = sched->current_thread;
+    if (current == NULL || current == sched->idle_thread) {
+        update_cpu_usage(cpu_id, BENAR);
+    } else {
+        update_cpu_usage(cpu_id, SALAH);
+    }
+    
+    /* Cek untuk priority boost */
+    if (sched->tick_count - sched->last_boost >= BOOST_INTERVAL) {
+        boost_prioritas();
+    }
+    
+    /* Cek untuk load balancing */
+    if (sched->tick_count % LOAD_AVG_INTERVAL == 0) {
+        hitung_load_avg();
+        load_balance_check();
+    }
+    
+    /* Tidak ada proses yang berjalan */
+    if (current == NULL || current == sched->idle_thread) {
+        sched->flags |= SCHED_FLAG_NEED_RESCHED;
         return;
     }
-
+    
+    /* Update CPU time */
+    current->cpu_time++;
+    if (current->proses != NULL) {
+        current->proses->cpu_time++;
+    }
+    
     /* Kurangi quantum */
     if (current->quantum > 0) {
         current->quantum--;
     }
-
-    /* Update CPU time */
-    current->cpu_time++;
-
+    
     /* Cek apakah quantum habis */
     if (current->quantum == 0) {
-        sched.flags |= SCHED_FLAG_NEED_RESCHED;
-        sched_stats.timeouts++;
+        sched->flags |= SCHED_FLAG_NEED_RESCHED;
+        g_cpu_stats[cpu_id].timeouts++;
+        g_sched_stats.total_timeouts++;
     }
 }
 
@@ -478,64 +883,87 @@ void scheduler_tick(void)
  * scheduler_schedule
  * ------------------
  * Jalankan scheduling.
- * Memilih proses berikutnya dan melakukan context switch.
+ * Memilih thread berikutnya dan melakukan context switch.
  */
 void scheduler_schedule(void)
 {
-    proses_t *prev;
-    proses_t *next;
+    scheduler_t *sched;
+    thread_t *prev;
+    thread_t *next;
+    tak_bertanda32_t cpu_id;
     tak_bertanda32_t idx;
-
-    if (!scheduler_initialized) {
+    
+    if (!g_scheduler_initialized) {
         return;
     }
-
-    spinlock_kunci(&sched.lock);
-
-    /* Ambil proses saat ini */
-    prev = proses_get_current();
-
+    
+    cpu_id = dapatkan_cpu_id();
+    sched = &g_sched[cpu_id];
+    
+    spinlock_kunci(&sched->lock);
+    
     /* Clear need_resched flag */
-    sched.flags &= ~SCHED_FLAG_NEED_RESCHED;
-
-    /* Handle proses sebelumnya */
-    if (prev != NULL && prev != sched.idle_proses &&
-        prev->status == PROSES_STATUS_JALAN) {
-
+    sched->flags &= ~SCHED_FLAG_NEED_RESCHED;
+    
+    /* Ambil thread saat ini */
+    prev = sched->current_thread;
+    
+    /* Handle thread sebelumnya */
+    if (prev != NULL && prev != sched->idle_thread &&
+        prev->status == THREAD_STATUS_JALAN) {
+        
+        /* Thread masih runnable, masukkan kembali ke antrian */
+        /* Turunkan prioritas jika bukan realtime */
+        if (prev->prioritas < PRIORITAS_REALTIME &&
+            prev->prioritas > PRIORITAS_RENDAH) {
+            prev->prioritas++;
+        }
+        
         /* Reset quantum */
         prev->quantum = dapatkan_quantum(prev->prioritas);
-
-        /* Turunkan prioritas jika bukan realtime */
-        if (prev->prioritas > PRIORITAS_REALTIME &&
-            prev->prioritas < PRIORITAS_RENDAH) {
-            prev->prioritas = (prioritas_t)(prev->prioritas + 1);
+        prev->status = THREAD_STATUS_SIAP;
+        
+        /* Masukkan ke antrian */
+        idx = dapatkan_runqueue_idx(prev->prioritas);
+        if (idx >= JUMLAH_ANTRIAN) {
+            idx = JUMLAH_ANTRIAN - 1;
         }
-
-        /* Kembalikan ke antrian */
-        idx = dapatkan_antrian_idx(prev->prioritas);
-        prev->status = PROSES_STATUS_SIAP;
-        runqueue_tambah(&sched.antrian[idx], prev);
+        
+        runqueue_tambah(&sched->antrian[idx], prev);
     }
-
-    /* Pilih proses berikutnya */
-    next = pilih_proses_berikutnya();
-
+    
+    /* Pilih thread berikutnya */
+    next = pilih_thread_berikutnya(sched);
+    
+    /* Jika tidak ada, gunakan idle */
     if (next == NULL) {
-        next = sched.idle_proses;
+        next = sched->idle_thread;
     }
-
+    
     /* Set status */
-    next->status = PROSES_STATUS_JALAN;
-
+    if (next != NULL) {
+        next->status = THREAD_STATUS_JALAN;
+        next->last_cpu = cpu_id;
+        sched->current_thread = next;
+    }
+    
     /* Update counter */
-    sched.context_switches++;
-    sched_stats.switches++;
-
-    spinlock_buka(&sched.lock);
-
+    sched->context_switches++;
+    g_cpu_stats[cpu_id].context_switches++;
+    g_sched_stats.total_switches++;
+    
+    spinlock_buka(&sched->lock);
+    
     /* Lakukan context switch jika berbeda */
-    if (next != prev) {
-        context_switch(prev, next);
+    if (next != NULL && next != prev) {
+        /* Update TSS untuk x86 */
+#if defined(ARSITEKTUR_X86) || defined(ARSITEKTUR_X86_64)
+        if (next->kstack_ptr != NULL) {
+            tss_set_kernel_stack((tak_bertanda64_t)(alamat_ptr_t)next->kstack_ptr);
+        }
+#endif
+        
+        context_switch_thread(prev, next);
     }
 }
 
@@ -548,31 +976,62 @@ void scheduler_schedule(void)
  */
 status_t scheduler_yield(void)
 {
-    proses_t *current;
-
-    if (!scheduler_initialized) {
+    scheduler_t *sched;
+    thread_t *current;
+    tak_bertanda32_t cpu_id;
+    
+    if (!g_scheduler_initialized) {
         return STATUS_GAGAL;
     }
-
-    current = proses_get_current();
-
-    if (current == NULL || current == sched.idle_proses) {
+    
+    cpu_id = dapatkan_cpu_id();
+    sched = &g_sched[cpu_id];
+    
+    current = sched->current_thread;
+    
+    if (current == NULL || current == sched->idle_thread) {
         return STATUS_BERHASIL;
     }
-
-    sched_stats.yields++;
-    sched.flags |= SCHED_FLAG_NEED_RESCHED;
-
+    
+    g_cpu_stats[cpu_id].yields++;
+    g_sched_stats.total_yields++;
+    
+    /* Set flag untuk reschedule */
+    sched->flags |= SCHED_FLAG_NEED_RESCHED;
+    
     /* Jalankan schedule */
     scheduler_schedule();
-
+    
     return STATUS_BERHASIL;
+}
+
+/*
+ * scheduler_preempt
+ * -----------------
+ * Force preemption.
+ */
+void scheduler_preempt(void)
+{
+    scheduler_t *sched;
+    tak_bertanda32_t cpu_id;
+    
+    if (!g_scheduler_initialized) {
+        return;
+    }
+    
+    cpu_id = dapatkan_cpu_id();
+    sched = &g_sched[cpu_id];
+    
+    sched->flags |= SCHED_FLAG_NEED_RESCHED;
+    
+    g_cpu_stats[cpu_id].preemptions++;
+    g_sched_stats.total_preemptions++;
 }
 
 /*
  * scheduler_block
  * ---------------
- * Blok proses saat ini.
+ * Blok thread saat ini.
  *
  * Parameter:
  *   reason - Alasan pemblokiran
@@ -581,143 +1040,445 @@ status_t scheduler_yield(void)
  */
 status_t scheduler_block(tak_bertanda32_t reason)
 {
-    proses_t *current;
-
-    if (!scheduler_initialized) {
+    scheduler_t *sched;
+    thread_t *current;
+    tak_bertanda32_t cpu_id;
+    
+    if (!g_scheduler_initialized) {
         return STATUS_GAGAL;
     }
-
-    current = proses_get_current();
-
+    
+    cpu_id = dapatkan_cpu_id();
+    sched = &g_sched[cpu_id];
+    
+    current = sched->current_thread;
+    
     if (current == NULL) {
         return STATUS_GAGAL;
     }
-
-    spinlock_kunci(&sched.lock);
-
-    current->status = PROSES_STATUS_TUNGGU;
-    sched.total_proses--;
-
-    spinlock_buka(&sched.lock);
-
-    /* Schedule ke proses lain */
+    
+    spinlock_kunci(&sched->lock);
+    
+    current->status = THREAD_STATUS_TUNGGU;
+    current->block_reason = reason;
+    
+    if (sched->total_threads > 0) {
+        sched->total_threads--;
+    }
+    
+    g_cpu_stats[cpu_id].sleeps++;
+    
+    spinlock_buka(&sched->lock);
+    
+    /* Schedule ke thread lain */
     scheduler_schedule();
+    
+    return STATUS_BERHASIL;
+}
 
+/*
+ * scheduler_block_timeout
+ * -----------------------
+ * Blok thread dengan timeout.
+ *
+ * Parameter:
+ *   reason  - Alasan pemblokiran
+ *   timeout - Timeout dalam ticks
+ *
+ * Return: Status operasi
+ */
+status_t scheduler_block_timeout(tak_bertanda32_t reason,
+                                 tak_bertanda64_t timeout)
+{
+    scheduler_t *sched;
+    thread_t *current;
+    tak_bertanda32_t cpu_id;
+    
+    if (!g_scheduler_initialized) {
+        return STATUS_GAGAL;
+    }
+    
+    cpu_id = dapatkan_cpu_id();
+    sched = &g_sched[cpu_id];
+    
+    current = sched->current_thread;
+    
+    if (current == NULL) {
+        return STATUS_GAGAL;
+    }
+    
+    spinlock_kunci(&sched->lock);
+    
+    current->status = THREAD_STATUS_TUNGGU;
+    current->block_reason = reason;
+    current->wake_time = hal_timer_get_ticks() + timeout;
+    
+    if (sched->total_threads > 0) {
+        sched->total_threads--;
+    }
+    
+    g_cpu_stats[cpu_id].sleeps++;
+    
+    spinlock_buka(&sched->lock);
+    
+    /* Schedule ke thread lain */
+    scheduler_schedule();
+    
     return STATUS_BERHASIL;
 }
 
 /*
  * scheduler_unblock
  * -----------------
- * Buka blokiran proses.
+ * Buka blokiran thread.
  *
  * Parameter:
- *   proses - Pointer ke proses
+ *   thread - Pointer ke thread
  *
  * Return: Status operasi
  */
-status_t scheduler_unblock(proses_t *proses)
+status_t scheduler_unblock(thread_t *thread)
 {
+    scheduler_t *sched;
+    tak_bertanda32_t cpu_id;
     tak_bertanda32_t idx;
-
-    if (!scheduler_initialized || proses == NULL) {
+    
+    if (!g_scheduler_initialized || thread == NULL) {
         return STATUS_PARAM_INVALID;
     }
-
-    spinlock_kunci(&sched.lock);
-
-    if (proses->status != PROSES_STATUS_TUNGGU) {
-        spinlock_buka(&sched.lock);
+    
+    cpu_id = thread->last_cpu;
+    if (cpu_id >= CPU_MAKS) {
+        cpu_id = 0;
+    }
+    
+    sched = &g_sched[cpu_id];
+    
+    spinlock_kunci(&sched->lock);
+    
+    if (thread->status != THREAD_STATUS_TUNGGU &&
+        thread->status != THREAD_STATUS_SLEEP) {
+        spinlock_buka(&sched->lock);
         return STATUS_BERHASIL;
     }
-
+    
     /* Set status dan quantum */
-    proses->status = PROSES_STATUS_SIAP;
-    proses->quantum = dapatkan_quantum(proses->prioritas);
-
-    /* Tambahkan ke antrian */
-    idx = dapatkan_antrian_idx(proses->prioritas);
-    runqueue_tambah(&sched.antrian[idx], proses);
-    sched.total_proses++;
-
-    spinlock_buka(&sched.lock);
-
+    thread->status = THREAD_STATUS_SIAP;
+    thread->quantum = dapatkan_quantum(thread->prioritas);
+    thread->wake_time = 0;
+    thread->block_reason = BLOCK_ALASAN_NONE;
+    
+    /* Masukkan ke antrian */
+    idx = dapatkan_runqueue_idx(thread->prioritas);
+    if (idx >= JUMLAH_ANTRIAN) {
+        idx = JUMLAH_ANTRIAN - 1;
+    }
+    
+    runqueue_tambah(&sched->antrian[idx], thread);
+    
+    sched->total_threads++;
+    
+    g_cpu_stats[cpu_id].wakeups++;
+    
+    spinlock_buka(&sched->lock);
+    
     return STATUS_BERHASIL;
 }
 
 /*
- * scheduler_set_priority
- * ----------------------
- * Set prioritas proses.
+ * scheduler_set_prioritas
+ * -----------------------
+ * Set prioritas thread.
  *
  * Parameter:
- *   proses    - Pointer ke proses
+ *   thread    - Pointer ke thread
  *   prioritas - Prioritas baru
  *
  * Return: Status operasi
  */
-status_t scheduler_set_priority(proses_t *proses, prioritas_t prioritas)
+status_t scheduler_set_prioritas(thread_t *thread, tak_bertanda32_t prioritas)
 {
     tak_bertanda32_t old_idx;
     tak_bertanda32_t new_idx;
-
-    if (!scheduler_initialized || proses == NULL) {
+    scheduler_t *sched;
+    tak_bertanda32_t cpu_id;
+    
+    if (!g_scheduler_initialized || thread == NULL) {
         return STATUS_PARAM_INVALID;
     }
-
-    if (prioritas > PRIORITAS_REALTIME) {
+    
+    if (prioritas > PRIORITAS_KRITIS) {
         return STATUS_PARAM_INVALID;
     }
-
-    spinlock_kunci(&sched.lock);
-
-    /* Jika proses dalam antrian, pindahkan */
-    if (proses->status == PROSES_STATUS_SIAP) {
-        old_idx = dapatkan_antrian_idx(proses->prioritas);
-        new_idx = dapatkan_antrian_idx(prioritas);
-
-        if (old_idx != new_idx) {
-            runqueue_hapus(&sched.antrian[old_idx], proses);
-            runqueue_tambah(&sched.antrian[new_idx], proses);
+    
+    cpu_id = thread->last_cpu;
+    if (cpu_id >= CPU_MAKS) {
+        cpu_id = 0;
+    }
+    
+    sched = &g_sched[cpu_id];
+    
+    spinlock_kunci(&sched->lock);
+    
+    /* Jika thread dalam antrian, pindahkan */
+    if (thread->status == THREAD_STATUS_SIAP) {
+        old_idx = dapatkan_runqueue_idx(thread->prioritas);
+        new_idx = dapatkan_runqueue_idx(prioritas);
+        
+        if (old_idx < JUMLAH_ANTRIAN && new_idx < JUMLAH_ANTRIAN &&
+            old_idx != new_idx) {
+            
+            runqueue_hapus(&sched->antrian[old_idx], thread);
+            runqueue_tambah(&sched->antrian[new_idx], thread);
         }
     }
-
+    
     /* Update prioritas */
-    proses->prioritas = prioritas;
-    proses->quantum = dapatkan_quantum(prioritas);
-
-    spinlock_buka(&sched.lock);
-
+    thread->prioritas = prioritas;
+    thread->quantum = dapatkan_quantum(prioritas);
+    
+    spinlock_buka(&sched->lock);
+    
     return STATUS_BERHASIL;
 }
 
 /*
- * scheduler_get_load
- * ------------------
- * Dapatkan beban scheduler.
+ * scheduler_boost_prioritas
+ * -------------------------
+ * Boost prioritas thread.
  *
- * Return: Jumlah proses runnable
+ * Parameter:
+ *   thread - Pointer ke thread
+ *
+ * Return: Status operasi
  */
-tak_bertanda32_t scheduler_get_load(void)
+status_t scheduler_boost_prioritas(thread_t *thread)
 {
-    return sched.total_proses;
+    if (thread == NULL) {
+        return STATUS_PARAM_INVALID;
+    }
+    
+    /* Naikkan prioritas satu level */
+    if (thread->prioritas > 0) {
+        return scheduler_set_prioritas(thread, thread->prioritas - 1);
+    }
+    
+    return STATUS_BERHASIL;
 }
 
 /*
- * scheduler_need_resched
- * ----------------------
+ * scheduler_dapat_beban
+ * ---------------------
+ * Dapatkan beban scheduler.
+ *
+ * Return: Jumlah thread runnable
+ */
+tak_bertanda32_t scheduler_dapat_beban(void)
+{
+    tak_bertanda32_t total;
+    tak_bertanda32_t i;
+    
+    total = 0;
+    
+    for (i = 0; i < hal_cpu_get_count() && i < CPU_MAKS; i++) {
+        total += g_sched[i].total_threads;
+    }
+    
+    return total;
+}
+
+/*
+ * scheduler_dapat_load_avg
+ * ------------------------
+ * Dapatkan load average.
+ *
+ * Parameter:
+ *   avg1 - Pointer untuk 1 minute average
+ *   avg5 - Pointer untuk 5 minute average
+ *   avg15 - Pointer untuk 15 minute average
+ */
+void scheduler_dapat_load_avg(tak_bertanda32_t *avg1,
+                              tak_bertanda32_t *avg5,
+                              tak_bertanda32_t *avg15)
+{
+    if (avg1 != NULL) {
+        *avg1 = g_load_avg[0];
+    }
+    
+    if (avg5 != NULL) {
+        *avg5 = g_load_avg[1];
+    }
+    
+    if (avg15 != NULL) {
+        *avg15 = g_load_avg[2];
+    }
+}
+
+/*
+ * scheduler_perlu_resched
+ * -----------------------
  * Cek apakah perlu reschedule.
  *
  * Return: BENAR jika perlu, SALAH jika tidak
  */
-bool_t scheduler_need_resched(void)
+bool_t scheduler_perlu_resched(void)
 {
-    return (sched.flags & SCHED_FLAG_NEED_RESCHED) ? BENAR : SALAH;
+    scheduler_t *sched;
+    tak_bertanda32_t cpu_id;
+    
+    if (!g_scheduler_initialized) {
+        return SALAH;
+    }
+    
+    cpu_id = dapatkan_cpu_id();
+    sched = &g_sched[cpu_id];
+    
+    return (sched->flags & SCHED_FLAG_NEED_RESCHED) ? BENAR : SALAH;
 }
 
 /*
- * scheduler_get_stats
- * -------------------
+ * scheduler_set_need_resched
+ * --------------------------
+ * Set flag need_resched.
+ */
+void scheduler_set_need_resched(void)
+{
+    scheduler_t *sched;
+    tak_bertanda32_t cpu_id;
+    
+    if (!g_scheduler_initialized) {
+        return;
+    }
+    
+    cpu_id = dapatkan_cpu_id();
+    sched = &g_sched[cpu_id];
+    
+    sched->flags |= SCHED_FLAG_NEED_RESCHED;
+}
+
+/*
+ * scheduler_clear_need_resched
+ * ----------------------------
+ * Clear flag need_resched.
+ */
+void scheduler_clear_need_resched(void)
+{
+    scheduler_t *sched;
+    tak_bertanda32_t cpu_id;
+    
+    if (!g_scheduler_initialized) {
+        return;
+    }
+    
+    cpu_id = dapatkan_cpu_id();
+    sched = &g_sched[cpu_id];
+    
+    sched->flags &= ~SCHED_FLAG_NEED_RESCHED;
+}
+
+/*
+ * scheduler_dapat_current
+ * -----------------------
+ * Dapatkan thread saat ini.
+ *
+ * Return: Pointer ke thread
+ */
+thread_t *scheduler_dapat_current(void)
+{
+    scheduler_t *sched;
+    tak_bertanda32_t cpu_id;
+    
+    if (!g_scheduler_initialized) {
+        return NULL;
+    }
+    
+    cpu_id = dapatkan_cpu_id();
+    sched = &g_sched[cpu_id];
+    
+    return sched->current_thread;
+}
+
+/*
+ * scheduler_set_current
+ * ---------------------
+ * Set thread saat ini.
+ *
+ * Parameter:
+ *   thread - Pointer ke thread
+ */
+void scheduler_set_current(thread_t *thread)
+{
+    scheduler_t *sched;
+    tak_bertanda32_t cpu_id;
+    
+    if (!g_scheduler_initialized) {
+        return;
+    }
+    
+    cpu_id = dapatkan_cpu_id();
+    sched = &g_sched[cpu_id];
+    
+    sched->current_thread = thread;
+}
+
+/*
+ * scheduler_set_affinity
+ * ----------------------
+ * Set CPU affinity untuk thread.
+ *
+ * Parameter:
+ *   thread - Pointer ke thread
+ *   mask   - CPU affinity mask
+ *
+ * Return: Status operasi
+ */
+status_t scheduler_set_affinity(thread_t *thread, tak_bertanda32_t mask)
+{
+    tak_bertanda32_t cpu_count;
+    
+    if (!g_scheduler_initialized || thread == NULL) {
+        return STATUS_PARAM_INVALID;
+    }
+    
+    cpu_count = hal_cpu_get_count();
+    
+    /* Pastikan mask valid */
+    if (mask == 0) {
+        mask = 0xFFFFFFFF;
+    }
+    
+    /* Batasi ke CPU yang tersedia */
+    if (cpu_count < 32) {
+        mask &= ((1UL << cpu_count) - 1);
+    }
+    
+    thread->cpu_affinity = mask;
+    
+    return STATUS_BERHASIL;
+}
+
+/*
+ * scheduler_dapat_affinity
+ * ------------------------
+ * Dapatkan CPU affinity thread.
+ *
+ * Parameter:
+ *   thread - Pointer ke thread
+ *
+ * Return: CPU affinity mask
+ */
+tak_bertanda32_t scheduler_dapat_affinity(thread_t *thread)
+{
+    if (thread == NULL) {
+        return 0;
+    }
+    
+    return thread->cpu_affinity;
+}
+
+/*
+ * scheduler_dapat_statistik
+ * -------------------------
  * Dapatkan statistik scheduler.
  *
  * Parameter:
@@ -726,25 +1487,25 @@ bool_t scheduler_need_resched(void)
  *   yields      - Pointer untuk jumlah yield
  *   timeouts    - Pointer untuk jumlah timeout
  */
-void scheduler_get_stats(tak_bertanda64_t *switches,
-                         tak_bertanda64_t *preemptions,
-                         tak_bertanda64_t *yields,
-                         tak_bertanda64_t *timeouts)
+void scheduler_dapat_statistik(tak_bertanda64_t *switches,
+                               tak_bertanda64_t *preemptions,
+                               tak_bertanda64_t *yields,
+                               tak_bertanda64_t *timeouts)
 {
     if (switches != NULL) {
-        *switches = sched_stats.switches;
+        *switches = g_sched_stats.total_switches;
     }
-
+    
     if (preemptions != NULL) {
-        *preemptions = sched_stats.preemptions;
+        *preemptions = g_sched_stats.total_preemptions;
     }
-
+    
     if (yields != NULL) {
-        *yields = sched_stats.yields;
+        *yields = g_sched_stats.total_yields;
     }
-
+    
     if (timeouts != NULL) {
-        *timeouts = sched_stats.timeouts;
+        *timeouts = g_sched_stats.total_timeouts;
     }
 }
 
@@ -755,16 +1516,44 @@ void scheduler_get_stats(tak_bertanda64_t *switches,
  */
 void scheduler_print_stats(void)
 {
+    tak_bertanda32_t i;
+    tak_bertanda32_t cpu_count;
+    
     kernel_printf("\n[SCHED] Statistik Scheduler:\n");
     kernel_printf("========================================\n");
-    kernel_printf("  Context Switches : %lu\n", sched_stats.switches);
-    kernel_printf("  Preemptions      : %lu\n", sched_stats.preemptions);
-    kernel_printf("  Yields           : %lu\n", sched_stats.yields);
-    kernel_printf("  Timeouts         : %lu\n", sched_stats.timeouts);
-    kernel_printf("  Load Average     : %lu proses\n",
-                  (tak_bertanda64_t)sched.total_proses);
-    kernel_printf("  Tick Count       : %lu\n",
-                  (tak_bertanda64_t)sched.tick_count);
+    kernel_printf("  Context Switches : %lu\n",
+                  g_sched_stats.total_switches);
+    kernel_printf("  Preemptions      : %lu\n",
+                  g_sched_stats.total_preemptions);
+    kernel_printf("  Yields           : %lu\n",
+                  g_sched_stats.total_yields);
+    kernel_printf("  Timeouts         : %lu\n",
+                  g_sched_stats.total_timeouts);
+    kernel_printf("  Migrations       : %lu\n",
+                  g_sched_stats.total_migrations);
+    kernel_printf("  Priority Boosts  : %lu\n",
+                  g_sched_stats.boost_count);
+    kernel_printf("  Load Balances    : %lu\n",
+                  g_sched_stats.load_balance_count);
+    kernel_printf("========================================\n");
+    kernel_printf("  Load Average: %lu.%02lu, %lu.%02lu, %lu.%02lu\n",
+                  g_load_avg[0] >> 8,
+                  (g_load_avg[0] & 0xFF) * 100 / 256,
+                  g_load_avg[1] >> 8,
+                  (g_load_avg[1] & 0xFF) * 100 / 256,
+                  g_load_avg[2] >> 8,
+                  (g_load_avg[2] & 0xFF) * 100 / 256);
+    
+    cpu_count = hal_cpu_get_count();
+    
+    kernel_printf("\n  Per-CPU Statistics:\n");
+    for (i = 0; i < cpu_count && i < CPU_MAKS; i++) {
+        kernel_printf("    CPU %lu: Load %lu%%, Switches %lu\n",
+                      (tak_bertanda64_t)i,
+                      (tak_bertanda64_t)g_cpu_usage[i].load,
+                      g_cpu_stats[i].context_switches);
+    }
+    
     kernel_printf("========================================\n");
 }
 
@@ -775,30 +1564,73 @@ void scheduler_print_stats(void)
  */
 void scheduler_print_queues(void)
 {
+    scheduler_t *sched;
+    runqueue_t *rq;
+    thread_t *thread;
+    tak_bertanda32_t cpu_id;
     tak_bertanda32_t i;
-    proses_t *proses;
     const char *prio_str[] = {
-        "REALTIME", "TINGGI", "NORMAL", "RENDAH"
+        "Kritis", "Realtime", "Tinggi", "Normal",
+        "Rendah", "Idle", "Batch", "Other"
     };
-
-    kernel_printf("\n[SCHED] Status Antrian:\n");
+    
+    cpu_id = dapatkan_cpu_id();
+    sched = &g_sched[cpu_id];
+    
+    kernel_printf("\n[SCHED] Status Antrian CPU %lu:\n",
+                  (tak_bertanda64_t)cpu_id);
     kernel_printf("========================================\n");
-
+    
+    /* Print realtime queue */
+    kernel_printf("  Realtime Queue (%lu): ", sched->rt_queue.count);
+    thread = sched->rt_queue.head;
+    while (thread != NULL) {
+        kernel_printf("[%lu:%s] ",
+                      (tak_bertanda64_t)thread->tid,
+                      thread->proses != NULL ? thread->proses->nama : "?");
+        thread = thread->next;
+    }
+    kernel_printf("\n");
+    
+    /* Print antrian normal */
     for (i = 0; i < JUMLAH_ANTRIAN; i++) {
-        kernel_printf("  Antrian %s (%u): ", prio_str[i],
-                      sched.antrian[i].count);
-
-        proses = sched.antrian[i].head;
-        while (proses != NULL) {
-            kernel_printf("[%lu:%s] ", (tak_bertanda64_t)proses->pid,
-                          proses->nama);
-            proses = proses->next;
+        rq = &sched->antrian[i];
+        
+        kernel_printf("  Antrian %s (%lu): ",
+                      prio_str[i < 8 ? i : 7],
+                      (tak_bertanda64_t)rq->count);
+        
+        thread = rq->head;
+        while (thread != NULL) {
+            kernel_printf("[%lu] ", (tak_bertanda64_t)thread->tid);
+            thread = thread->next;
         }
-
+        
         kernel_printf("\n");
     }
-
+    
     kernel_printf("========================================\n");
-    kernel_printf("  Total Runnable: %lu proses\n",
-                  (tak_bertanda64_t)sched.total_proses);
+    kernel_printf("  Total Runnable: %lu threads\n",
+                  (tak_bertanda64_t)sched->total_threads);
+}
+
+/*
+ * scheduler_print_load
+ * --------------------
+ * Print load average.
+ */
+void scheduler_print_load(void)
+{
+    kernel_printf("\n[SCHED] Load Average:\n");
+    kernel_printf("========================================\n");
+    kernel_printf("  1 min : %lu.%02lu\n",
+                  g_load_avg[0] >> 8,
+                  (g_load_avg[0] & 0xFF) * 100 / 256);
+    kernel_printf("  5 min : %lu.%02lu\n",
+                  g_load_avg[1] >> 8,
+                  (g_load_avg[1] & 0xFF) * 100 / 256);
+    kernel_printf("  15 min: %lu.%02lu\n",
+                  g_load_avg[2] >> 8,
+                  (g_load_avg[2] & 0xFF) * 100 / 256);
+    kernel_printf("========================================\n");
 }

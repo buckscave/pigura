@@ -312,8 +312,12 @@ typedef struct {
  * ===========================================================================
  * MAKRO OPERASI ARITMATIKA AMAN (SAFE ARITHMETIC MACROS)
  * ===========================================================================
- * CATATAN: Menggunakan __typeof__ (GCC extension) karena C89 tidak memiliki
- * typeof. Ini didukung oleh GCC dan kompatibel dengan Pigura C90.
+ * CATATAN: Makro ini menggunakan GCC built-in functions yang merupakan
+ * ekstensi GCC dan bukan bagian dari standar C90. Namun, ekstensi ini
+ * didukung secara luas oleh GCC dan kompatibel dengan Pigura C90.
+ *
+ * Alternatif implementasi C90 murni disediakan sebagai komentar untuk
+ * portabilitas ke compiler lain.
  */
 
 /* Cek overflow penjumlahan */
@@ -356,6 +360,21 @@ typedef struct {
 
 #ifndef TIDAK_DIGUNAKAN
 #define TIDAK_DIGUNAKAN(expr) ((void)(expr))
+#endif
+
+/* Makro untuk menandai fungsi statis yang mungkin tidak digunakan */
+#ifndef FUNGSI_TIDAK_DIGUNAKAN
+#define FUNGSI_TIDAK_DIGUNAKAN __attribute__((unused))
+#endif
+
+/* Alias untuk kompatibilitas */
+#ifndef DIGUNAKAN
+#define DIGUNAKAN __attribute__((used))
+#endif
+
+/* Makro untuk menandai variabel lokal tidak digunakan */
+#ifndef VAR_TIDAK_DIGUNAKAN
+#define VAR_TIDAK_DIGUNAKAN(var) ((void)(var))
 #endif
 
 #endif /* INTI_MAKRO_H */

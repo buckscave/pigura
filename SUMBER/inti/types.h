@@ -94,8 +94,7 @@ typedef unsigned long long tak_bertanda64_t;
     typedef tanda32_t jarak_t;
 #endif
 
-/* Tipe untuk jarak antara dua pointer (setara ptrdiff_t) */
-typedef jarak_t jarak_ptr_t;
+/* Tipe untuk jarak antara dua pointer (setara ptrdiff_t) - didefinisikan setelah intptr_t */
 
 /* Tipe untuk alamat memori virtual (pointer-sized) */
 #if defined(PIGURA_ARSITEKTUR_64BIT)
@@ -124,6 +123,8 @@ typedef tak_bertanda32_t offset_halaman_t;
 
 /* Alias untuk menyimpan pointer sebagai integer (bahasa Indonesia) */
 typedef uintptr_t alamat_ptr_t;
+
+/* Tipe untuk jarak antara dua pointer (setara ptrdiff_t) */
 typedef intptr_t jarak_ptr_t;
 
 /*
@@ -302,6 +303,10 @@ typedef enum {
     STATUS_FS_PENUH = -53,
     STATUS_FS_TIDAK_ADA = -54,
 
+    /* Status error format */
+    STATUS_FORMAT_INVALID = -55,
+    STATUS_FORMAT_TIDAK_DUKUNG = -56,
+
     /* Status error proses */
     STATUS_PROSES_TIDAK_ADA = -60,
     STATUS_PROSES_ZOMBIE = -61,
@@ -341,6 +346,19 @@ typedef enum {
     PROSES_STATUS_BLOCK = 7
 } proses_status_t;
 
+/* Makro untuk kompatibilitas dengan kode yang menggunakan #define */
+/* Nilai harus sama dengan enum di atas */
+#ifndef PROSES_STATUS_INVALID
+#define PROSES_STATUS_INVALID    0
+#define PROSES_STATUS_BELUM      1
+#define PROSES_STATUS_SIAP       2
+#define PROSES_STATUS_JALAN      3
+#define PROSES_STATUS_TUNGGU     4
+#define PROSES_STATUS_ZOMBIE     5
+#define PROSES_STATUS_STOP       6
+#define PROSES_STATUS_BLOCK      7
+#endif
+
 /*
  * ===========================================================================
  * TIPE STATUS THREAD (THREAD STATUS TYPE)
@@ -356,8 +374,23 @@ typedef enum {
     THREAD_STATUS_TUNGGU = 4,
     THREAD_STATUS_STOP = 5,
     THREAD_STATUS_BLOCK = 6,
-    THREAD_STATUS_SLEEP = 7
+    THREAD_STATUS_SLEEP = 7,
+    THREAD_STATUS_ZOMBIE = 8
 } thread_status_t;
+
+/* Makro untuk kompatibilitas dengan kode yang menggunakan #define */
+/* Nilai harus sama dengan enum di atas */
+#ifndef THREAD_STATUS_INVALID
+#define THREAD_STATUS_INVALID    0
+#define THREAD_STATUS_BELUM      1
+#define THREAD_STATUS_SIAP       2
+#define THREAD_STATUS_JALAN      3
+#define THREAD_STATUS_TUNGGU     4
+#define THREAD_STATUS_STOP       5
+#define THREAD_STATUS_BLOCK      6
+#define THREAD_STATUS_SLEEP      7
+#define THREAD_STATUS_ZOMBIE     8
+#endif
 
 /*
  * ===========================================================================
@@ -385,7 +418,7 @@ typedef enum {
 
 typedef enum {
     MEMORI_STATUS_INVALID = 0,
-    MEMORI_STATUS_BEbas = 1,
+    MEMORI_STATUS_BEBAS = 1,
     MEMORI_STATUS_DIPAKAI = 2,
     MEMORI_STATUS_RESERVE = 3,
     MEMORI_STATUS_LOCK = 4,

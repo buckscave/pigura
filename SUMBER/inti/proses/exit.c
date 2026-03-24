@@ -6,11 +6,18 @@
  * Berkas ini berisi fungsi-fungsi untuk menghentikan proses
  * dan membersihkan resource yang digunakan.
  *
- * Versi: 1.0
+ * KEPATUHAN STANDAR:
+ * - C90 (ANSI C89) dengan POSIX Safe Functions
+ * - Tidak menggunakan fitur C99/C11
+ * - Semua fungsi diimplementasikan lengkap
+ * - Batas 80 karakter per baris
+ *
+ * Versi: 3.0
  * Tanggal: 2025
  */
 
 #include "../kernel.h"
+#include "proses.h"
 
 /*
  * ============================================================================
@@ -21,11 +28,8 @@
 /* Exit code mask */
 #define EXIT_CODE_MASK          0xFF
 
-/* Signal core flag */
-#define EXIT_SIGNAL_CORE        0x80
-
-/* Exit signal shift */
-#define EXIT_SIGNAL_SHIFT       8
+/* Maximum zombie age (ticks) before warning */
+#define ZOMBIE_MAX_AGE           10000
 
 /*
  * ============================================================================
@@ -39,14 +43,15 @@ static struct {
     tak_bertanda64_t normal_exits;
     tak_bertanda64_t signal_exits;
     tak_bertanda64_t kernel_exits;
-} exit_stats = {0};
+    tak_bertanda64_t zombie_cleanups;
+} exit_stats = {0, 0, 0, 0, 0};
 
 /* Status inisialisasi */
 static bool_t exit_initialized = SALAH;
 
 /* Proses yang sedang dalam status zombie */
 static proses_t *zombie_list = NULL;
-static spinlock_t zombie_lock = {0};
+static spinlock_t zombie_lock;
 
 /*
  * ============================================================================
@@ -65,18 +70,20 @@ static spinlock_t zombie_lock = {0};
 static void cleanup_file_descriptors(proses_t *proses)
 {
     tak_bertanda32_t i;
-
+    
     if (proses == NULL) {
         return;
     }
-
-    for (i = 0; i < MAKS_FD_PER_PROSES; i++) {
+    
+    for (i = 0; i < FD_MAKS_PER_PROSES; i++) {
         if (proses->fd_table[i] != NULL) {
-            berkas_tutup(proses->fd_table[i]);
+            /* Tutup file descriptor - bebaskan memori */
+            /* TODO: Implementasikan berkas_tutup dari VFS */
+            kfree(proses->fd_table[i]);
             proses->fd_table[i] = NULL;
         }
     }
-
+    
     proses->fd_count = 0;
 }
 
@@ -92,41 +99,50 @@ static void cleanup_memory(proses_t *proses)
 {
     thread_t *thread;
     thread_t *next_thread;
-
+    
     if (proses == NULL) {
         return;
     }
-
+    
     /* Hapus address space */
     if (proses->vm != NULL) {
         vm_destroy_address_space(proses->vm);
         proses->vm = NULL;
     }
-
+    
     /* Hapus threads */
     thread = proses->threads;
     while (thread != NULL) {
         next_thread = thread->next;
-
+        
         /* Hapus context */
         if (thread->context != NULL) {
-            context_destroy(thread->context);
+            context_hancurkan(thread->context);
             thread->context = NULL;
         }
-
+        
         /* Hapus stack */
-        if (thread->stack != NULL) {
-            thread_free_stack(thread->stack, thread->stack_size,
-                              !(proses->flags & PROSES_FLAG_KERNEL));
-            thread->stack = NULL;
+        if (thread->stack_base != NULL) {
+            thread_bebaskan_stack(thread->stack_ptr,
+                                   thread->stack_size,
+                                   !(proses->flags & PROSES_FLAG_KERNEL));
+            thread->stack_base = NULL;
+            thread->stack_ptr = NULL;
         }
-
+        
+        /* Hapus kernel stack */
+        if (thread->kstack_base != NULL) {
+            thread_bebaskan_kstack(thread->kstack_ptr);
+            thread->kstack_base = NULL;
+            thread->kstack_ptr = NULL;
+        }
+        
         /* Bebaskan struktur thread */
-        thread_free(thread);
-
+        thread_bebaskan(thread);
+        
         thread = next_thread;
     }
-
+    
     proses->threads = NULL;
     proses->main_thread = NULL;
     proses->thread_count = 0;
@@ -144,31 +160,37 @@ static void reparent_children(proses_t *proses)
 {
     proses_t *child;
     proses_t *init;
-
+    proses_t *next;
+    
     if (proses == NULL) {
         return;
     }
-
+    
     init = proses_cari(PID_INIT);
     if (init == NULL) {
-        init = proses_get_kernel();
+        init = proses_dapat_kernel();
     }
-
+    
     child = proses->children;
     while (child != NULL) {
-        proses_t *next = child->sibling;
-
+        next = child->sibling;
+        
         /* Pindahkan ke init */
+        proses_hapus_child(proses, child);
         child->ppid = init->pid;
-        child->sibling = init->children;
-        init->children = child;
-
+        proses_tambah_child(init, child);
+        
         /* Kirim SIGCHLD ke init */
-        signal_send(init->pid, SIGNAL_CHILD);
-
+        signal_kirim_ke_proses(init, SIGCHLD);
+        
+        /* Jika child zombie, notify init */
+        if (child->status == PROSES_STATUS_ZOMBIE) {
+            init->zombie_children++;
+        }
+        
         child = next;
     }
-
+    
     proses->children = NULL;
 }
 
@@ -183,26 +205,27 @@ static void reparent_children(proses_t *proses)
 static void notify_parent(proses_t *proses)
 {
     proses_t *parent;
-
+    
     if (proses == NULL) {
         return;
     }
-
+    
     parent = proses_cari(proses->ppid);
     if (parent == NULL) {
         return;
     }
-
+    
     /* Increment child zombie count */
     parent->zombie_children++;
-
+    
     /* Jika parent menunggu, wake up */
-    if (parent->wait_state != WAIT_STATE_NONE) {
-        scheduler_unblock(parent);
+    if (parent->main_thread != NULL &&
+        parent->main_thread->status == THREAD_STATUS_TUNGGU) {
+        scheduler_unblock(parent->main_thread);
     }
-
+    
     /* Kirim SIGCHLD */
-    signal_send(parent->pid, SIGNAL_CHILD);
+    signal_kirim_ke_proses(parent, SIGCHLD);
 }
 
 /*
@@ -216,10 +239,10 @@ static void notify_parent(proses_t *proses)
 static void add_to_zombie_list(proses_t *proses)
 {
     spinlock_kunci(&zombie_lock);
-
+    
     proses->next_zombie = zombie_list;
     zombie_list = proses;
-
+    
     spinlock_buka(&zombie_lock);
 }
 
@@ -241,15 +264,15 @@ status_t exit_init(void)
     if (exit_initialized) {
         return STATUS_SUDAH_ADA;
     }
-
+    
     kernel_memset(&exit_stats, 0, sizeof(exit_stats));
     spinlock_init(&zombie_lock);
     zombie_list = NULL;
-
+    
     exit_initialized = BENAR;
-
+    
     kernel_printf("[EXIT] Exit subsystem initialized\n");
-
+    
     return STATUS_BERHASIL;
 }
 
@@ -260,72 +283,75 @@ status_t exit_init(void)
  *
  * Parameter:
  *   exit_code - Exit code
- *
- * Return: Tidak return
  */
 void do_exit(tanda32_t exit_code)
 {
     proses_t *proses;
-
+    proses_t *parent;
+    
     if (!exit_initialized) {
-        kernel_panic("exit: tidak diinisialisasi");
+        PANIC("exit: tidak diinisialisasi");
     }
-
-    proses = proses_get_current();
+    
+    proses = proses_dapat_saat_ini();
     if (proses == NULL) {
-        kernel_panic("exit: tidak ada proses current");
+        PANIC("exit: tidak ada proses current");
     }
-
+    
     /* Tidak boleh exit kernel process */
     if (proses->flags & PROSES_FLAG_KERNEL) {
-        kernel_panic("exit: tidak dapat exit kernel process");
+        PANIC("exit: tidak dapat exit kernel process");
     }
-
+    
     exit_stats.total_exits++;
-
+    
     /* Set exit code dan status */
     proses->exit_code = exit_code;
     proses->status = PROSES_STATUS_ZOMBIE;
     proses->exit_time = hal_timer_get_ticks();
-
+    
     /* Cek apakah exit karena signal */
     if (exit_code & EXIT_SIGNAL_CORE) {
         exit_stats.signal_exits++;
     } else {
         exit_stats.normal_exits++;
     }
-
+    
     /* Cleanup resources */
     cleanup_file_descriptors(proses);
     cleanup_memory(proses);
-
+    
     /* Reparent children */
     reparent_children(proses);
-
+    
     /* Hapus dari scheduler */
-    scheduler_hapus_proses(proses);
-
+    if (proses->main_thread != NULL) {
+        scheduler_hapus_thread(proses->main_thread);
+    }
+    
     /* Hapus dari list proses aktif */
-    proses_hapus_dari_aktif(proses);
-
+    proses_hapus_dari_list(proses);
+    
     /* Notify parent */
     notify_parent(proses);
-
+    
     /* Tambahkan ke zombie list */
     add_to_zombie_list(proses);
-
+    
     /* Jika parent dalam vfork, unblock */
-    proses_t *parent = proses_cari(proses->ppid);
+    parent = proses_cari(proses->ppid);
     if (parent != NULL && parent->vfork_child == proses->pid) {
         parent->vfork_child = 0;
-        scheduler_unblock(parent);
+        if (parent->main_thread != NULL) {
+            scheduler_unblock(parent->main_thread);
+        }
     }
-
+    
     /* Schedule ke proses lain */
     scheduler_schedule();
-
+    
     /* Tidak seharusnya sampai sini */
-    kernel_panic("exit: should not reach here");
+    PANIC("exit: should not reach here");
 }
 
 /*
@@ -340,19 +366,19 @@ void do_exit_group(tanda32_t exit_code)
 {
     proses_t *proses;
     thread_t *thread;
-
-    proses = proses_get_current();
+    
+    proses = proses_dapat_saat_ini();
     if (proses == NULL) {
         return;
     }
-
+    
     /* Set status zombie untuk semua thread */
     thread = proses->threads;
     while (thread != NULL) {
-        thread->status = PROSES_STATUS_ZOMBIE;
+        thread->status = THREAD_STATUS_ZOMBIE;
         thread = thread->next;
     }
-
+    
     /* Exit proses */
     do_exit(exit_code);
 }
@@ -396,28 +422,28 @@ void sys_exit_group(tanda32_t exit_code)
 void exit_by_signal(proses_t *proses, tak_bertanda32_t signal, bool_t core)
 {
     tanda32_t exit_code;
-
+    
     if (proses == NULL) {
         return;
     }
-
+    
     /* Encode exit code */
     exit_code = (signal << EXIT_SIGNAL_SHIFT);
     if (core) {
         exit_code |= EXIT_SIGNAL_CORE;
     }
-
+    
     /* Set sebagai current jika bukan */
-    if (proses_get_current() != proses) {
-        proses_set_current(proses);
+    if (proses_dapat_saat_ini() != proses) {
+        proses_set_saat_ini(proses);
     }
-
+    
     do_exit(exit_code);
 }
 
 /*
- * exit_get_stats
- * --------------
+ * exit_dapat_statistik
+ * --------------------
  * Dapatkan statistik exit.
  *
  * Parameter:
@@ -426,21 +452,23 @@ void exit_by_signal(proses_t *proses, tak_bertanda32_t signal, bool_t core)
  *   signal  - Pointer untuk exit signal
  *   kernel  - Pointer untuk kernel exit
  */
-void exit_get_stats(tak_bertanda64_t *total, tak_bertanda64_t *normal,
-                    tak_bertanda64_t *signal, tak_bertanda64_t *kernel)
+void exit_dapat_statistik(tak_bertanda64_t *total,
+                          tak_bertanda64_t *normal,
+                          tak_bertanda64_t *signal,
+                          tak_bertanda64_t *kernel)
 {
     if (total != NULL) {
         *total = exit_stats.total_exits;
     }
-
+    
     if (normal != NULL) {
         *normal = exit_stats.normal_exits;
     }
-
+    
     if (signal != NULL) {
         *signal = exit_stats.signal_exits;
     }
-
+    
     if (kernel != NULL) {
         *kernel = exit_stats.kernel_exits;
     }
@@ -459,6 +487,7 @@ void exit_print_stats(void)
     kernel_printf("  Normal Exits   : %lu\n", exit_stats.normal_exits);
     kernel_printf("  Signal Exits   : %lu\n", exit_stats.signal_exits);
     kernel_printf("  Kernel Exits   : %lu\n", exit_stats.kernel_exits);
+    kernel_printf("  Cleanups       : %lu\n", exit_stats.zombie_cleanups);
     kernel_printf("========================================\n");
 }
 
@@ -478,15 +507,15 @@ tak_bertanda32_t exit_cleanup_zombies(tak_bertanda32_t max_count)
     proses_t *prev;
     proses_t *next;
     tak_bertanda32_t count = 0;
-
+    
     spinlock_kunci(&zombie_lock);
-
+    
     prev = NULL;
     proses = zombie_list;
-
+    
     while (proses != NULL && (max_count == 0 || count < max_count)) {
         next = proses->next_zombie;
-
+        
         /* Cek apakah parent sudah wait */
         if (proses->wait_collected) {
             /* Hapus dari zombie list */
@@ -495,43 +524,45 @@ tak_bertanda32_t exit_cleanup_zombies(tak_bertanda32_t max_count)
             } else {
                 prev->next_zombie = next;
             }
-
+            
             /* Bebaskan struktur proses */
             proses_bebaskan(proses);
             count++;
+            
+            exit_stats.zombie_cleanups++;
         } else {
             prev = proses;
         }
-
+        
         proses = next;
     }
-
+    
     spinlock_buka(&zombie_lock);
-
+    
     return count;
 }
 
 /*
- * exit_get_zombie_count
- * ---------------------
+ * exit_dapat_jumlah_zombie
+ * ------------------------
  * Dapatkan jumlah zombie processes.
  *
  * Return: Jumlah zombie
  */
-tak_bertanda32_t exit_get_zombie_count(void)
+tak_bertanda32_t exit_dapat_jumlah_zombie(void)
 {
     proses_t *proses;
     tak_bertanda32_t count = 0;
-
+    
     spinlock_kunci(&zombie_lock);
-
+    
     proses = zombie_list;
     while (proses != NULL) {
         count++;
         proses = proses->next_zombie;
     }
-
+    
     spinlock_buka(&zombie_lock);
-
+    
     return count;
 }

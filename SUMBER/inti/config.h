@@ -24,14 +24,64 @@
  * KONFIGURASI ARSITEKTUR (ARCHITECTURE CONFIGURATION)
  * ===========================================================================
  * Deteksi dan konfigurasi arsitektur target.
- * Arsitektur harus didefinisikan melalui flag compiler:
+ * Arsitektur dapat didefinisikan melalui flag compiler:
  *   -DARSITEKTUR_X86     untuk Intel/AMD 32-bit
  *   -DARSITEKTUR_X86_64  untuk Intel/AMD 64-bit
- *   -DARSITEKTUR_ARM32   untuk ARM 32-bit
+ *   -DARSITEKTUR_ARM     untuk ARM 32-bit
+ *   -DARSITEKTUR_ARMV7   untuk ARMv7 32-bit
  *   -DARSITEKTUR_ARM64   untuk ARM 64-bit (AArch64)
+ *
+ * Jika tidak didefinisikan, akan auto-detect dari compiler macros.
  */
 
-/* Validasi: pastikan salah satu arsitektur didefinisikan */
+/*
+ * AUTO-DETECT ARSITEKTUR DARI COMPILER PREDEFINED MACROS
+ * ========================================================
+ * GCC dan compiler lain mendefinisikan macros otomatis berdasarkan target:
+ *   __x86_64__ / _M_X64    -> x86_64 (64-bit)
+ *   __i386__ / _M_IX86     -> x86 (32-bit)
+ *   __aarch64__            -> ARM64 (AArch64)
+ *   __arm__                -> ARM 32-bit
+ */
+
+/* Auto-detect x86_64 */
+#if defined(__x86_64__) || defined(_M_X64)
+    #ifndef ARSITEKTUR_X86_64
+        #define ARSITEKTUR_X86_64 1
+    #endif
+
+/* Auto-detect x86 32-bit */
+#elif defined(__i386__) || defined(_M_IX86)
+    #ifndef ARSITEKTUR_X86
+        #define ARSITEKTUR_X86 1
+    #endif
+
+/* Auto-detect ARM64 */
+#elif defined(__aarch64__)
+    #ifndef ARSITEKTUR_ARM64
+        #define ARSITEKTUR_ARM64 1
+    #endif
+
+/* Auto-detect ARM 32-bit */
+#elif defined(__arm__)
+    #ifndef ARSITEKTUR_ARM
+        #define ARSITEKTUR_ARM 1
+    #endif
+    /* Jika ARMv7 terdeteksi */
+    #if defined(__ARM_ARCH_7A__) || defined(__ARM_ARCH_7__)
+        #ifndef ARSITEKTUR_ARMV7
+            #define ARSITEKTUR_ARMV7 1
+        #endif
+    #endif
+
+/* Default jika tidak terdeteksi */
+#elif !defined(ARSITEKTUR_X86) && !defined(ARSITEKTUR_X86_64) && \
+      !defined(ARSITEKTUR_ARM) && !defined(ARSITEKTUR_ARMV7) && \
+      !defined(ARSITEKTUR_ARM64)
+    #define ARSITEKTUR_X86_64 1  /* Default ke 64-bit modern */
+#endif
+
+/* Konfigurasi berdasarkan arsitektur yang terdeteksi/didefinisikan */
 #if defined(ARSITEKTUR_X86)
     #define NAMA_ARSITEKTUR "x86"
     #define NAMA_ARSITEKTUR_LENGKAP "x86 (32-bit)"
@@ -71,14 +121,8 @@
     #define SUPPORT_NEON 1
 
 #else
-    /* Default ke x86 jika tidak didefinisikan (untuk backward compat) */
-    #define ARSITEKTUR_X86 1
-    #define NAMA_ARSITEKTUR "x86"
-    #define NAMA_ARSITEKTUR_LENGKAP "x86 (32-bit)"
-    #define LEBAR_BIT 32
-    #define PAGING_32BIT 1
-    #define PAGING_64BIT 0
-    #define SUPPORT_SEGMENTASI 1
+    /* Fallback - tidak seharusnya sampai sini */
+    #error "Arsitektur tidak dikenali. Definisikan ARSITEKTUR_X86, ARSITEKTUR_X86_64, ARSITEKTUR_ARM, atau ARSITEKTUR_ARM64"
 #endif
 
 /*

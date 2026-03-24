@@ -1082,124 +1082,42 @@ void heap_print_stats(void);
  * ===========================================================================
  * DEKLARASI FUNGSI PROSES (PROCESS FUNCTIONS)
  * ===========================================================================
+ * CATATAN: Fungsi-fungsi proses dideklarasikan secara lengkap di proses/proses.h
+ * Deklarasi di bawah adalah untuk kemudahan akses dari kernel.h
+ * Gunakan nama fungsi dalam Bahasa Indonesia untuk konsistensi.
  */
 
-/*
- * proses_init
- * -----------
- * Inisialisasi subsistem proses.
- *
- * Return: Status operasi
- */
+/* Inisialisasi subsistem proses */
 status_t proses_init(void);
 
-/*
- * proses_create
- * -------------
- * Buat proses baru.
- *
- * Parameter:
- *   nama  - Nama proses
- *   ppid  - Parent PID
- *   flags - Flag proses
- *
- * Return: PID proses baru, atau PID_INVALID jika gagal
- */
-pid_t proses_create(const char *nama, pid_t ppid, tak_bertanda32_t flags);
+/* Buat proses baru (alias: proses_buat) */
+pid_t proses_buat(const char *nama, pid_t ppid, tak_bertanda32_t flags);
 
-/*
- * proses_exit
- * -----------
- * Exit proses.
- *
- * Parameter:
- *   pid       - PID proses
- *   exit_code - Kode exit
- *
- * Return: Status operasi
- */
+/* Exit proses */
 status_t proses_exit(pid_t pid, tanda32_t exit_code);
 
-/*
- * proses_cari
- * -----------
- * Cari proses berdasarkan PID.
- *
- * Parameter:
- *   pid - PID proses
- *
- * Return: Pointer ke proses, atau NULL
- */
+/* Cari proses berdasarkan PID */
 proses_t *proses_cari(pid_t pid);
 
-/*
- * proses_get_current
- * ------------------
- * Dapatkan proses saat ini.
- *
- * Return: Pointer ke proses saat ini
- */
-proses_t *proses_get_current(void);
+/* Dapatkan proses saat ini (alias: proses_dapat_saat_ini) */
+proses_t *proses_dapat_saat_ini(void);
 
-/*
- * proses_set_current
- * ------------------
- * Set proses saat ini.
- *
- * Parameter:
- *   proses - Pointer ke proses
- */
-void proses_set_current(proses_t *proses);
+/* Set proses saat ini */
+void proses_set_saat_ini(proses_t *proses);
 
-/*
- * proses_get_kernel
- * -----------------
- * Dapatkan kernel process.
- *
- * Return: Pointer ke kernel process
- */
-proses_t *proses_get_kernel(void);
+/* Dapatkan kernel process */
+proses_t *proses_dapat_kernel(void);
 
-/*
- * proses_get_count
- * ----------------
- * Dapatkan jumlah proses.
- *
- * Return: Jumlah proses
- */
-tak_bertanda32_t proses_get_count(void);
+/* Dapatkan jumlah proses */
+tak_bertanda32_t proses_dapat_jumlah(void);
 
-/*
- * proses_wait
- * -----------
- * Wait untuk proses child.
- *
- * Parameter:
- *   pid    - PID child
- *   status - Pointer untuk status exit
- *
- * Return: PID child yang exit, atau -1 jika error
- */
+/* Wait untuk proses child */
 pid_t proses_wait(pid_t pid, tanda32_t *status);
 
-/*
- * proses_kill
- * -----------
- * Kill proses.
- *
- * Parameter:
- *   pid    - PID proses
- *   signal - Nomor signal
- *
- * Return: Status operasi
- */
+/* Kill proses */
 status_t proses_kill(pid_t pid, tak_bertanda32_t signal);
 
-/*
- * proses_print_list
- * -----------------
- * Print list proses.
- */
+/* Print list proses */
 void proses_print_list(void);
 
 /*
