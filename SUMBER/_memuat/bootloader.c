@@ -251,12 +251,13 @@ static void _puts(const char *str)
 
         /* Scroll jika perlu */
         if (posisi >= 80 * 25) {
+            int j;
             posisi = 80 * 24;
             /* Simple scroll */
-            for (int j = 0; j < 80 * 24; j++) {
+            for (j = 0; j < 80 * 24; j++) {
                 vga[j] = vga[j + 80];
             }
-            for (int j = 80 * 24; j < 80 * 25; j++) {
+            for (j = 80 * 24; j < 80 * 25; j++) {
                 vga[j] = (0x07 << 8) | ' ';
             }
         }
@@ -323,6 +324,8 @@ static void _putdec(uint32_t val)
  * ----------
  * Memeriksa apakah A20 line aktif.
  */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds"
 static int _check_a20(void)
 {
     volatile uint8_t *low;
@@ -330,8 +333,9 @@ static int _check_a20(void)
     uint8_t save_low;
     uint8_t save_high;
 
-    low = (volatile uint8_t *)0x00000500;
-    high = (volatile uint8_t *)0x10000500;
+    /* Direct memory access for A20 check */
+    low = (volatile uint8_t *)(uintptr_t)0x00000500ULL;
+    high = (volatile uint8_t *)(uintptr_t)0x10000500ULL;
 
     save_low = *low;
     save_high = *high;
@@ -349,6 +353,7 @@ static int _check_a20(void)
     *high = save_high;
     return 1;       /* A20 aktif */
 }
+#pragma GCC diagnostic pop
 
 /*
  * _enable_a20_fast
@@ -548,14 +553,14 @@ void bootloader_main(uint32_t magic, multiboot_info_t *boot_info)
     _puts("\n");
 
     _puts("[BOOT] Boot info at: ");
-    _puthex((uint32_t)boot_info);
+    _puthex((uint32_t)(uintptr_t)boot_info);
     _puts("\n");
 
     _puts("[BOOT] Jumping to kernel...\n\n");
 
     /* Set entry point */
     kernel_entry = ALAMAT_KERNEL_ENTRY;
-    kernel_start = (void (*)(uint32_t, multiboot_info_t *))kernel_entry;
+    kernel_start = (void (*)(uint32_t, multiboot_info_t *))(uintptr_t)kernel_entry;
 
     /* Enable interrupts sebelum lompat */
     _enable_interrupts();

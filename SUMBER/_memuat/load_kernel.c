@@ -522,14 +522,14 @@ static int _parse_elf32(elf32_hdr_t *header)
 
         /* Copy segment to memory */
         if (phdr->p_filesz > 0) {
-            _memcpy((void *)phdr->p_paddr,
+            _memcpy((void *)(uintptr_t)phdr->p_paddr,
                     kernel_data + phdr->p_offset,
                     phdr->p_filesz);
         }
 
         /* Zero BSS */
         if (phdr->p_memsz > phdr->p_filesz) {
-            _memset((void *)(phdr->p_paddr + phdr->p_filesz),
+            _memset((void *)(uintptr_t)(phdr->p_paddr + phdr->p_filesz),
                     0,
                     phdr->p_memsz - phdr->p_filesz);
         }
@@ -584,14 +584,14 @@ static int _parse_elf64(elf64_hdr_t *header)
 
         /* Copy segment */
         if (phdr->p_filesz > 0) {
-            _memcpy((void *)(uint32_t)phdr->p_paddr,
-                    kernel_data + (uint32_t)phdr->p_offset,
+            _memcpy((void *)(uintptr_t)phdr->p_paddr,
+                    kernel_data + (size_t)phdr->p_offset,
                     (size_t)phdr->p_filesz);
         }
 
         /* Zero BSS */
         if (phdr->p_memsz > phdr->p_filesz) {
-            _memset((void *)(uint32_t)(phdr->p_paddr + phdr->p_filesz),
+            _memset((void *)(uintptr_t)(phdr->p_paddr + phdr->p_filesz),
                     0,
                     (size_t)(phdr->p_memsz - phdr->p_filesz));
         }
@@ -759,7 +759,7 @@ void load_kernel_jump(uint32_t magic, multiboot_info_t *mbi)
 {
     void (*entry)(uint32_t, multiboot_info_t *);
 
-    entry = (void (*)(uint32_t, multiboot_info_t *))g_kernel_info.entry_point;
+    entry = (void (*)(uint32_t, multiboot_info_t *))(uintptr_t)g_kernel_info.entry_point;
 
     _puts("[LOAD] Jumping to kernel at ");
     _puthex(g_kernel_info.entry_point);

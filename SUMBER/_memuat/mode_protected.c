@@ -7,10 +7,16 @@
  * Berkas ini berisi fungsi-fungsi untuk melakukan transisi dari
  * Real Mode (16-bit) ke Protected Mode (32-bit) pada arsitektur x86.
  *
- * Arsitektur: x86
+ * CATATAN: Berkas ini hanya untuk x86 32-bit. Untuk x86_64, gunakan
+ *          mode_long.c untuk transisi ke long mode.
+ *
+ * Arsitektur: x86 (32-bit only)
  * Versi: 1.0
  * =============================================================================
  */
+
+/* Hanya untuk x86 32-bit */
+#if defined(__i386__) && !defined(__x86_64__)
 
 #include <stdint.h>
 #include <stddef.h>
@@ -251,6 +257,8 @@ static inline void _lidt(void *ptr)
  */
 static inline void _jmp_far(uint16_t cs, uint32_t addr)
 {
+    (void)cs;  /* Unused in this implementation */
+    (void)addr;  /* Unused parameter */
     __asm__ __volatile__(
         "ljmp %0, $1f\n\t"
         "1:"
@@ -298,7 +306,7 @@ static void _setup_gdt_pm(void)
 
     /* Set GDT pointer */
     g_gdt_ptr_pm.limit = sizeof(g_gdt_pm) - 1;
-    g_gdt_ptr_pm.base = (uint32_t)&g_gdt_pm;
+    g_gdt_ptr_pm.base = (uint32_t)(uintptr_t)&g_gdt_pm;
 }
 
 /*
@@ -576,7 +584,7 @@ void mode_protected_invalidate_tlb_page(uint32_t addr)
     __asm__ __volatile__(
         "invlpg %0"
         :
-        : "m"(*(uint8_t *)addr)
+        : "m"(*(uint8_t *)(uintptr_t)addr)
         : "memory"
     );
 }
@@ -601,3 +609,5 @@ void mode_protected_set_segment(uint16_t ds, uint16_t es,
         : "memory"
     );
 }
+
+#endif /* __i386__ && !__x86_64__ */

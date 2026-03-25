@@ -121,6 +121,13 @@ typedef struct {
 typedef void (*interrupt_handler_t)(interrupt_frame_t *frame);
 
 /* =============================================================================
+ * FORWARD DECLARATIONS
+ * =============================================================================
+ */
+static inline uint8_t _inb(uint16_t port);
+static inline void _outb(uint8_t val, uint16_t port);
+
+/* =============================================================================
  * VARIABEL GLOBAL
  * =============================================================================
  */
@@ -308,7 +315,7 @@ void idt_init(void)
 
     /* Set IDT pointer */
     g_idt_ptr.limit = sizeof(g_idt) - 1;
-    g_idt_ptr.base = (uint32_t)&g_idt;
+    g_idt_ptr.base = (uint32_t)(uintptr_t)&g_idt;
 
     /* Load IDT */
     _lidt(&g_idt_ptr);
@@ -340,9 +347,8 @@ void idt_set_gate(uint8_t index, uint32_t handler,
  */
 void idt_set_handler(uint8_t index, interrupt_handler_t handler)
 {
-    if (index < IDT_ENTRIES) {
-        g_handlers[index] = handler;
-    }
+    /* uint8_t always valid for 256-entry IDT */
+    g_handlers[index] = handler;
 }
 
 /*
@@ -352,10 +358,8 @@ void idt_set_handler(uint8_t index, interrupt_handler_t handler)
  */
 interrupt_handler_t idt_get_handler(uint8_t index)
 {
-    if (index < IDT_ENTRIES) {
-        return g_handlers[index];
-    }
-    return NULL;
+    /* uint8_t always valid for 256-entry IDT */
+    return g_handlers[index];
 }
 
 /*

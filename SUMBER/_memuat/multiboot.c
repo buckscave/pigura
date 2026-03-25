@@ -201,7 +201,7 @@ static void _parse_memory_map(void)
     end = addr + g_mbi->mmap_length;
 
     while (addr < end) {
-        entry = (multiboot_mmap_entry_t *)addr;
+        entry = (multiboot_mmap_entry_t *)(uintptr_t)addr;
 
         /* Get base address (64-bit) */
         base = ((uint64_t)entry->base_addr_high << 32) |
@@ -363,7 +363,7 @@ uint64_t multiboot_get_available_memory(void)
 const char *multiboot_get_cmdline(void)
 {
     if (g_mbi != NULL && (g_mbi->flags & MULTIBOOT_FLAG_CMDLINE)) {
-        return (const char *)g_mbi->cmdline;
+        return (const char *)(uintptr_t)g_mbi->cmdline;
     }
     return NULL;
 }
@@ -402,7 +402,7 @@ uint8_t multiboot_get_boot_device_type(void)
 const char *multiboot_get_boot_loader_name(void)
 {
     if (g_mbi != NULL && (g_mbi->flags & MULTIBOOT_FLAG_LOADER)) {
-        return (const char *)g_mbi->boot_loader_name;
+        return (const char *)(uintptr_t)g_mbi->boot_loader_name;
     }
     return "Unknown";
 }
@@ -437,7 +437,7 @@ multiboot_module_t *multiboot_get_module(uint32_t index)
         return NULL;
     }
 
-    modules = (multiboot_module_t *)g_mbi->mods_addr;
+    modules = (multiboot_module_t *)(uintptr_t)g_mbi->mods_addr;
     return &modules[index];
 }
 
@@ -511,7 +511,7 @@ int multiboot_get_mmap(uint32_t index, uint64_t *base, uint64_t *length,
     count = 0;
 
     while (addr < end) {
-        entry = (multiboot_mmap_entry_t *)addr;
+        entry = (multiboot_mmap_entry_t *)(uintptr_t)addr;
 
         if (count == index) {
             if (base != NULL) {
@@ -556,7 +556,7 @@ uint32_t multiboot_get_mmap_count(void)
     count = 0;
 
     while (addr < end) {
-        entry = (multiboot_mmap_entry_t *)addr;
+        entry = (multiboot_mmap_entry_t *)(uintptr_t)addr;
         count++;
         addr += entry->size + sizeof(entry->size);
     }

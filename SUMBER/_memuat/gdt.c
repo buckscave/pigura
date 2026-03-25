@@ -72,7 +72,7 @@ typedef struct {
 /* GDT pointer */
 typedef struct {
     uint16_t limit;             /* Size of GDT - 1 */
-    uint32_t base;              /* Address of GDT */
+    uintptr_t base;             /* Address of GDT (32-bit or 64-bit) */
 } __attribute__((packed)) gdt_ptr_t;
 
 /* Task State Segment (TSS) for x86 */
@@ -171,12 +171,12 @@ static inline void _ltr(uint16_t selector)
  * _reload_segments
  * ----------------
  * Reload segment registers.
+ * For x86_64, we use a different approach since far jump syntax differs.
  */
 static inline void _reload_segments(void)
 {
+    /* Reload data segment registers */
     __asm__ __volatile__(
-        "jmp $0x08, $1f\n\t"
-        "1:\n\t"
         "mov $0x10, %%ax\n\t"
         "mov %%ax, %%ds\n\t"
         "mov %%ax, %%es\n\t"
@@ -261,12 +261,12 @@ static void _init_tss(void)
  */
 static void _set_tss_entry(void)
 {
-    uint32_t base;
+    uintptr_t base;
     uint32_t limit;
     uint8_t access;
     uint8_t flags;
 
-    base = (uint32_t)&g_tss;
+    base = (uintptr_t)&g_tss;
     limit = sizeof(tss_t) - 1;
 
     /* TSS descriptor: present, DPL 0, system, 32-bit */
@@ -338,7 +338,7 @@ void gdt_init(void)
 
     /* Set GDT pointer */
     g_gdt_ptr.limit = sizeof(g_gdt) - 1;
-    g_gdt_ptr.base = (uint32_t)&g_gdt;
+    g_gdt_ptr.base = (uintptr_t)&g_gdt;
 
     /* Load GDT */
     _lgdt(&g_gdt_ptr);

@@ -246,8 +246,10 @@ static inline void _lgdt64(gdt_ptr64_t *ptr)
  */
 static void _setup_gdt64(void)
 {
+    int i;
+    
     /* Clear GDT */
-    for (int i = 0; i < 5; i++) {
+    for (i = 0; i < 5; i++) {
         g_gdt64[i].limit_low = 0;
         g_gdt64[i].base_low = 0;
         g_gdt64[i].base_middle = 0;
@@ -338,38 +340,38 @@ static void _setup_page_tables(void)
  */
 static int _check_cpuid(void)
 {
-    uint32_t eflags;
-    uint32_t eflags_after;
+    uint64_t eflags;
+    uint64_t eflags_after;
 
-    /* Get EFLAGS */
+    /* Get EFLAGS - use pushfq/popq for x86_64 */
     __asm__ __volatile__(
-        "pushfl\n\t"
-        "popl %0"
+        "pushfq\n\t"
+        "popq %0"
         : "=r"(eflags)
     );
 
     /* Flip ID bit (bit 21) */
-    eflags_after = eflags ^ 0x00200000;
+    eflags_after = eflags ^ 0x00200000ULL;
 
     /* Set EFLAGS */
     __asm__ __volatile__(
-        "pushl %0\n\t"
-        "popfl"
+        "pushq %0\n\t"
+        "popfq"
         :
         : "r"(eflags_after)
     );
 
     /* Get EFLAGS again */
     __asm__ __volatile__(
-        "pushfl\n\t"
-        "popl %0"
+        "pushfq\n\t"
+        "popq %0"
         : "=r"(eflags_after)
     );
 
     /* Restore EFLAGS */
     __asm__ __volatile__(
-        "pushl %0\n\t"
-        "popfl"
+        "pushq %0\n\t"
+        "popfq"
         :
         : "r"(eflags)
     );
@@ -493,18 +495,18 @@ void mode_long_enter(uint64_t entry_point)
 
     g_long_mode_enabled = 1;
 
-    /* Jump to 64-bit code */
+    /* Jump to 64-bit code - use far return for x86_64 compatibility */
     __asm__ __volatile__(
-        "ljmpl $0x08, $1f\n\t"
+        "pushq $0x08\n\t"           /* Kernel code segment selector */
+        "pushq %0\n\t"              /* Entry point */
+        "retfq\n\t"                 /* Far return to jump to 64-bit code */
         "1:\n\t"
         "movw $0x10, %%ax\n\t"
         "movw %%ax, %%ds\n\t"
         "movw %%ax, %%es\n\t"
         "movw %%ax, %%fs\n\t"
         "movw %%ax, %%gs\n\t"
-        "movw %%ax, %%ss\n\t"
-        "movq %0, %%rax\n\t"
-        "jmp *%%rax"
+        "movw %%ax, %%ss"
         :
         : "r"(entry_point)
         : "ax", "memory"
