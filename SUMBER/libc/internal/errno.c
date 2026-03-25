@@ -8,6 +8,7 @@
  */
 
 #include <errno.h>
+#include <stddef.h>
 
 /* ============================================================
  * VARIABEL GLOBAL ERNO

@@ -42,52 +42,28 @@
 #if defined(__x86_64__) || defined(_M_X64)
     /* x86_64: rbx, rbp, r12-r15, rsp, rip */
     typedef struct {
-        unsigned long long __rbx;
-        unsigned long long __rbp;
-        unsigned long long __r12;
-        unsigned long long __r13;
-        unsigned long long __r14;
-        unsigned long long __r15;
-        unsigned long long __rsp;
-        unsigned long long __rip;
+        unsigned long long __jb[8];
     } __jmp_buf_internal;
     typedef __jmp_buf_internal jmp_buf[1];
 
 #elif defined(__i386__) || defined(_M_IX86)
     /* x86 32-bit: ebx, esi, edi, ebp, esp, eip */
     typedef struct {
-        unsigned int __ebx;
-        unsigned int __esi;
-        unsigned int __edi;
-        unsigned int __ebp;
-        unsigned int __esp;
-        unsigned int __eip;
+        unsigned int __jb[6];
     } __jmp_buf_internal;
     typedef __jmp_buf_internal jmp_buf[1];
 
 #elif defined(__aarch64__)
     /* ARM64: x19-x28, fp, sp, lr */
     typedef struct {
-        unsigned long long __x[10];   /* x19-x28 */
-        unsigned long long __fp;      /* x29 */
-        unsigned long long __sp;      /* sp */
-        unsigned long long __lr;      /* x30 */
+        unsigned long long __jb[14];
     } __jmp_buf_internal;
     typedef __jmp_buf_internal jmp_buf[1];
 
 #elif defined(__arm__)
     /* ARM 32-bit: r4-r11, sp, lr */
     typedef struct {
-        unsigned int __r4;
-        unsigned int __r5;
-        unsigned int __r6;
-        unsigned int __r7;
-        unsigned int __r8;
-        unsigned int __r9;
-        unsigned int __r10;
-        unsigned int __fp;   /* r11 */
-        unsigned int __sp;
-        unsigned int __lr;
+        unsigned int __jb[11];
     } __jmp_buf_internal;
     typedef __jmp_buf_internal jmp_buf[1];
 
@@ -140,8 +116,8 @@ extern void longjmp(jmp_buf env, int val) __attribute__((noreturn));
 
 typedef struct {
     jmp_buf __jmpbuf;        /* Konteks standar */
-    int __mask_was_saved;    /* Flag apakah signal mask disimpan */
-    unsigned long __saved_mask; /* Signal mask yang disimpan */
+    int __savemask;          /* Flag apakah signal mask disimpan */
+    unsigned long __sigmask; /* Signal mask yang disimpan */
 } sigjmp_buf_internal;
 
 typedef sigjmp_buf_internal sigjmp_buf[1];

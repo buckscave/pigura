@@ -138,9 +138,9 @@ extern int errno;
 #define EMULTIHOP  90    /* Multihop attempted */
 #define EBADMSG    91    /* Bukan data message */
 #define ENODATA    92    /* Tidak ada data tersedia */
-#define EOVERFLOW  93    /* Overflow nilai */
+/* EOVERFLOW sudah didefinisikan di atas (35) */
 #define ENOLINK    94    /* Link rusak */
-#define EILSEQ     95    /* Illegal byte sequence */
+/* EILSEQ sudah didefinisikan di atas (3) */
 #define ENOTRECOVERABLE 96 /* State tidak recoverable */
 #define EOWNERDEAD 97    /* Owner mati */
 #define ERFKILL    98    /* RF-kill active */
