@@ -20,6 +20,29 @@
 
 /*
  * ===========================================================================
+ * KOMPATIBILITAS C89 (C89 COMPATIBILITY)
+ * ===========================================================================
+ * C89 tidak mendukung keyword 'inline', gunakan extension GCC.
+ */
+#ifndef inline
+#ifdef __GNUC__
+    #define inline __inline__
+#else
+    #define inline
+#endif
+#endif
+
+/* Demikian juga untuk restrict jika diperlukan */
+#ifndef restrict
+#ifdef __GNUC__
+    #define restrict __restrict__
+#else
+    #define restrict
+#endif
+#endif
+
+/*
+ * ===========================================================================
  * DETEKSI ARSITEKTUR (ARCHITECTURE DETECTION)
  * ===========================================================================
  * Deteksi otomatis arsitektur target berdasarkan compiler predefined macros.

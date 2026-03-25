@@ -576,8 +576,6 @@ void *kmem_cache_alloc(kmem_cache_t *cache)
 void kmem_cache_free(kmem_cache_t *cache, void *obj)
 {
     slab_t *slab;
-    tak_bertanda32_t offset;
-    tak_bertanda32_t slab_data_start;
 
     if (cache == NULL || cache->magic != CACHE_MAGIC || obj == NULL) {
         return;

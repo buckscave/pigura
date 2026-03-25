@@ -17,6 +17,16 @@
 
 #include "../kernel.h"
 
+/* Undef 32-bit macros and use 64-bit versions for x86_64 */
+#ifdef __x86_64__
+#undef cpu_read_cr2
+static inline tak_bertanda64_t cpu_read_cr2(void) {
+    tak_bertanda64_t val;
+    __asm__ __volatile__("mov %%cr2, %0" : "=r"(val));
+    return val;
+}
+#endif
+
 /*
  * ===========================================================================
  * DEKLARASI FORWARD (FORWARD DECLARATIONS)

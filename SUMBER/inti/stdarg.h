@@ -18,6 +18,9 @@
 #ifndef INTI_STDARG_H
 #define INTI_STDARG_H
 
+/* Sertakan types.h untuk definisi tipe dasar */
+#include "types.h"
+
 /*
  * ===========================================================================
  * TIPE VA_LIST (VA_LIST TYPE)

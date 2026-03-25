@@ -629,7 +629,6 @@ alamat_fisik_t memori_alloc_lowmem(ukuran_t size)
 {
     tak_bertanda32_t pages;
     alamat_fisik_t phys;
-    tak_bertanda32_t i;
 
     if (!(mem_flags & MEM_FLAG_PMM_READY)) {
         return 0;

@@ -325,8 +325,6 @@ static void detect_ioapic(void)
  */
 status_t apic_init(void)
 {
-    tak_bertanda32_t i;
-
     if (apic_initialized) {
         return STATUS_SUDAH_ADA;
     }

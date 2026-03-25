@@ -12,6 +12,16 @@
 
 #include "../kernel.h"
 
+/* Undef 32-bit macros and use 64-bit versions for x86_64 */
+#ifdef __x86_64__
+#undef cpu_read_cr2
+static inline tak_bertanda64_t cpu_read_cr2(void) {
+    tak_bertanda64_t val;
+    __asm__ __volatile__("mov %%cr2, %0" : "=r"(val));
+    return val;
+}
+#endif
+
 /*
  * ============================================================================
  * KONSTANTA LOKAL (LOCAL CONSTANTS)
@@ -318,7 +328,11 @@ void exception_divide_error_handler(register_context_t *ctx)
     exception_counter[0]++;
 
     kernel_printf("\n[EXCEPTION] Divide Error (#DE)\n");
+#ifdef __x86_64__
+    kernel_printf("  RIP: 0x%016lX\n", (ukuran_t)ctx->rip);
+#else
     kernel_printf("  EIP: 0x%08lX\n", (ukuran_t)ctx->eip);
+#endif
 
     /* Coba recovery atau panic */
     kernel_panic_exception(ctx);
@@ -332,16 +346,19 @@ void exception_divide_error_handler(register_context_t *ctx)
 void exception_invalid_opcode_handler(register_context_t *ctx)
 {
     tak_bertanda8_t opcode;
-    tak_bertanda8_t *eip_ptr;
+    tak_bertanda8_t *ip_ptr;
 
     exception_counter[6]++;
 
     kernel_printf("\n[EXCEPTION] Invalid Opcode (#UD)\n");
+#ifdef __x86_64__
+    kernel_printf("  RIP: 0x%016lX\n", (ukuran_t)ctx->rip);
+    ip_ptr = (tak_bertanda8_t *)(uintptr_t)ctx->rip;
+#else
     kernel_printf("  EIP: 0x%08lX\n", (ukuran_t)ctx->eip);
-
-    /* Cast melalui uintptr_t untuk menghindari warning */
-    eip_ptr = (tak_bertanda8_t *)(uintptr_t)ctx->eip;
-    opcode = *eip_ptr;
+    ip_ptr = (tak_bertanda8_t *)(uintptr_t)ctx->eip;
+#endif
+    opcode = *ip_ptr;
     kernel_printf("  Opcode byte: 0x%02X\n", opcode);
 
     kernel_panic_exception(ctx);
@@ -373,7 +390,11 @@ void exception_gpf_handler(register_context_t *ctx)
     exception_counter[13]++;
 
     kernel_printf("\n[EXCEPTION] General Protection Fault (#GP)\n");
+#ifdef __x86_64__
+    kernel_printf("  RIP: 0x%016lX\n", (ukuran_t)ctx->rip);
+#else
     kernel_printf("  EIP: 0x%08lX\n", (ukuran_t)ctx->eip);
+#endif
 
     if (ctx->err_code != 0) {
         decode_segment_error(ctx->err_code);
@@ -389,7 +410,7 @@ void exception_gpf_handler(register_context_t *ctx)
  */
 void exception_page_fault_handler(register_context_t *ctx)
 {
-    tak_bertanda32_t cr2;
+    tak_bertanda64_t cr2;
 
     exception_counter[14]++;
 
@@ -397,7 +418,11 @@ void exception_page_fault_handler(register_context_t *ctx)
 
     kernel_printf("\n[EXCEPTION] Page Fault (#PF)\n");
     decode_page_fault_error(ctx->err_code, cr2);
+#ifdef __x86_64__
+    kernel_printf("  RIP: 0x%016lX\n", (ukuran_t)ctx->rip);
+#else
     kernel_printf("  EIP: 0x%08lX\n", (ukuran_t)ctx->eip);
+#endif
 
     /* Cek apakah ini recoverable */
     if (page_fault_handler_active) {

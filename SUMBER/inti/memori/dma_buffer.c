@@ -254,7 +254,8 @@ static void free_dma_pages(alamat_fisik_t phys, tak_bertanda32_t count)
     tak_bertanda32_t index;
     tak_bertanda32_t i;
 
-    if (phys < DMA_ZONE_START || phys >= DMA_ZONE_END) {
+    /* DMA_ZONE_START is 0, so only check upper bound */
+    if (phys >= DMA_ZONE_END) {
         return;
     }
 
@@ -552,7 +553,8 @@ alamat_fisik_t dma_map_single(void *virt, ukuran_t size, int dir)
     }
 
     /* Cek apakah dalam DMA zone */
-    if (phys < DMA_ZONE_START || phys + size > DMA_ZONE_END) {
+    /* DMA_ZONE_START is 0, so only check upper bound */
+    if (phys + size > DMA_ZONE_END) {
         /* Buffer tidak dalam DMA zone - perlu bounce buffer */
         /* TODO: Implement bounce buffer */
         kernel_printf("[DMA] Warning: Buffer outside DMA zone\n");
@@ -623,6 +625,8 @@ void *dma_alloc_bounce(ukuran_t size)
 void dma_free_bounce(void *ptr, ukuran_t size)
 {
     tak_bertanda32_t i;
+
+    (void)size;  /* Currently unused */
 
     if (ptr == NULL) {
         return;
