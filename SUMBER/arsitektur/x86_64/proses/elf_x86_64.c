@@ -10,7 +10,7 @@
  * Versi: 1.0
  */
 
-#include "../../inti/kernel.h"
+#include "../../../inti/kernel.h"
 
 /*
  * ============================================================================
@@ -275,7 +275,6 @@ tak_bertanda64_t elf_x86_64_get_size(void *data)
     struct elf64_header *header;
     struct elf64_phdr *phdr;
     tak_bertanda16_t i;
-    tak_bertanda64_t total = 0;
     tak_bertanda64_t max_addr = 0;
 
     if (data == NULL) {

@@ -10,7 +10,7 @@
  * Versi: 1.0
  */
 
-#include "../../inti/kernel.h"
+#include "../../../inti/kernel.h"
 
 /*
  * ============================================================================
@@ -78,12 +78,12 @@ static void _print_bootinfo(multiboot_info_t *bootinfo)
 
     if (bootinfo->flags & MULTIBOOT_FLAG_CMDLINE) {
         kernel_printf("Command line: %s\n",
-                      (const char *)bootinfo->cmdline);
+                      (const char *)(uintptr_t)bootinfo->cmdline);
     }
 
     if (bootinfo->flags & MULTIBOOT_FLAG_LOADER) {
         kernel_printf("Bootloader: %s\n",
-                      (const char *)bootinfo->boot_loader_name);
+                      (const char *)(uintptr_t)bootinfo->boot_loader_name);
     }
 
     kernel_printf("========================\n\n");

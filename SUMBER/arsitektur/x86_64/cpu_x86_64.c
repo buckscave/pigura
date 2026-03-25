@@ -449,7 +449,8 @@ static void _baca_cache(void)
 
     /* Default values */
     g_info_cpu.cache_line = 64;
-    g_info_cpu.cache_l1 = 32;
+    g_info_cpu.cache_l1_data = 32;
+    g_info_cpu.cache_l1_inst = 32;
     g_info_cpu.cache_l2 = 256;
     g_info_cpu.cache_l3 = 8192;
 
@@ -466,7 +467,8 @@ static void _baca_cache(void)
         _cpuid(0x80000005, 0, &eax, &ebx, &ecx, &edx);
 
         /* L1 cache dari ECX (AMD) */
-        g_info_cpu.cache_l1 = ((ecx >> 24) & 0xFF);
+        g_info_cpu.cache_l1_data = ((ecx >> 24) & 0xFF);
+        g_info_cpu.cache_l1_inst = ((ecx >> 24) & 0xFF);
     }
 
     if (g_cpuid_max_ext >= 0x80000006) {
@@ -554,8 +556,8 @@ static void _deteksi_frekuensi(void)
     tak_bertanda32_t ecx;
     tak_bertanda32_t edx;
 
-    /* Default 2 GHz */
-    g_info_cpu.freq_mhz = 2000;
+    /* Default 2 GHz = 2000000 kHz */
+    g_info_cpu.freq_khz = 2000000;
 
     /* Coba baca dari brand string */
     if (g_info_cpu.brand[0] != '\0') {
@@ -592,7 +594,7 @@ static void _deteksi_frekuensi(void)
                     }
                 }
 
-                g_info_cpu.freq_mhz = ghz_val * 1000 + mhz_val * 100;
+                g_info_cpu.freq_khz = ghz_val * 1000000 + mhz_val * 100000;
             }
         }
     }
@@ -607,9 +609,9 @@ static void _deteksi_frekuensi(void)
             tak_bertanda32_t crystal = ecx;
 
             if (denom != 0 && crystal != 0) {
-                g_info_cpu.freq_mhz =
+                g_info_cpu.freq_khz =
                     (tak_bertanda32_t)((numer * crystal) /
-                                       (denom * 1000000));
+                                       (denom * 1000));
             }
         }
     }
@@ -716,7 +718,7 @@ status_t hal_cpu_init(void)
                   g_info_cpu.family, g_info_cpu.model, g_info_cpu.stepping);
     kernel_printf("[CPU-x86_64] Cores: %u, Threads: %u\n",
                   g_info_cpu.cores, g_info_cpu.threads);
-    kernel_printf("[CPU-x86_64] Frequency: %u MHz\n", g_info_cpu.freq_mhz);
+    kernel_printf("[CPU-x86_64] Frequency: %u kHz\n", g_info_cpu.freq_khz);
     kernel_printf("[CPU-x86_64] Virtual addr width: %u bits\n",
                   g_alamat_virtual_lebar);
     kernel_printf("[CPU-x86_64] Physical addr width: %u bits\n",
@@ -844,20 +846,20 @@ void hal_cpu_disable_interrupts(void)
  * Return:
  *   State interupsi sebelumnya
  */
-tak_bertanda64_t hal_cpu_save_interrupts(void)
+tak_bertanda32_t hal_cpu_save_interrupts(void)
 {
-    tak_bertanda64_t flags;
+    tak_bertanda64_t flags64;
 
     __asm__ __volatile__(
         "pushfq\n\t"
         "popq %0\n\t"
         "cli"
-        : "=rm"(flags)
+        : "=rm"(flags64)
         :
         : "memory"
     );
 
-    return flags;
+    return (tak_bertanda32_t)flags64;
 }
 
 /*
@@ -868,13 +870,13 @@ tak_bertanda64_t hal_cpu_save_interrupts(void)
  * Parameter:
  *   state - State yang disimpan
  */
-void hal_cpu_restore_interrupts(tak_bertanda64_t state)
+void hal_cpu_restore_interrupts(tak_bertanda32_t state)
 {
     __asm__ __volatile__(
         "pushq %0\n\t"
         "popfq"
         :
-        : "g"(state)
+        : "g"((tak_bertanda64_t)state)
         : "memory", "cc"
     );
 }
@@ -1028,7 +1030,7 @@ bool_t cpu_has_feature(tak_bertanda32_t fitur)
  */
 tak_bertanda32_t cpu_get_frequency(void)
 {
-    return g_info_cpu.freq_mhz;
+    return g_info_cpu.freq_khz / 1000;  /* Return MHz */
 }
 
 /*
@@ -1066,12 +1068,12 @@ void cpu_delay_us(tak_bertanda32_t us)
     tak_bertanda64_t end;
     tak_bertanda64_t delay;
 
-    if (g_info_cpu.freq_mhz == 0) {
+    if (g_info_cpu.freq_khz == 0) {
         return;
     }
 
     start = cpu_read_tsc();
-    delay = (tak_bertanda64_t)g_info_cpu.freq_mhz * us;
+    delay = (tak_bertanda64_t)(g_info_cpu.freq_khz / 1000) * us;
 
     do {
         end = cpu_read_tsc();
@@ -1099,6 +1101,13 @@ void cpu_delay_ms(tak_bertanda32_t ms)
  * Return:
  *   Nilai CR0
  */
+/* Undef kernel.h macros for 32-bit CR access */
+#undef cpu_read_cr0
+#undef cpu_write_cr0
+#undef cpu_read_cr2
+#undef cpu_read_cr3
+#undef cpu_write_cr3
+
 tak_bertanda64_t cpu_read_cr0(void)
 {
     tak_bertanda64_t val;

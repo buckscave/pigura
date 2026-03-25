@@ -226,7 +226,7 @@ static status_t _muat_segment(void *data, struct elf32_phdr *phdr,
 
     /* Get source dan destination */
     src = (void *)((tak_bertanda8_t *)data + phdr->p_offset);
-    dst = (void *)phdr->p_vaddr;
+    dst = (void *)(uintptr_t)phdr->p_vaddr;
 
     kernel_printf("[ELF] Memuat segmen: 0x%08x -> 0x%08x (%u bytes)\n",
                   phdr->p_vaddr, phdr->p_vaddr + phdr->p_memsz,
@@ -336,6 +336,7 @@ status_t elf_muat(void *buffer, ukuran_t ukuran,
 status_t elf_muat_dari_file(const char *path, alamat_virtual_t *entry)
 {
     /* Placeholder - perlu VFS */
+    (void)entry;  /* TODO: implementasi dengan VFS */
     kernel_printf("[ELF] Muat dari file: %s (belum implementasi)\n", path);
 
     return STATUS_TIDAK_DUKUNG;
@@ -517,4 +518,3 @@ void elf_print_info(void *buffer)
             phdr[i].p_filesz, phdr[i].p_memsz);
     }
 }
-

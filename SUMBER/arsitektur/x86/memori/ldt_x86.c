@@ -140,7 +140,7 @@ status_t ldt_init(void)
 
     /* Setup pointer */
     g_ldt_ptr.batas = sizeof(g_ldt_default) - 1;
-    g_ldt_ptr.basis = (tak_bertanda32_t)g_ldt_default;
+    g_ldt_ptr.basis = (tak_bertanda32_t)(uintptr_t)g_ldt_default;
 
     return STATUS_BERHASIL;
 }
@@ -166,7 +166,7 @@ status_t ldt_load(void *ldt, ukuran_t ukuran)
     }
 
     ptr.batas = (tak_bertanda16_t)(ukuran - 1);
-    ptr.basis = (tak_bertanda32_t)ldt;
+    ptr.basis = (tak_bertanda32_t)(uintptr_t)ldt;
 
     /* Load LDT menggunakan LLDT instruction */
     __asm__ __volatile__(

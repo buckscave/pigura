@@ -12,6 +12,7 @@
  */
 
 #include "../../inti/kernel.h"
+#include "cpu_x86_64.h"
 
 /*
  * ============================================================================
@@ -87,8 +88,8 @@ struct interupsi_frame {
     tak_bertanda64_t ss;            /* Stack segment */
 } __attribute__((packed));
 
-/* Tipe handler interupsi */
-typedef void (*handler_interupsi_t)(struct interupsi_frame *);
+/* Tipe handler interupsi lokal (berbeda dengan types.h) */
+typedef void (*handler_interupsi_lokal_t)(struct interupsi_frame *);
 
 /* Nama exception */
 struct nama_exception {
@@ -111,7 +112,7 @@ static struct idt_entry g_idt[JUMLAH_VEKTOR]
 static struct idt_ptr g_idt_ptr;
 
 /* Tabel handler interupsi */
-static handler_interupsi_t g_handler_interupsi[JUMLAH_VEKTOR];
+static handler_interupsi_lokal_t g_handler_interupsi[JUMLAH_VEKTOR];
 
 /* Tabel handler IRQ */
 static void (*g_handler_irq[JUMLAH_IRQ_PIC])(void);
@@ -543,7 +544,7 @@ static void _handler_irq_umum(struct interupsi_frame *frame)
  */
 void _dispatcher_interupsi(struct interupsi_frame *frame)
 {
-    handler_interupsi_t handler;
+    handler_interupsi_lokal_t hdl;
 
     if (frame == NULL) {
         return;
@@ -551,10 +552,10 @@ void _dispatcher_interupsi(struct interupsi_frame *frame)
 
     /* Cari handler yang terdaftar */
     if (frame->nomor_int < JUMLAH_VEKTOR) {
-        handler = g_handler_interupsi[frame->nomor_int];
+        hdl = g_handler_interupsi[frame->nomor_int];
 
-        if (handler != NULL) {
-            handler(frame);
+        if (hdl != NULL) {
+            hdl(frame);
             return;
         }
     }
@@ -728,13 +729,13 @@ status_t interupsi_x86_64_init(void)
  *   STATUS_BERHASIL jika berhasil
  */
 status_t interupsi_x86_64_daftarkan_handler(tak_bertanda32_t vektor,
-                                             handler_interupsi_t handler)
+                                             handler_interupsi_lokal_t hdl)
 {
     if (vektor >= JUMLAH_VEKTOR) {
         return STATUS_PARAM_INVALID;
     }
 
-    g_handler_interupsi[vektor] = handler;
+    g_handler_interupsi[vektor] = hdl;
 
     return STATUS_BERHASIL;
 }
@@ -752,13 +753,13 @@ status_t interupsi_x86_64_daftarkan_handler(tak_bertanda32_t vektor,
  *   STATUS_BERHASIL jika berhasil
  */
 status_t interupsi_x86_64_daftarkan_handler_irq(tak_bertanda32_t irq,
-                                                 void (*handler)(void))
+                                                 void (*hdl)(void))
 {
     if (irq >= JUMLAH_IRQ_PIC) {
         return STATUS_PARAM_INVALID;
     }
 
-    g_handler_irq[irq] = handler;
+    g_handler_irq[irq] = hdl;
 
     return STATUS_BERHASIL;
 }

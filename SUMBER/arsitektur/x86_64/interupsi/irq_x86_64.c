@@ -10,7 +10,7 @@
  * Versi: 1.0
  */
 
-#include "../../inti/kernel.h"
+#include "../../../inti/kernel.h"
 
 /*
  * ============================================================================
@@ -136,6 +136,10 @@ static void _pic_update_mask(void)
  * FUNGSI PUBLIC
  * ============================================================================
  */
+
+/* Forward declarations */
+status_t irq_x86_64_enable(tak_bertanda32_t irq);
+status_t irq_x86_64_disable(tak_bertanda32_t irq);
 
 /*
  * irq_x86_64_init

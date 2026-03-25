@@ -1,99 +1,104 @@
 /*
- * PIGURA OS - HAL x86
- * --------------------
- * Implementasi Hardware Abstraction Layer untuk arsitektur x86.
+ * PIGURA OS - HAL_x86.C
+ * ----------------------
+ * Implementasi arsitektur-spesifik untuk Hardware Abstraction Layer x86.
  *
- * Berkas ini berisi implementasi fungsi-fungsi HAL yang spesifik
- * untuk arsitektur x86 (32-bit). Fungsi-fungsi ini mengabstraksi
- * detail hardware dari kernel utama.
+ * Berkas ini berisi fungsi-fungsi inisialisasi dan helper yang spesifik
+ * untuk arsitektur x86/x86_64. Fungsi-fungsi HAL utama diimplementasikan
+ * di SUMBER/inti/hal/.
  *
- * Arsitektur: x86 (32-bit)
- * Versi: 1.0
+ * KEPATUHAN STANDAR:
+ * - C90 (ANSI C89) dengan POSIX Safe Functions
+ *
+ * Arsitektur: x86, x86_64
+ * Versi: 2.0
+ * Tanggal: 2025
  */
 
 #include "../../inti/kernel.h"
+#include "../../inti/hal/hal.h"
 #include "cpu_x86.h"
 
 /*
  * ============================================================================
- * VARIABEL GLOBAL
+ * KONSTANTA LOKAL (LOCAL CONSTANTS)
  * ============================================================================
  */
 
-/* State HAL global */
-hal_state_t g_hal_state_x86;
+/* PIC (Programmable Interrupt Controller) */
+#define PIC1_COMMAND            0x20
+#define PIC1_DATA               0x21
+#define PIC2_COMMAND            0xA0
+#define PIC2_DATA               0xA1
 
-/* Flag inisialisasi */
-static bool_t g_hal_diinisialisasi = SALAH;
+/* PIC command bits */
+#define PIC_CMD_ICW1_INIT       0x10    /* Initialization */
+#define PIC_CMD_ICW1_ICW4       0x01    /* ICW4 needed */
+#define PIC_CMD_ICW4_8086       0x01    /* 8086 mode */
+
+/* PIC EOI */
+#define PIC_CMD_EOI             0x20
+
+/* PIT (Programmable Interval Timer) */
+#define PIT_CHANNEL_0           0x40
+#define PIT_CHANNEL_1           0x41
+#define PIT_CHANNEL_2           0x42
+#define PIT_COMMAND             0x43
+
+/* PIT frequency */
+#define PIT_FREQUENCY           1193182UL
+
+/* PIT command bits */
+#define PIT_CMD_BINARY          0x00
+#define PIT_CMD_MODE_3          0x06    /* Square wave */
+#define PIT_CMD_BOTH            0x30    /* LSB then MSB */
+
+/* VGA */
+#define VGA_BUFFER              0xB8000
+#define VGA_KOLOM               80
+#define VGA_BARIS               25
+
+/* VGA I/O ports */
+#define PORT_VGA_CRTC_INDEX     0x3D4
+#define PORT_VGA_CRTC_DATA      0x3D5
+
+/*
+ * ============================================================================
+ * VARIABEL LOKAL (LOCAL VARIABLES)
+ * ============================================================================
+ */
+
+/* Flag untuk status inisialisasi arsitektur */
+static bool_t g_arch_initialized = SALAH;
 
 /* Pointer ke boot info */
 static void *g_boot_info_ptr = NULL;
 
 /*
  * ============================================================================
- * FUNGSI INTERNAL
+ * FUNGSI INTERNAL PIC (INTERNAL PIC FUNCTIONS)
  * ============================================================================
  */
 
 /*
- * _init_console_awal
- * ------------------
- * Inisialisasi console VGA text mode untuk output awal.
- */
-static status_t _init_console_awal(void)
-{
-    volatile tak_bertanda16_t *vga;
-    tak_bertanda32_t i;
-
-    vga = (volatile tak_bertanda16_t *)VGA_BUFFER;
-
-    /* Clear screen */
-    for (i = 0; i < VGA_KOLOM * VGA_BARIS; i++) {
-        vga[i] = (tak_bertanda16_t)(' ' | (VGA_ABU_ABU << 8));
-    }
-
-    return STATUS_BERHASIL;
-}
-
-/*
- * _init_gdt
- * ---------
- * Inisialisasi Global Descriptor Table.
- */
-static status_t _init_gdt(void)
-{
-    /* GDT init dipanggil dari modul memori */
-    return STATUS_BERHASIL;
-}
-
-/*
- * _init_idt
- * ----------
- * Inisialisasi Interrupt Descriptor Table.
- */
-static status_t _init_idt(void)
-{
-    /* IDT init dipanggil dari modul interupsi */
-    return STATUS_BERHASIL;
-}
-
-/*
- * _remap_pic
+ * _pic_remap
  * ----------
  * Remap PIC untuk menghindari konflik vektor dengan exception.
+ * IRQ 0-7 dipetakan ke vektor 32-39
+ * IRQ 8-15 dipetakan ke vektor 40-47
  */
-static void _remap_pic(void)
+static void _pic_remap(void)
 {
-    /* Mulai remap */
+    /* Mulai inisialisasi PIC */
     outb(PIC1_COMMAND, PIC_CMD_ICW1_INIT | PIC_CMD_ICW1_ICW4);
     io_delay();
     outb(PIC2_COMMAND, PIC_CMD_ICW1_INIT | PIC_CMD_ICW1_ICW4);
     io_delay();
 
     /* Set vektor offset */
-    outb(PIC1_DATA, VEKTOR_IRQ_MULAI);      /* Master: vektor 32-39 */
+    outb(PIC1_DATA, VEKTOR_IRQ_MULAI);         /* Master: vektor 32-39 */
     io_delay();
-    outb(PIC2_DATA, VEKTOR_IRQ_MULAI + 8);   /* Slave: vektor 40-47 */
+    outb(PIC1_DATA, VEKTOR_IRQ_MULAI + 8);     /* Slave: vektor 40-47 */
     io_delay();
 
     /* Setup cascade */
@@ -108,26 +113,97 @@ static void _remap_pic(void)
     outb(PIC2_DATA, PIC_CMD_ICW4_8086);
     io_delay();
 
-    /* Mask semua IRQ kecuali cascade */
+    /* Mask semua IRQ kecuali cascade (IRQ2) */
     outb(PIC1_DATA, 0xFB);   /* Unmask IRQ2 (cascade) */
     outb(PIC2_DATA, 0xFF);   /* Mask semua IRQ slave */
 }
 
 /*
- * _init_pit
- * ----------
- * Inisialisasi Programmable Interval Timer untuk sistem timer.
+ * _pic_mask_irq
+ * -------------
+ * Mask IRQ tertentu.
+ *
+ * Parameter:
+ *   irq - Nomor IRQ (0-15)
  */
-static void _init_pit(tak_bertanda32_t frekuensi)
+static void _pic_mask_irq(tak_bertanda32_t irq)
+{
+    tak_bertanda8_t mask;
+    tak_bertanda16_t port;
+
+    if (irq > 15) {
+        return;
+    }
+
+    if (irq < 8) {
+        port = PIC1_DATA;
+    } else {
+        port = PIC2_DATA;
+        irq -= 8;
+    }
+
+    mask = inb((tak_bertanda16_t)port);
+    mask |= (tak_bertanda8_t)(1 << irq);
+    outb((tak_bertanda16_t)port, mask);
+}
+
+/*
+ * _pic_unmask_irq
+ * ---------------
+ * Unmask IRQ tertentu.
+ *
+ * Parameter:
+ *   irq - Nomor IRQ (0-15)
+ */
+static void _pic_unmask_irq(tak_bertanda32_t irq)
+{
+    tak_bertanda8_t mask;
+    tak_bertanda16_t port;
+
+    if (irq > 15) {
+        return;
+    }
+
+    if (irq < 8) {
+        port = PIC1_DATA;
+    } else {
+        port = PIC2_DATA;
+        irq -= 8;
+    }
+
+    mask = inb((tak_bertanda16_t)port);
+    mask &= (tak_bertanda8_t)(~(1 << irq));
+    outb((tak_bertanda16_t)port, mask);
+}
+
+/*
+ * ============================================================================
+ * FUNGSI INTERNAL PIT (INTERNAL PIT FUNCTIONS)
+ * ============================================================================
+ */
+
+/*
+ * _pit_init
+ * ---------
+ * Inisialisasi PIT dengan frekuensi tertentu.
+ *
+ * Parameter:
+ *   frequency - Frekuensi yang diinginkan dalam Hz
+ */
+static void _pit_init(tak_bertanda32_t frekuensi)
 {
     tak_bertanda16_t divisor;
 
     /* Hitung divisor */
-    divisor = (tak_bertanda16_t)(FREKUENSI_PIT / frekuensi);
+    divisor = (tak_bertanda16_t)(PIT_FREQUENCY / frekuensi);
 
-    /* Set mode square wave, channel 0, binary counting */
-    outb(PIT_COMMAND, PIT_CMD_BINARY | PIT_CMD_MODE_3 | 
-                       PIT_CMD_BOTH | 0x00);
+    /* Pastikan divisor tidak nol */
+    if (divisor == 0) {
+        divisor = 1;
+    }
+
+    /* Set mode: channel 0, mode 3 (square wave), binary, both bytes */
+    outb(PIT_COMMAND, PIT_CMD_BINARY | PIT_CMD_MODE_3 | PIT_CMD_BOTH);
 
     /* Kirim divisor (LSB dulu, lalu MSB) */
     outb(PIT_CHANNEL_0, (tak_bertanda8_t)(divisor & 0xFF));
@@ -136,536 +212,137 @@ static void _init_pit(tak_bertanda32_t frekuensi)
 
 /*
  * ============================================================================
- * FUNGSI PUBLIC - HAL UTAMA
+ * FUNGSI INTERNAL VGA (INTERNAL VGA FUNCTIONS)
  * ============================================================================
  */
 
 /*
- * hal_init
- * --------
- * Menginisialisasi HAL untuk arsitektur x86.
+ * _vga_clear
+ * ----------
+ * Bersihkan layar VGA text mode.
  */
-status_t hal_init(void)
+static void _vga_clear(void)
 {
-    kernel_memset(&g_hal_state_x86, 0, sizeof(hal_state_t));
+    volatile tak_bertanda16_t *vga;
+    tak_bertanda32_t i;
 
-    /* Inisialisasi console awal untuk debug */
-    _init_console_awal();
+    vga = (volatile tak_bertanda16_t *)VGA_BUFFER;
 
-    kernel_printf("[HAL-x86] Memulai inisialisasi HAL...\n");
+    for (i = 0; i < VGA_KOLOM * VGA_BARIS; i++) {
+        vga[i] = (tak_bertanda16_t)(' ' | (VGA_ABU_ABU << 8));
+    }
+}
 
-    /* Inisialisasi GDT */
-    kernel_printf("[HAL-x86] Inisialisasi GDT...\n");
+/*
+ * ============================================================================
+ * FUNGSI PUBLIC - INISIALISASI ARSITEKTUR
+ * ============================================================================
+ */
 
-    /* Inisialisasi IDT */
-    kernel_printf("[HAL-x86] Inisialisasi IDT...\n");
+/*
+ * hal_arch_init
+ * -------------
+ * Inisialisasi arsitektur x86.
+ * Fungsi ini dipanggil oleh hal_init() di inti/hal/hal.c
+ *
+ * Return: Status operasi
+ */
+status_t hal_arch_init(void)
+{
+    if (g_arch_initialized) {
+        return STATUS_SUDAH_ADA;
+    }
+
+    /* Clear VGA screen untuk output awal */
+    _vga_clear();
 
     /* Remap PIC */
-    kernel_printf("[HAL-x86] Remap PIC...\n");
-    _remap_pic();
+    _pic_remap();
 
-    /* Inisialisasi timer */
-    kernel_printf("[HAL-x86] Inisialisasi timer...\n");
-    g_hal_state_x86.timer.frequency = FREKUENSI_TIMER;
-    g_hal_state_x86.timer.resolution_ns = 
-        (1000000000UL / FREKUENSI_TIMER);
-    g_hal_state_x86.timer.supports_one_shot = SALAH;
-    g_hal_state_x86.timer.supports_periodic = BENAR;
+    /* Inisialisasi PIT */
+    _pit_init(FREKUENSI_TIMER);
 
-    _init_pit(FREKUENSI_TIMER);
-
-    /* Set flag inisialisasi */
-    g_hal_state_x86.status = HAL_STATUS_READY;
-    g_hal_diinisialisasi = BENAR;
-
-    kernel_printf("[HAL-x86] HAL siap\n");
+    g_arch_initialized = BENAR;
 
     return STATUS_BERHASIL;
 }
 
 /*
- * hal_shutdown
- * ------------
- * Mematikan HAL.
+ * hal_arch_shutdown
+ * -----------------
+ * Shutdown arsitektur x86.
+ *
+ * Return: Status operasi
  */
-status_t hal_shutdown(void)
+status_t hal_arch_shutdown(void)
 {
-    if (!g_hal_diinisialisasi) {
+    if (!g_arch_initialized) {
         return STATUS_GAGAL;
     }
 
-    kernel_printf("[HAL-x86] Mematikan HAL...\n");
-
-    /* Disable interrupt */
-    hal_cpu_disable_interrupts();
-
-    g_hal_state_x86.status = HAL_STATUS_UNINITIALIZED;
-    g_hal_diinisialisasi = SALAH;
-
-    return STATUS_BERHASIL;
-}
-
-/*
- * hal_get_state
- * -------------
- * Mendapatkan state HAL.
- */
-const hal_state_t *hal_get_state(void)
-{
-    if (!g_hal_diinisialisasi) {
-        return NULL;
-    }
-
-    return &g_hal_state_x86;
-}
-
-/*
- * hal_is_initialized
- * ------------------
- * Cek apakah HAL sudah diinisialisasi.
- */
-bool_t hal_is_initialized(void)
-{
-    return g_hal_diinisialisasi;
-}
-
-/*
- * ============================================================================
- * FUNGSI PUBLIC - CPU
- * ============================================================================
- */
-
-/*
- * hal_cpu_init
- * ------------
- * Inisialisasi subsistem CPU.
- */
-status_t hal_cpu_init(void)
-{
-    return STATUS_BERHASIL;
-}
-
-/*
- * hal_cpu_halt
- * ------------
- * Hentikan CPU.
- */
-void hal_cpu_halt(void)
-{
-    cpu_halt();
-}
-
-/*
- * hal_cpu_reset
- * -------------
- * Reset CPU.
- */
-void hal_cpu_reset(bool_t keras)
-{
-    /* Disable interrupt */
+    /* Disable semua interrupt */
     cpu_disable_irq();
 
-    if (keras) {
-        /* Hard reset via keyboard controller */
-        tak_bertanda8_t temp;
+    g_arch_initialized = SALAH;
 
-        /* Flush keyboard buffer */
-        do {
-            temp = inb(0x64);
-            if (temp & 0x01) {
-                inb(0x60);
-            }
-        } while (temp & 0x02);
-
-        /* Pulse reset line */
-        outb(0x64, 0xFE);
-    } else {
-        /* Soft reset */
-        tak_bertanda32_t *warm_reset;
-        warm_reset = (tak_bertanda32_t *)0x0472;
-        *warm_reset = 0x1234;
-
-        __asm__ __volatile__(
-            "ljmp $0xFFFF, $0x0000\n\t"
-        );
-    }
-
-    /* Tidak akan sampai sini */
-    while (1) {
-        cpu_halt();
-    }
+    return STATUS_BERHASIL;
 }
 
 /*
- * hal_cpu_get_id
- * --------------
- * Mendapatkan ID CPU.
+ * ============================================================================
+ * FUNGSI PUBLIC - OPERASI PIC
+ * ============================================================================
  */
-tak_bertanda32_t hal_cpu_get_id(void)
+
+/*
+ * hal_arch_pic_enable_irq
+ * -----------------------
+ * Aktifkan IRQ melalui PIC.
+ *
+ * Parameter:
+ *   irq - Nomor IRQ (0-15)
+ *
+ * Return: Status operasi
+ */
+status_t hal_arch_pic_enable_irq(tak_bertanda32_t irq)
 {
-    return 0;
+    if (irq > 15) {
+        return STATUS_PARAM_INVALID;
+    }
+
+    _pic_unmask_irq(irq);
+    return STATUS_BERHASIL;
 }
 
 /*
- * hal_cpu_get_info
+ * hal_arch_pic_disable_irq
+ * ------------------------
+ * Nonaktifkan IRQ melalui PIC.
+ *
+ * Parameter:
+ *   irq - Nomor IRQ (0-15)
+ *
+ * Return: Status operasi
+ */
+status_t hal_arch_pic_disable_irq(tak_bertanda32_t irq)
+{
+    if (irq > 15) {
+        return STATUS_PARAM_INVALID;
+    }
+
+    _pic_mask_irq(irq);
+    return STATUS_BERHASIL;
+}
+
+/*
+ * hal_arch_pic_eoi
  * ----------------
- * Mendapatkan informasi CPU.
+ * Kirim End of Interrupt ke PIC.
+ *
+ * Parameter:
+ *   irq - Nomor IRQ (0-15)
  */
-status_t hal_cpu_get_info(hal_cpu_info_t *info)
-{
-    if (info == NULL) {
-        return STATUS_PARAM_INVALID;
-    }
-
-    return STATUS_BERHASIL;
-}
-
-/*
- * hal_cpu_enable_interrupts
- * -------------------------
- * Aktifkan interupsi.
- */
-void hal_cpu_enable_interrupts(void)
-{
-    cpu_enable_irq();
-}
-
-/*
- * hal_cpu_disable_interrupts
- * --------------------------
- * Nonaktifkan interupsi.
- */
-void hal_cpu_disable_interrupts(void)
-{
-    cpu_disable_irq();
-}
-
-/*
- * hal_cpu_save_interrupts
- * -----------------------
- * Simpan state interupsi.
- */
-tak_bertanda32_t hal_cpu_save_interrupts(void)
-{
-    return cpu_save_flags();
-}
-
-/*
- * hal_cpu_restore_interrupts
- * --------------------------
- * Restore state interupsi.
- */
-void hal_cpu_restore_interrupts(tak_bertanda32_t state)
-{
-    cpu_restore_flags(state);
-}
-
-/*
- * hal_cpu_invalidate_tlb
- * ----------------------
- * Invalidate TLB untuk alamat.
- */
-void hal_cpu_invalidate_tlb(void *addr)
-{
-    cpu_invlpg(addr);
-}
-
-/*
- * hal_cpu_invalidate_tlb_all
- * --------------------------
- * Invalidate semua TLB.
- */
-void hal_cpu_invalidate_tlb_all(void)
-{
-    cpu_reload_cr3();
-}
-
-/*
- * hal_cpu_cache_flush
- * -------------------
- * Flush cache.
- */
-void hal_cpu_cache_flush(void)
-{
-    __asm__ __volatile__("wbinvd\n\t");
-}
-
-/*
- * hal_cpu_cache_disable
- * ---------------------
- * Nonaktifkan cache.
- */
-void hal_cpu_cache_disable(void)
-{
-    tak_bertanda32_t cr0;
-
-    cr0 = cpu_read_cr0();
-    cr0 |= (1 << 30) | (1 << 29);
-    cpu_write_cr0(cr0);
-}
-
-/*
- * hal_cpu_cache_enable
- * --------------------
- * Aktifkan cache.
- */
-void hal_cpu_cache_enable(void)
-{
-    tak_bertanda32_t cr0;
-
-    cr0 = cpu_read_cr0();
-    cr0 &= ~((1 << 30) | (1 << 29));
-    cpu_write_cr0(cr0);
-}
-
-/*
- * ============================================================================
- * FUNGSI PUBLIC - TIMER
- * ============================================================================
- */
-
-/* Variabel timer */
-static volatile tak_bertanda64_t g_timer_ticks = 0;
-static volatile tak_bertanda64_t g_timer_uptime = 0;
-static void (*g_timer_handler)(void) = NULL;
-
-/*
- * timer_interrupt_handler
- * -----------------------
- * Handler untuk timer interrupt.
- */
-void timer_interrupt_handler(void)
-{
-    g_timer_ticks++;
-
-    /* Update uptime setiap detik */
-    if ((g_timer_ticks % FREKUENSI_TIMER) == 0) {
-        g_timer_uptime++;
-    }
-
-    /* Panggil handler user jika ada */
-    if (g_timer_handler != NULL) {
-        g_timer_handler();
-    }
-}
-
-/*
- * hal_timer_init
- * --------------
- * Inisialisasi timer.
- */
-status_t hal_timer_init(void)
-{
-    g_timer_ticks = 0;
-    g_timer_uptime = 0;
-
-    /* PIT sudah di-init di hal_init */
-    g_hal_state_x86.timer.frequency = FREKUENSI_TIMER;
-    g_hal_state_x86.timer.resolution_ns = 
-        (1000000000UL / FREKUENSI_TIMER);
-
-    return STATUS_BERHASIL;
-}
-
-/*
- * hal_timer_get_ticks
- * -------------------
- * Mendapatkan jumlah tick.
- */
-tak_bertanda64_t hal_timer_get_ticks(void)
-{
-    return g_timer_ticks;
-}
-
-/*
- * hal_timer_get_frequency
- * -----------------------
- * Mendapatkan frekuensi timer.
- */
-tak_bertanda32_t hal_timer_get_frequency(void)
-{
-    return g_hal_state_x86.timer.frequency;
-}
-
-/*
- * hal_timer_get_uptime
- * --------------------
- * Mendapatkan uptime dalam detik.
- */
-tak_bertanda64_t hal_timer_get_uptime(void)
-{
-    return g_timer_uptime;
-}
-
-/*
- * hal_timer_sleep
- * ---------------
- * Sleep untuk durasi tertentu.
- */
-void hal_timer_sleep(tak_bertanda32_t milidetik)
-{
-    tak_bertanda64_t start;
-    tak_bertanda64_t target;
-    tak_bertanda32_t ticks_per_ms;
-
-    if (milidetik == 0) {
-        return;
-    }
-
-    ticks_per_ms = FREKUENSI_TIMER / 1000;
-    if (ticks_per_ms == 0) {
-        ticks_per_ms = 1;
-    }
-
-    start = g_timer_ticks;
-    target = start + ((tak_bertanda64_t)milidetik * ticks_per_ms);
-
-    while (g_timer_ticks < target) {
-        cpu_halt();
-    }
-}
-
-/*
- * hal_timer_delay
- * ---------------
- * Busy-wait delay.
- */
-void hal_timer_delay(tak_bertanda32_t mikrodetik)
-{
-    tak_bertanda64_t start;
-    tak_bertanda64_t end;
-    tak_bertanda64_t delay_cycls;
-    tak_bertanda32_t freq_khz;
-
-    freq_khz = g_hal_state_x86.cpu.freq_khz;
-    if (freq_khz == 0) {
-        freq_khz = 1000;
-    }
-
-    start = g_timer_ticks;
-    delay_cycls = (tak_bertanda64_t)freq_khz * mikrodetik;
-
-    do {
-        end = g_timer_ticks;
-    } while ((end - start) < (delay_cycls / FREKUENSI_TIMER));
-}
-
-/*
- * hal_timer_set_handler
- * ---------------------
- * Set handler timer.
- */
-status_t hal_timer_set_handler(void (*handler)(void))
-{
-    g_timer_handler = handler;
-    return STATUS_BERHASIL;
-}
-
-/*
- * ============================================================================
- * FUNGSI PUBLIC - INTERUPSI
- * ============================================================================
- */
-
-/*
- * hal_interrupt_init
- * ------------------
- * Inisialisasi subsistem interupsi.
- */
-status_t hal_interrupt_init(void)
-{
-    g_hal_state_x86.interrupt.irq_count = JUMLAH_IRQ;
-    g_hal_state_x86.interrupt.vector_base = VEKTOR_IRQ_MULAI;
-    g_hal_state_x86.interrupt.has_apic = SALAH;
-    g_hal_state_x86.interrupt.has_ioapic = SALAH;
-
-    return STATUS_BERHASIL;
-}
-
-/*
- * hal_interrupt_enable
- * --------------------
- * Aktifkan IRQ.
- */
-status_t hal_interrupt_enable(tak_bertanda32_t irq)
-{
-    tak_bertanda8_t mask;
-    tak_bertanda16_t port;
-
-    if (irq > 15) {
-        return STATUS_PARAM_INVALID;
-    }
-
-    if (irq < 8) {
-        port = PIC1_DATA;
-    } else {
-        port = PIC2_DATA;
-        irq -= 8;
-    }
-
-    /* Clear bit untuk enable IRQ */
-    mask = inb(port);
-    mask &= ~(1 << irq);
-    outb(port, mask);
-
-    return STATUS_BERHASIL;
-}
-
-/*
- * hal_interrupt_disable
- * ---------------------
- * Nonaktifkan IRQ.
- */
-status_t hal_interrupt_disable(tak_bertanda32_t irq)
-{
-    tak_bertanda8_t mask;
-    tak_bertanda16_t port;
-
-    if (irq > 15) {
-        return STATUS_PARAM_INVALID;
-    }
-
-    if (irq < 8) {
-        port = PIC1_DATA;
-    } else {
-        port = PIC2_DATA;
-        irq -= 8;
-    }
-
-    /* Set bit untuk disable IRQ */
-    mask = inb(port);
-    mask |= (1 << irq);
-    outb(port, mask);
-
-    return STATUS_BERHASIL;
-}
-
-/*
- * hal_interrupt_mask
- * ------------------
- * Mask IRQ.
- */
-status_t hal_interrupt_mask(tak_bertanda32_t irq)
-{
-    return hal_interrupt_disable(irq);
-}
-
-/*
- * hal_interrupt_unmask
- * --------------------
- * Unmask IRQ.
- */
-status_t hal_interrupt_unmask(tak_bertanda32_t irq)
-{
-    return hal_interrupt_enable(irq);
-}
-
-/*
- * hal_interrupt_acknowledge
- * -------------------------
- * Acknowledge IRQ.
- */
-void hal_interrupt_acknowledge(tak_bertanda32_t irq)
+void hal_arch_pic_eoi(tak_bertanda32_t irq)
 {
     if (irq >= 8) {
         /* Ack slave PIC */
@@ -677,442 +354,276 @@ void hal_interrupt_acknowledge(tak_bertanda32_t irq)
 }
 
 /*
- * hal_interrupt_set_handler
- * -------------------------
- * Set handler IRQ.
- */
-status_t hal_interrupt_set_handler(tak_bertanda32_t irq,
-                                    void (*handler)(void))
-{
-    if (irq > 15) {
-        return STATUS_PARAM_INVALID;
-    }
-
-    /* Handler registration akan dilakukan via IDT */
-    return STATUS_BERHASIL;
-}
-
-/*
- * hal_interrupt_get_handler
- * -------------------------
- * Dapatkan handler IRQ.
- */
-void (*hal_interrupt_get_handler(tak_bertanda32_t irq))(void)
-{
-    if (irq > 15) {
-        return NULL;
-    }
-
-    return NULL;
-}
-
-/*
  * ============================================================================
- * FUNGSI PUBLIC - MEMORI
+ * FUNGSI PUBLIC - DETEKSI HARDWARE
  * ============================================================================
  */
 
 /*
- * hal_memory_init
- * ---------------
- * Inisialisasi subsistem memori.
+ * hal_arch_detect_cpu_features
+ * ----------------------------
+ * Deteksi fitur CPU x86.
+ *
+ * Parameter:
+ *   info - Pointer ke struktur hal_cpu_info_t
+ *
+ * Return: Status operasi
  */
-status_t hal_memory_init(void *bootinfo)
+status_t hal_arch_detect_cpu_features(hal_cpu_info_t *info)
 {
-    multiboot_info_t *mbi;
-    tak_bertanda64_t total_mem;
+    tak_bertanda32_t eax, ebx, ecx, edx;
+    tak_bertanda32_t i;
 
-    g_boot_info_ptr = bootinfo;
-
-    if (bootinfo != NULL) {
-        mbi = (multiboot_info_t *)bootinfo;
-
-        /* Baca info memori dari multiboot */
-        if (mbi->flags & MULTIBOOT_FLAG_MEM) {
-            total_mem = (tak_bertanda64_t)mbi->mem_lower * 1024;
-            total_mem += (tak_bertanda64_t)mbi->mem_upper * 1024;
-
-            g_hal_state_x86.memory.total_bytes = total_mem;
-            g_hal_state_x86.memory.available_bytes = total_mem;
-        }
-    }
-
-    g_hal_state_x86.memory.page_size = UKURAN_HALAMAN;
-    g_hal_state_x86.memory.page_count = 
-        g_hal_state_x86.memory.total_bytes / UKURAN_HALAMAN;
-    g_hal_state_x86.memory.has_pae = SALAH;
-    g_hal_state_x86.memory.has_nx = SALAH;
-
-    return STATUS_BERHASIL;
-}
-
-/*
- * hal_memory_get_info
- * -------------------
- * Mendapatkan informasi memori.
- */
-status_t hal_memory_get_info(hal_memory_info_t *info)
-{
     if (info == NULL) {
-        return STATUS_PARAM_INVALID;
+        return STATUS_PARAM_NULL;
     }
 
-    kernel_memcpy(info, &g_hal_state_x86.memory, 
-                  sizeof(hal_memory_info_t));
+    /* Cek apakah CPUID tersedia */
+    /* Untuk x86, kita asumsikan CPUID selalu tersedia pada CPU modern */
 
-    return STATUS_BERHASIL;
-}
+    /* Dapatkan vendor string (leaf 0) */
+    cpu_cpuid(0, 0, &eax, &ebx, &ecx, &edx);
 
-/*
- * hal_memory_get_free_pages
- * -------------------------
- * Mendapatkan jumlah halaman bebas.
- */
-tak_bertanda64_t hal_memory_get_free_pages(void)
-{
-    /* Akan diimplementasikan oleh PMM */
-    return 0;
-}
+    /* Vendor string disimpan dalam EBX, EDX, ECX */
+    *((tak_bertanda32_t *)(info->vendor + 0)) = ebx;
+    *((tak_bertanda32_t *)(info->vendor + 4)) = edx;
+    *((tak_bertanda32_t *)(info->vendor + 8)) = ecx;
+    info->vendor[12] = '\0';
 
-/*
- * hal_memory_get_total_pages
- * --------------------------
- * Mendapatkan jumlah total halaman.
- */
-tak_bertanda64_t hal_memory_get_total_pages(void)
-{
-    return g_hal_state_x86.memory.page_count;
-}
+    /* Dapatkan brand string (leaf 0x80000002-0x80000004) */
+    if (eax >= 0x80000004) {
+        for (i = 0; i < 3; i++) {
+            cpu_cpuid(0x80000002 + i, 0, &eax, &ebx, &ecx, &edx);
 
-/*
- * hal_memory_alloc_page
- * ---------------------
- * Alokasikan satu halaman.
- */
-alamat_fisik_t hal_memory_alloc_page(void)
-{
-    /* Akan diimplementasikan oleh PMM */
-    return ALAMAT_FISIK_INVALID;
-}
-
-/*
- * hal_memory_free_page
- * --------------------
- * Bebaskan satu halaman.
- */
-status_t hal_memory_free_page(alamat_fisik_t addr)
-{
-    /* Akan diimplementasikan oleh PMM */
-    return STATUS_TIDAK_DUKUNG;
-}
-
-/*
- * hal_memory_alloc_pages
- * ----------------------
- * Alokasikan multiple halaman.
- */
-alamat_fisik_t hal_memory_alloc_pages(tak_bertanda32_t count)
-{
-    /* Akan diimplementasikan oleh PMM */
-    return ALAMAT_FISIK_INVALID;
-}
-
-/*
- * hal_memory_free_pages
- * ---------------------
- * Bebaskan multiple halaman.
- */
-status_t hal_memory_free_pages(alamat_fisik_t addr,
-                                tak_bertanda32_t count)
-{
-    /* Akan diimplementasikan oleh PMM */
-    return STATUS_TIDAK_DUKUNG;
-}
-
-/*
- * ============================================================================
- * FUNGSI PUBLIC - CONSOLE
- * ============================================================================
- */
-
-/* Posisi cursor */
-static tak_bertanda32_t g_cursor_x = 0;
-static tak_bertanda32_t g_cursor_y = 0;
-static tak_bertanda8_t g_warna_fg = VGA_ABU_ABU;
-static tak_bertanda8_t g_warna_bg = VGA_HITAM;
-
-/*
- * hal_console_init
- * ----------------
- * Inisialisasi console.
- */
-status_t hal_console_init(void)
-{
-    volatile tak_bertanda16_t *vga;
-    tak_bertanda32_t i;
-
-    vga = (volatile tak_bertanda16_t *)VGA_BUFFER;
-
-    /* Clear screen */
-    for (i = 0; i < VGA_KOLOM * VGA_BARIS; i++) {
-        vga[i] = (tak_bertanda16_t)(' ' | 
-            (VGA_ATTR(VGA_ABU_ABU, VGA_HITAM) << 8));
-    }
-
-    g_cursor_x = 0;
-    g_cursor_y = 0;
-    g_warna_fg = VGA_ABU_ABU;
-    g_warna_bg = VGA_HITAM;
-
-    return STATUS_BERHASIL;
-}
-
-/*
- * hal_console_putchar
- * -------------------
- * Tampilkan satu karakter.
- */
-status_t hal_console_putchar(char c)
-{
-    volatile tak_bertanda16_t *vga;
-    tak_bertanda32_t offset;
-
-    vga = (volatile tak_bertanda16_t *)VGA_BUFFER;
-
-    if (c == '\n') {
-        g_cursor_x = 0;
-        g_cursor_y++;
-    } else if (c == '\r') {
-        g_cursor_x = 0;
-    } else if (c == '\t') {
-        g_cursor_x = (g_cursor_x + 4) & ~3;
-        if (g_cursor_x >= VGA_KOLOM) {
-            g_cursor_x = 0;
-            g_cursor_y++;
+            *((tak_bertanda32_t *)(info->brand + (i * 16) + 0)) = eax;
+            *((tak_bertanda32_t *)(info->brand + (i * 16) + 4)) = ebx;
+            *((tak_bertanda32_t *)(info->brand + (i * 16) + 8)) = ecx;
+            *((tak_bertanda32_t *)(info->brand + (i * 16) + 12)) = edx;
         }
-    } else if (c == '\b') {
-        if (g_cursor_x > 0) {
-            g_cursor_x--;
-            offset = g_cursor_y * VGA_KOLOM + g_cursor_x;
-            vga[offset] = (tak_bertanda16_t)(' ' | 
-                (VGA_ATTR(g_warna_fg, g_warna_bg) << 8));
-        }
+        info->brand[48] = '\0';
     } else {
-        offset = g_cursor_y * VGA_KOLOM + g_cursor_x;
-        vga[offset] = (tak_bertanda16_t)((tak_bertanda8_t)c | 
-            (VGA_ATTR(g_warna_fg, g_warna_bg) << 8));
-
-        g_cursor_x++;
-
-        if (g_cursor_x >= VGA_KOLOM) {
-            g_cursor_x = 0;
-            g_cursor_y++;
-        }
+        info->brand[0] = '\0';
     }
 
-    /* Scroll jika perlu */
-    if (g_cursor_y >= VGA_BARIS) {
-        tak_bertanda32_t i;
+    /* Dapatkan feature flags (leaf 1) */
+    if (eax >= 1) {
+        cpu_cpuid(1, 0, &eax, &ebx, &ecx, &edx);
 
-        /* Copy baris ke atas */
-        for (i = 0; i < (VGA_BARIS - 1) * VGA_KOLOM; i++) {
-            vga[i] = vga[i + VGA_KOLOM];
+        info->features = edx;
+        info->features_ext = ecx;
+
+        /* Family, model, stepping */
+        info->stepping = eax & 0xF;
+        info->model = (eax >> 4) & 0xF;
+        info->family = (eax >> 8) & 0xF;
+
+        /* Extended family dan model */
+        if (info->family == 0xF) {
+            info->family += (eax >> 20) & 0xFF;
+            info->model += ((eax >> 16) & 0xF) << 4;
         }
 
-        /* Clear baris terakhir */
-        for (i = (VGA_BARIS - 1) * VGA_KOLOM; 
-             i < VGA_BARIS * VGA_KOLOM; i++) {
-            vga[i] = (tak_bertanda16_t)(' ' | 
-                (VGA_ATTR(g_warna_fg, g_warna_bg) << 8));
-        }
-
-        g_cursor_y = VGA_BARIS - 1;
+        /* Cache line size */
+        info->cache_line = (ebx >> 8) & 0xFF;
     }
-
-    /* Update cursor hardware */
-    offset = g_cursor_y * VGA_KOLOM + g_cursor_x;
-    outb(PORT_VGA_CRTC_INDEX, 0x0F);
-    outb(PORT_VGA_CRTC_DATA, (tak_bertanda8_t)(offset & 0xFF));
-    outb(PORT_VGA_CRTC_INDEX, 0x0E);
-    outb(PORT_VGA_CRTC_DATA, (tak_bertanda8_t)((offset >> 8) & 0xFF));
 
     return STATUS_BERHASIL;
 }
 
 /*
- * hal_console_puts
+ * ============================================================================
+ * FUNGSI PUBLIC - UTILITAS ARSITEKTUR
+ * ============================================================================
+ */
+
+/*
+ * hal_arch_get_cr2
  * ----------------
- * Tampilkan string.
+ * Dapatkan nilai CR2 (alamat page fault).
+ *
+ * Return: Nilai CR2
  */
-status_t hal_console_puts(const char *str)
+tak_bertanda32_t hal_arch_get_cr2(void)
 {
-    if (str == NULL) {
-        return STATUS_PARAM_INVALID;
-    }
-
-    while (*str) {
-        hal_console_putchar(*str);
-        str++;
-    }
-
-    return STATUS_BERHASIL;
+    return cpu_read_cr2();
 }
 
 /*
- * hal_console_clear
+ * hal_arch_get_cr3
+ * ----------------
+ * Dapatkan nilai CR3 (page directory base).
+ *
+ * Return: Nilai CR3
+ */
+tak_bertanda32_t hal_arch_get_cr3(void)
+{
+    return cpu_read_cr3();
+}
+
+/*
+ * hal_arch_set_cr3
+ * ----------------
+ * Set nilai CR3 (switch page directory).
+ *
+ * Parameter:
+ *   value - Alamat fisik page directory
+ */
+void hal_arch_set_cr3(tak_bertanda32_t value)
+{
+    cpu_write_cr3(value);
+}
+
+/*
+ * hal_arch_invlpg
+ * ---------------
+ * Invalidate TLB entry untuk satu halaman.
+ *
+ * Parameter:
+ *   addr - Alamat virtual
+ */
+void hal_arch_invlpg(void *addr)
+{
+    cpu_invlpg(addr);
+}
+
+/*
+ * hal_arch_read_tsc
  * -----------------
- * Bersihkan layar.
+ * Baca Time Stamp Counter.
+ *
+ * Return: Nilai TSC
  */
-status_t hal_console_clear(void)
+tak_bertanda64_t hal_arch_read_tsc(void)
 {
-    return hal_console_init();
+    return cpu_read_tsc();
 }
 
 /*
- * hal_console_set_color
- * ---------------------
- * Set warna teks.
+ * hal_arch_cpuid
+ * --------------
+ * Jalankan instruksi CPUID.
+ *
+ * Parameter:
+ *   leaf    - EAX input
+ *   subleaf - ECX input
+ *   eax     - Pointer untuk hasil EAX
+ *   ebx     - Pointer untuk hasil EBX
+ *   ecx     - Pointer untuk hasil ECX
+ *   edx     - Pointer untuk hasil EDX
  */
-status_t hal_console_set_color(tak_bertanda8_t fg, tak_bertanda8_t bg)
+void hal_arch_cpuid(tak_bertanda32_t leaf, tak_bertanda32_t subleaf,
+                    tak_bertanda32_t *eax, tak_bertanda32_t *ebx,
+                    tak_bertanda32_t *ecx, tak_bertanda32_t *edx)
 {
-    if (fg > 15 || bg > 7) {
-        return STATUS_PARAM_INVALID;
-    }
-
-    g_warna_fg = fg;
-    g_warna_bg = bg;
-
-    return STATUS_BERHASIL;
+    cpu_cpuid(leaf, subleaf, eax, ebx, ecx, edx);
 }
 
 /*
- * hal_console_set_cursor
- * ----------------------
- * Set posisi cursor.
+ * ============================================================================
+ * FUNGSI PUBLIC - RESET DAN SHUTDOWN
+ * ============================================================================
  */
-status_t hal_console_set_cursor(tak_bertanda32_t x, tak_bertanda32_t y)
-{
-    if (x >= VGA_KOLOM || y >= VGA_BARIS) {
-        return STATUS_PARAM_INVALID;
-    }
-
-    g_cursor_x = x;
-    g_cursor_y = y;
-
-    return STATUS_BERHASIL;
-}
 
 /*
- * hal_console_get_cursor
- * ----------------------
- * Dapatkan posisi cursor.
+ * hal_arch_reset
+ * --------------
+ * Reset sistem x86.
+ *
+ * Parameter:
+ *   hard - Jika BENAR, lakukan hard reset
  */
-status_t hal_console_get_cursor(tak_bertanda32_t *x, tak_bertanda32_t *y)
+void hal_arch_reset(bool_t hard)
 {
-    if (x != NULL) {
-        *x = g_cursor_x;
-    }
-    if (y != NULL) {
-        *y = g_cursor_y;
-    }
+    tak_bertanda8_t temp;
 
-    return STATUS_BERHASIL;
-}
+    /* Disable interrupt */
+    cpu_disable_irq();
 
-/*
- * hal_console_scroll
- * ------------------
- * Scroll layar.
- */
-status_t hal_console_scroll(tak_bertanda32_t lines)
-{
-    volatile tak_bertanda16_t *vga;
-    tak_bertanda32_t i;
-    tak_bertanda32_t j;
+    if (hard) {
+        /* Triple fault untuk hard reset */
+        struct {
+            tak_bertanda16_t limit;
+            tak_bertanda32_t base;
+        } __attribute__((packed)) null_idt = {0, 0};
 
-    vga = (volatile tak_bertanda16_t *)VGA_BUFFER;
-
-    if (lines == 0) {
-        return STATUS_BERHASIL;
-    }
-
-    if (lines > 0) {
-        /* Scroll ke atas */
-        for (i = 0; i < (VGA_BARIS - lines) * VGA_KOLOM; i++) {
-            vga[i] = vga[i + lines * VGA_KOLOM];
-        }
-
-        /* Clear baris bawah */
-        for (j = 0; j < lines; j++) {
-            for (i = 0; i < VGA_KOLOM; i++) {
-                vga[(VGA_BARIS - 1 - j) * VGA_KOLOM + i] = 
-                    (tak_bertanda16_t)(' ' | 
-                        (VGA_ATTR(g_warna_fg, g_warna_bg) << 8));
+        __asm__ __volatile__(
+            "lidt %0\n\t"
+            "int $3"
+            :
+            : "m"(null_idt)
+        );
+    } else {
+        /* Keyboard controller reset */
+        /* Clear keyboard buffer */
+        do {
+            temp = inb(0x64);
+            if (temp & 0x01) {
+                (void)inb(0x60);
             }
-        }
+        } while (temp & 0x02);
 
-        if (g_cursor_y >= lines) {
-            g_cursor_y -= lines;
-        } else {
-            g_cursor_y = 0;
-        }
+        /* Pulse reset line */
+        outb(0x64, 0xFE);
     }
 
-    return STATUS_BERHASIL;
+    /* Tidak akan sampai sini */
+    for (;;) {
+        cpu_halt();
+    }
 }
 
 /*
- * hal_console_get_size
- * --------------------
- * Dapatkan ukuran layar.
+ * hal_arch_halt
+ * -------------
+ * Hentikan CPU.
  */
-status_t hal_console_get_size(tak_bertanda32_t *lebar,
-                               tak_bertanda32_t *tinggi)
+void hal_arch_halt(void)
 {
-    if (lebar != NULL) {
-        *lebar = VGA_KOLOM;
-    }
-    if (tinggi != NULL) {
-        *tinggi = VGA_BARIS;
-    }
-
-    return STATUS_BERHASIL;
+    cpu_halt();
 }
 
 /*
- * hal_console_print_error
+ * ============================================================================
+ * FUNGSI PUBLIC - MEMORY BARRIER
+ * ============================================================================
+ */
+
+/*
+ * hal_arch_memory_barrier
  * -----------------------
- * Print pesan error (merah).
+ * Memory barrier.
  */
-void hal_console_print_error(const char *str)
+void hal_arch_memory_barrier(void)
 {
-    tak_bertanda8_t old_fg = g_warna_fg;
-    tak_bertanda8_t old_bg = g_warna_bg;
-
-    g_warna_fg = VGA_MERAH_TERANG;
-    g_warna_bg = VGA_HITAM;
-
-    hal_console_puts(str);
-
-    g_warna_fg = old_fg;
-    g_warna_bg = old_bg;
+    cpu_memory_barrier();
 }
 
 /*
- * hal_console_print_warning
- * -------------------------
- * Print pesan warning (kuning).
+ * hal_arch_sfence
+ * ---------------
+ * Store fence.
  */
-void hal_console_print_warning(const char *str)
+void hal_arch_sfence(void)
 {
-    tak_bertanda8_t old_fg = g_warna_fg;
-    tak_bertanda8_t old_bg = g_warna_bg;
+    cpu_sfence();
+}
 
-    g_warna_fg = VGA_KUNING;
-    g_warna_bg = VGA_HITAM;
+/*
+ * hal_arch_lfence
+ * ---------------
+ * Load fence.
+ */
+void hal_arch_lfence(void)
+{
+    cpu_lfence();
+}
 
-    hal_console_puts(str);
-
-    g_warna_fg = old_fg;
-    g_warna_bg = old_bg;
+/*
+ * hal_arch_mfence
+ * ---------------
+ * Memory fence.
+ */
+void hal_arch_mfence(void)
+{
+    cpu_mfence();
 }

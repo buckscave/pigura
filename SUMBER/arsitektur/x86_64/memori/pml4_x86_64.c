@@ -10,7 +10,8 @@
  * Versi: 1.0
  */
 
-#include "../../inti/kernel.h"
+#include "../../../inti/kernel.h"
+#include "../cpu_x86_64.h"
 
 /*
  * ============================================================================
@@ -230,6 +231,7 @@ static tak_bertanda64_t _get_offset(tak_bertanda64_t addr)
  * Return:
  *   Alamat fisik
  */
+__attribute__((unused))
 static tak_bertanda64_t _entry_to_addr(tak_bertanda64_t entry)
 {
     return entry & 0x000FFFFFFFFFF000ULL;
@@ -279,7 +281,6 @@ tak_bertanda64_t pml4_x86_64_buat(void)
 {
     struct pml4e *pml4;
     alamat_fisik_t pml4_fisik;
-    tak_bertanda32_t i;
 
     /* Alokasikan halaman untuk PML4 */
     pml4_fisik = hal_memory_alloc_page();
@@ -373,7 +374,7 @@ status_t pml4_x86_64_map(tak_bertanda64_t pml4_addr,
         pml4[pml4_idx].alamat = halaman >> 12;
     }
 
-    pdpt = (struct pdpte *)(pml4[pml4_idx].alamat << 12);
+    pdpt = (struct pdpte *)(uintptr_t)(pml4[pml4_idx].alamat << 12);
 
     /* Level 2: PDPT */
     if (!pdpt[pdpt_idx].ada) {
@@ -392,7 +393,7 @@ status_t pml4_x86_64_map(tak_bertanda64_t pml4_addr,
         pdpt[pdpt_idx].alamat = halaman >> 12;
     }
 
-    pd = (struct pde *)(pdpt[pdpt_idx].alamat << 12);
+    pd = (struct pde *)(uintptr_t)(pdpt[pdpt_idx].alamat << 12);
 
     /* Level 3: PD */
     if (!pd[pd_idx].ada) {
@@ -411,7 +412,7 @@ status_t pml4_x86_64_map(tak_bertanda64_t pml4_addr,
         pd[pd_idx].alamat = halaman >> 12;
     }
 
-    pt = (struct pte *)(pd[pd_idx].alamat << 12);
+    pt = (struct pte *)(uintptr_t)(pd[pd_idx].alamat << 12);
 
     /* Level 4: PT - set mapping */
     pt[pt_idx].ada = 1;
@@ -466,17 +467,17 @@ status_t pml4_x86_64_unmap(tak_bertanda64_t pml4_addr,
         return STATUS_TIDAK_DITEMUKAN;
     }
 
-    pdpt = (struct pdpte *)(pml4[pml4_idx].alamat << 12);
+    pdpt = (struct pdpte *)(uintptr_t)(pml4[pml4_idx].alamat << 12);
     if (!pdpt[pdpt_idx].ada) {
         return STATUS_TIDAK_DITEMUKAN;
     }
 
-    pd = (struct pde *)(pdpt[pdpt_idx].alamat << 12);
+    pd = (struct pde *)(uintptr_t)(pdpt[pdpt_idx].alamat << 12);
     if (!pd[pd_idx].ada) {
         return STATUS_TIDAK_DITEMUKAN;
     }
 
-    pt = (struct pte *)(pd[pd_idx].alamat << 12);
+    pt = (struct pte *)(uintptr_t)(pd[pd_idx].alamat << 12);
 
     /* Clear entry */
     kernel_memset(&pt[pt_idx], 0, sizeof(struct pte));
@@ -527,17 +528,17 @@ tak_bertanda64_t pml4_x86_64_get_fisik(tak_bertanda64_t pml4_addr,
         return 0;
     }
 
-    pdpt = (struct pdpte *)(pml4[pml4_idx].alamat << 12);
+    pdpt = (struct pdpte *)(uintptr_t)(pml4[pml4_idx].alamat << 12);
     if (!pdpt[pdpt_idx].ada) {
         return 0;
     }
 
-    pd = (struct pde *)(pdpt[pdpt_idx].alamat << 12);
+    pd = (struct pde *)(uintptr_t)(pdpt[pdpt_idx].alamat << 12);
     if (!pd[pd_idx].ada) {
         return 0;
     }
 
-    pt = (struct pte *)(pd[pd_idx].alamat << 12);
+    pt = (struct pte *)(uintptr_t)(pd[pd_idx].alamat << 12);
     if (!pt[pt_idx].ada) {
         return 0;
     }

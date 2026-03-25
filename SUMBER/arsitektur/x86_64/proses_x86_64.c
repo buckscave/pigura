@@ -12,6 +12,7 @@
  */
 
 #include "../../inti/kernel.h"
+#include "cpu_x86_64.h"
 
 /*
  * ============================================================================
@@ -22,11 +23,15 @@
 /* Jumlah maksimum proses */
 #define MAKS_PROSES_SISTEM      64
 
-/* Ukuran stack kernel */
+/* Ukuran stack kernel (gunakan dari konstanta.h jika sudah didefinisi) */
+#ifndef UKURAN_STACK_KERNEL
 #define UKURAN_STACK_KERNEL     (16 * 1024)
+#endif
 
-/* Ukuran stack user */
+/* Ukuran stack user (gunakan dari konstanta.h jika sudah didefinisi) */
+#ifndef UKURAN_STACK_USER
 #define UKURAN_STACK_USER       (1 * 1024 * 1024)
+#endif
 
 /* Alamat kernel */
 #define KERNEL_VIRTUAL_BASE     0xFFFFFFFF80000000ULL
@@ -104,8 +109,8 @@ static struct tss g_tss_kernel __attribute__((aligned(16)));
 /* Tabel proses */
 static struct proses_internal g_tabel_proses[MAKS_PROSES_SISTEM];
 
-/* Proses saat ini */
-static struct proses_internal *g_proses_sekarang = NULL;
+/* Proses saat ini (internal untuk arsitektur x86_64) */
+static struct proses_internal *g_proses_sekarang_x86_64 = NULL;
 
 /* Proses kernel */
 static struct proses_internal g_proses_kernel;
@@ -359,7 +364,9 @@ static tak_bertanda64_t _buat_pml4(void)
     kernel_memset(pml4, 0, UKURAN_HALAMAN);
 
     /* Copy kernel mapping (entry 511) */
-    tak_bertanda64_t *kernel_pml4 = (tak_bertanda64_t *)cpu_read_cr3();
+    tak_bertanda64_t kernel_cr3_fisik = cpu_read_cr3();
+    tak_bertanda64_t *kernel_pml4 = (tak_bertanda64_t *)
+        (kernel_cr3_fisik + KERNEL_VIRTUAL_BASE);
     pml4[511] = kernel_pml4[511];
 
     return pml4_fisik;
@@ -472,7 +479,7 @@ status_t proses_x86_64_init(void)
     g_proses_kernel.sedang_jalan = BENAR;
     g_proses_kernel.waktu_mulai = 0;
 
-    g_proses_sekarang = &g_proses_kernel;
+    g_proses_sekarang_x86_64 = &g_proses_kernel;
     g_jumlah_proses = 1;
 
     g_proses_diinisialisasi = BENAR;
@@ -716,8 +723,8 @@ status_t proses_x86_64_exit(pid_t pid, tanda32_t exit_code)
     proses->status = PROSES_STATUS_ZOMBIE;
 
     /* Jika ini proses saat ini, switch ke proses lain */
-    if (g_proses_sekarang == proses) {
-        g_proses_sekarang = &g_proses_kernel;
+    if (g_proses_sekarang_x86_64 == proses) {
+        g_proses_sekarang_x86_64 = &g_proses_kernel;
     }
 
     g_jumlah_proses--;
@@ -752,7 +759,7 @@ status_t proses_x86_64_switch(pid_t pid_target)
         return STATUS_GAGAL;
     }
 
-    proses_lama = g_proses_sekarang;
+    proses_lama = g_proses_sekarang_x86_64;
 
     /* Cari proses target */
     if (pid_target == 0) {
@@ -812,7 +819,7 @@ status_t proses_x86_64_switch(pid_t pid_target)
     _tss_set_kernel_stack(proses_baru->kernel_stack);
 
     /* Update current process */
-    g_proses_sekarang = proses_baru;
+    g_proses_sekarang_x86_64 = proses_baru;
 
     /* Context switch */
     _context_switch_64(&proses_lama->context, &proses_baru->context);
@@ -846,7 +853,7 @@ void proses_x86_64_yield(void)
  */
 struct proses_internal *proses_x86_64_get_sekarang(void)
 {
-    return g_proses_sekarang;
+    return g_proses_sekarang_x86_64;
 }
 
 /*
@@ -859,11 +866,11 @@ struct proses_internal *proses_x86_64_get_sekarang(void)
  */
 pid_t proses_x86_64_get_pid_sekarang(void)
 {
-    if (g_proses_sekarang == NULL) {
+    if (g_proses_sekarang_x86_64 == NULL) {
         return PID_KERNEL;
     }
 
-    return g_proses_sekarang->pid;
+    return g_proses_sekarang_x86_64->pid;
 }
 
 /*
@@ -978,7 +985,7 @@ void proses_x86_64_print_daftar(void)
 void proses_x86_64_jump_usermode(tak_bertanda64_t entry,
                                   tak_bertanda64_t stack)
 {
-    _tss_set_kernel_stack(g_proses_sekarang->kernel_stack);
+    _tss_set_kernel_stack(g_proses_sekarang_x86_64->kernel_stack);
     _jump_to_usermode_64(entry, stack);
 }
 

@@ -159,7 +159,7 @@ status_t hal_init(void)
     _init_pit(FREKUENSI_TIMER);
 
     /* Set flag inisialisasi */
-    g_hal_state_x86_64.initialized = BENAR;
+    g_hal_state_x86_64.status = HAL_STATUS_READY;
     g_hal_diinisialisasi = BENAR;
 
     kernel_printf("[HAL-x86_64] HAL siap\n");
@@ -183,7 +183,7 @@ status_t hal_shutdown(void)
     /* Disable interrupt */
     hal_cpu_disable_interrupts();
 
-    g_hal_state_x86_64.initialized = SALAH;
+    g_hal_state_x86_64.status = HAL_STATUS_UNINITIALIZED;
     g_hal_diinisialisasi = SALAH;
 
     return STATUS_BERHASIL;
@@ -236,7 +236,9 @@ status_t hal_cpu_init(void)
  */
 void hal_cpu_halt(void)
 {
-    cpu_halt();
+    while (1) {
+        cpu_halt();
+    }
 }
 
 /*
@@ -326,20 +328,20 @@ void hal_cpu_disable_interrupts(void)
  * -----------------------
  * Simpan state interupsi.
  */
-tak_bertanda64_t hal_cpu_save_interrupts(void)
+tak_bertanda32_t hal_cpu_save_interrupts(void)
 {
-    tak_bertanda64_t flags;
+    tak_bertanda64_t flags64;
 
     __asm__ __volatile__(
         "pushfq\n\t"
         "popq %0\n\t"
         "cli"
-        : "=rm"(flags)
+        : "=rm"(flags64)
         :
         : "memory"
     );
 
-    return flags;
+    return (tak_bertanda32_t)flags64;
 }
 
 /*
@@ -347,13 +349,13 @@ tak_bertanda64_t hal_cpu_save_interrupts(void)
  * --------------------------
  * Restore state interupsi.
  */
-void hal_cpu_restore_interrupts(tak_bertanda64_t state)
+void hal_cpu_restore_interrupts(tak_bertanda32_t state)
 {
     __asm__ __volatile__(
         "pushq %0\n\t"
         "popfq"
         :
-        : "g"(state)
+        : "g"((tak_bertanda64_t)state)
         : "memory", "cc"
     );
 }
@@ -566,15 +568,15 @@ void hal_timer_delay(tak_bertanda32_t mikrodetik)
     tak_bertanda64_t start;
     tak_bertanda64_t end;
     tak_bertanda64_t delay_cycls;
-    tak_bertanda32_t freq_mhz;
+    tak_bertanda32_t freq_khz;
 
-    freq_mhz = g_hal_state_x86_64.cpu.freq_mhz;
-    if (freq_mhz == 0) {
-        freq_mhz = 2000;
+    freq_khz = g_hal_state_x86_64.cpu.freq_khz;
+    if (freq_khz == 0) {
+        freq_khz = 2000000;  /* Default 2 GHz */
     }
 
     start = g_timer_ticks;
-    delay_cycls = (tak_bertanda64_t)freq_mhz * mikrodetik;
+    delay_cycls = (tak_bertanda64_t)(freq_khz / 1000) * mikrodetik;
 
     do {
         end = g_timer_ticks;
@@ -715,6 +717,8 @@ void hal_interrupt_acknowledge(tak_bertanda32_t irq)
 status_t hal_interrupt_set_handler(tak_bertanda32_t irq,
                                     void (*handler)(void))
 {
+    (void)handler; /* TODO: implement via IDT */
+
     if (irq > 15) {
         return STATUS_PARAM_INVALID;
     }
@@ -835,6 +839,8 @@ alamat_fisik_t hal_memory_alloc_page(void)
  */
 status_t hal_memory_free_page(alamat_fisik_t addr)
 {
+    (void)addr; /* TODO: implement via PMM */
+
     /* Akan diimplementasikan oleh PMM */
     return STATUS_TIDAK_DUKUNG;
 }
@@ -846,6 +852,8 @@ status_t hal_memory_free_page(alamat_fisik_t addr)
  */
 alamat_fisik_t hal_memory_alloc_pages(tak_bertanda32_t count)
 {
+    (void)count; /* TODO: implement via PMM */
+
     /* Akan diimplementasikan oleh PMM */
     return ALAMAT_FISIK_INVALID;
 }
@@ -858,6 +866,9 @@ alamat_fisik_t hal_memory_alloc_pages(tak_bertanda32_t count)
 status_t hal_memory_free_pages(alamat_fisik_t addr,
                                 tak_bertanda32_t count)
 {
+    (void)addr;  /* TODO: implement via PMM */
+    (void)count; /* TODO: implement via PMM */
+
     /* Akan diimplementasikan oleh PMM */
     return STATUS_TIDAK_DUKUNG;
 }

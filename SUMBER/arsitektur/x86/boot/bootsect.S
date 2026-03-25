@@ -23,6 +23,7 @@
 .set JUMLAH_SEKTOR,      16          # Jumlah sektor stage2 (8 KB)
 .set ALAMAT_STAGE2,      0x7E00      # Alamat memori stage2
 .set ALAMAT_STACK,       0x7C00      # Stack di bawah boot sector
+.set ALAMAT_STAGE2_PARA, 0x07E0      # ALAMAT_STAGE2 >> 4 (paragraph)
 
 .set BIOS_VIDEO,         0x10        # Interrupt video BIOS
 .set BIOS_DISK,          0x13        # Interrupt disk BIOS
@@ -86,7 +87,10 @@ _start:
 
     # Setup parameter untuk membaca disk
     movw $0x0200 | JUMLAH_SEKTOR, %ax   # AH=02 (baca), AL=jumlah sektor
-    movw $ALAMAT_STAGE2 >> 4, %es       # ES:BX = buffer tujuan
+    pushw %ax                           # Simpan nilai AX
+    movw $ALAMAT_STAGE2_PARA, %ax       # ES:BX = buffer tujuan (paragraph)
+    movw %ax, %es
+    popw %ax                            # Kembalikan nilai AX
     xorw %bx, %bx                       # BX = 0
     movw $SEKTOR_STAGE2, %cx            # CH=cylinder, CL=sektor
     movb _drive_boot, %dl               # Drive boot

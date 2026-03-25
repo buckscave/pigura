@@ -52,7 +52,7 @@ _start:
     jc disk_error
 
     # Jump ke stage 2
-    jmp LOADSEG:0
+    ljmp $LOADSEG, $0
 
 # -----------------------------------------------------------------------------
 # print_string

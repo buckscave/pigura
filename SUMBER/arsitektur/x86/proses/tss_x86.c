@@ -125,7 +125,7 @@ status_t tss_init(void)
     g_tss_kernel.iomap_base = sizeof(struct tss);
 
     /* Set SS0 ke kernel data selector */
-    g_tss_kernel.ss0 = GDT_SELECTOR_DATA;
+    g_tss_kernel.ss0 = SELECTOR_KERNEL_DATA;
 
     /* ESP0 akan diset saat switch ke user mode */
     g_tss_kernel.esp0 = 0;
@@ -134,14 +134,14 @@ status_t tss_init(void)
     g_tss_kernel.cr3 = 0;
 
     /* Set CS ke kernel code selector */
-    g_tss_kernel.cs = GDT_SELECTOR_KODE;
+    g_tss_kernel.cs = SELECTOR_KERNEL_CODE;
 
     /* Set segment register */
-    g_tss_kernel.ds = GDT_SELECTOR_DATA;
-    g_tss_kernel.es = GDT_SELECTOR_DATA;
-    g_tss_kernel.fs = GDT_SELECTOR_DATA;
-    g_tss_kernel.gs = GDT_SELECTOR_DATA;
-    g_tss_kernel.ss = GDT_SELECTOR_DATA;
+    g_tss_kernel.ds = SELECTOR_KERNEL_DATA;
+    g_tss_kernel.es = SELECTOR_KERNEL_DATA;
+    g_tss_kernel.fs = SELECTOR_KERNEL_DATA;
+    g_tss_kernel.gs = SELECTOR_KERNEL_DATA;
+    g_tss_kernel.ss = SELECTOR_KERNEL_DATA;
 
     /* Link ke NULL */
     g_tss_kernel.link = 0;

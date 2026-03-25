@@ -12,6 +12,9 @@
 
 #include "../../../inti/kernel.h"
 
+/* Forward declaration dari tss_x86.c */
+extern void tss_set_esp0(tak_bertanda32_t esp0);
+
 /*
  * ============================================================================
  * KONSTANTA
@@ -80,6 +83,7 @@ status_t user_mode_luncurkan(alamat_virtual_t entry_point,
                               alamat_virtual_t stack,
                               void *argumen)
 {
+    (void)argumen;  /* TODO: implementasi passing argumen */
     tak_bertanda32_t *stack_ptr;
     tak_bertanda32_t eflags;
 
@@ -109,7 +113,7 @@ status_t user_mode_luncurkan(alamat_virtual_t entry_point,
     cpu_disable_irq();
 
     /* Set TSS ESP0 */
-    tss_set_esp0((tak_bertanda32_t)&g_user_stack_kernel[
+    tss_set_esp0((tak_bertanda32_t)(uintptr_t)&g_user_stack_kernel[
                  sizeof(g_user_stack_kernel) - 4]);
 
     /* Baca EFLAGS */
@@ -188,7 +192,7 @@ status_t user_mode_luncurkan_dengan_args(alamat_virtual_t entry,
     for (i = 0; i < argc; i++) {
         if (argv[i] != NULL) {
             ukuran_t len = kernel_strlen(argv[i]);
-            stack_ptr = (tak_bertanda32_t *)((tak_bertanda32_t)stack_ptr - 
+            stack_ptr = (tak_bertanda32_t *)((uintptr_t)stack_ptr -
                         len - 1);
             kernel_strncpy((char *)stack_ptr, argv[i], len + 1);
             /* Update argv[i] ke alamat baru */
@@ -197,7 +201,7 @@ status_t user_mode_luncurkan_dengan_args(alamat_virtual_t entry,
     }
 
     /* Align lagi */
-    stack_ptr = (tak_bertanda32_t *)((tak_bertanda32_t)stack_ptr & ~0x03);
+    stack_ptr = (tak_bertanda32_t *)((uintptr_t)stack_ptr & ~0x03);
 
     /* Push NULL terminator untuk argv */
     stack_ptr--;
@@ -206,11 +210,11 @@ status_t user_mode_luncurkan_dengan_args(alamat_virtual_t entry,
     /* Push argv pointers */
     for (i = argc; i > 0; i--) {
         stack_ptr--;
-        *stack_ptr = (tak_bertanda32_t)argv[i - 1];
+        *stack_ptr = (tak_bertanda32_t)(uintptr_t)argv[i - 1];
     }
 
     /* Push argv pointer */
-    tak_bertanda32_t argv_ptr = (tak_bertanda32_t)stack_ptr;
+    tak_bertanda32_t argv_ptr = (tak_bertanda32_t)(uintptr_t)stack_ptr;
     stack_ptr--;
     *stack_ptr = argv_ptr;
 
@@ -226,7 +230,7 @@ status_t user_mode_luncurkan_dengan_args(alamat_virtual_t entry,
     cpu_disable_irq();
 
     /* Set TSS ESP0 */
-    tss_set_esp0((tak_bertanda32_t)&g_user_stack_kernel[
+    tss_set_esp0((tak_bertanda32_t)(uintptr_t)&g_user_stack_kernel[
                  sizeof(g_user_stack_kernel) - 4]);
 
     /* Get EFLAGS */
@@ -307,7 +311,7 @@ void *user_mode_get_kernel_stack(void)
 void user_mode_set_kernel_stack(void *stack)
 {
     if (stack != NULL) {
-        tss_set_esp0((tak_bertanda32_t)stack);
+        tss_set_esp0((tak_bertanda32_t)(uintptr_t)stack);
     }
 }
 
@@ -349,6 +353,7 @@ alamat_virtual_t user_mode_setup_stack(alamat_virtual_t stack_top,
                                         alamat_virtual_t entry,
                                         void *argumen)
 {
+    (void)entry;  /* Entry point tidak digunakan di setup stack */
     tak_bertanda32_t *sp;
 
     /* Align ke 16 byte */
@@ -362,7 +367,7 @@ alamat_virtual_t user_mode_setup_stack(alamat_virtual_t stack_top,
     /* Push argumen jika ada */
     if (argumen != NULL) {
         sp--;
-        *sp = (tak_bertanda32_t)argumen;
+        *sp = (tak_bertanda32_t)(uintptr_t)argumen;
     }
 
     return (alamat_virtual_t)sp;

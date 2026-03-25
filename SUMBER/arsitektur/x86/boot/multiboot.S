@@ -96,8 +96,7 @@ _info_multiboot_template:
     .long 0                               # framebuffer_height
     .byte 0                               # framebuffer_bpp
     .byte 0                               # framebuffer_type
-    .org 51
-    .byte 0                               # color_info[6]
+    .skip 6                               # color_info[6]
 
 # =============================================================================
 # KONSTANTA FLAG MULTIBOOT

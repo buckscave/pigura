@@ -201,7 +201,7 @@ static tak_bertanda64_t _hitung_memori_total(multiboot_info_t *mbi)
         struct mmap_entry_bios *entry;
 
         len = mbi->mmap_length;
-        ptr = (tak_bertanda8_t *)mbi->mmap_addr;
+        ptr = (tak_bertanda8_t *)(uintptr_t)mbi->mmap_addr;
         total = 0;
 
         for (i = 0; i < len; ) {

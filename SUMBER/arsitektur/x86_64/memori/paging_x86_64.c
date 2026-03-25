@@ -10,7 +10,26 @@
  * Versi: 1.0
  */
 
-#include "../../inti/kernel.h"
+#include "../../../inti/kernel.h"
+#include "../cpu_x86_64.h"
+
+/*
+ * ============================================================================
+ * DEKLARASI FUNGSI EKSTERNAL (dari pml4_x86_64.c)
+ * ============================================================================
+ */
+extern status_t pml4_x86_64_init(void);
+extern tak_bertanda64_t pml4_x86_64_buat(void);
+extern void pml4_x86_64_hancurkan(tak_bertanda64_t pml4_addr);
+extern status_t pml4_x86_64_map(tak_bertanda64_t pml4_addr,
+                                alamat_virtual_t vaddr,
+                                alamat_fisik_t paddr,
+                                tak_bertanda64_t flags);
+extern status_t pml4_x86_64_unmap(tak_bertanda64_t pml4_addr,
+                                  alamat_virtual_t vaddr);
+extern tak_bertanda64_t pml4_x86_64_get_fisik(tak_bertanda64_t pml4_addr,
+                                               alamat_virtual_t vaddr);
+extern status_t pml4_x86_64_switch(tak_bertanda64_t pml4_addr);
 
 /*
  * ============================================================================

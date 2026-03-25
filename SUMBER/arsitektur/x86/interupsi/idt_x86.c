@@ -295,28 +295,28 @@ int idt_init(void)
         if (i < 32) {
             /* Exception handlers - interrupt gate, DPL 0 */
             _atur_entry_idt((uint8_t)i,
-                           (uint32_t)_handler_exception_default,
+                           (uint32_t)(uintptr_t)_handler_exception_default,
                            IDT_SELECTOR_KODE,
                            IDT_FLAG_PRESENT | IDT_FLAG_DPL0 |
                            IDT_FLAG_GATETYPE_INT);
         } else if (i < 48) {
             /* IRQ handlers - interrupt gate, DPL 0 */
             _atur_entry_idt((uint8_t)i,
-                           (uint32_t)_handler_irq_default,
+                           (uint32_t)(uintptr_t)_handler_irq_default,
                            IDT_SELECTOR_KODE,
                            IDT_FLAG_PRESENT | IDT_FLAG_DPL0 |
                            IDT_FLAG_GATETYPE_INT);
         } else if (i == IDT_VEKTOR_SYSCALL) {
             /* Syscall - trap gate, DPL 3 (user dapat memanggil) */
             _atur_entry_idt((uint8_t)i,
-                           (uint32_t)_handler_irq_default,
+                           (uint32_t)(uintptr_t)_handler_irq_default,
                            IDT_SELECTOR_KODE,
                            IDT_FLAG_PRESENT | IDT_FLAG_DPL3 |
                            IDT_FLAG_GATETYPE_TRAP);
         } else {
             /* Software interrupts - interrupt gate, DPL 0 */
             _atur_entry_idt((uint8_t)i,
-                           (uint32_t)_handler_irq_default,
+                           (uint32_t)(uintptr_t)_handler_irq_default,
                            IDT_SELECTOR_KODE,
                            IDT_FLAG_PRESENT | IDT_FLAG_DPL0 |
                            IDT_FLAG_GATETYPE_INT);
@@ -325,7 +325,7 @@ int idt_init(void)
 
     /* Setup pointer IDT */
     g_pointer_idt.batas = sizeof(g_tabel_idt) - 1;
-    g_pointer_idt.basis = (uint32_t)&g_tabel_idt;
+    g_pointer_idt.basis = (uint32_t)(uintptr_t)&g_tabel_idt;
 
     /* Load IDT */
     __asm__ __volatile__(
@@ -359,7 +359,7 @@ int idt_set_handler(uint8_t vektor, handler_interrupt_t handler)
 
     /* Update entry IDT dengan handler baru */
     _atur_entry_idt(vektor,
-                   (uint32_t)handler,
+                   (uint32_t)(uintptr_t)handler,
                    IDT_SELECTOR_KODE,
                    g_tabel_idt[vektor].flags);
 
@@ -448,4 +448,3 @@ int idt_set_gate(uint8_t vektor, uint32_t handler,
 
     return 0;
 }
-

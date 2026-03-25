@@ -21,6 +21,9 @@
 #include <stdint.h>
 #include <stddef.h>
 
+/* Inline keyword untuk GCC/C90 */
+#define inline __inline__
+
 /* =============================================================================
  * KONSTANTA
  * =============================================================================
@@ -314,7 +317,7 @@ static void _setup_gdt(void)
 
     /* Setup GDT pointer */
     g_gdt_pointer.batas = sizeof(g_gdt) - 1;
-    g_gdt_pointer.basis = (uint32_t)&g_gdt;
+    g_gdt_pointer.basis = (uint32_t)(uintptr_t)&g_gdt;
 }
 
 /*
@@ -337,7 +340,7 @@ static void _setup_idt(void)
 
     /* Setup IDT pointer */
     g_idt_pointer.batas = sizeof(g_idt) - 1;
-    g_idt_pointer.basis = (uint32_t)&g_idt;
+    g_idt_pointer.basis = (uint32_t)(uintptr_t)&g_idt;
 }
 
 /*

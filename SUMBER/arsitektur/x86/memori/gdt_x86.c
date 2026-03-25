@@ -350,7 +350,7 @@ int gdt_init(void)
 
     /* Setup pointer GDT */
     g_pointer_gdt.batas = sizeof(g_tabel_gdt) - 1;
-    g_pointer_gdt.basis = (uint32_t)&g_tabel_gdt;
+    g_pointer_gdt.basis = (uint32_t)(uintptr_t)&g_tabel_gdt;
 
     /* Load GDT menggunakan assembly */
     __asm__ __volatile__(
