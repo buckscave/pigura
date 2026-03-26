@@ -19,15 +19,9 @@
  */
 
 #define DRIVER_NAMA_PANJANG  32
-#define DRIVER_MAKS          16
+#define DRIVER_MAKS           IC_MAKS_DRIVER
 
-/*
- * ===========================================================================
- * STRUKTUR DRIVER
- * ===========================================================================
- */
-
-/* Struktur driver generik */
+/* Struktur driver internal - berbeda dari ic_driver_t di ic.h */
 typedef struct {
     char nama[DRIVER_NAMA_PANJANG];
     ic_kategori_t kategori;
@@ -42,7 +36,7 @@ typedef struct {
     tak_bertanda32_t (*read)(ic_perangkat_t *perangkat, void *buf, ukuran_t size);
     tak_bertanda32_t (*write)(ic_perangkat_t *perangkat, const void *buf, ukuran_t size);
     status_t (*ioctl)(ic_perangkat_t *perangkat, tak_bertanda32_t cmd, void *arg);
-} ic_driver_t;
+} ic_driver_internal_t;
 
 /*
  * ===========================================================================
@@ -50,7 +44,7 @@ typedef struct {
  * ===========================================================================
  */
 
-static ic_driver_t g_driver_list[DRIVER_MAKS];
+static ic_driver_internal_t g_driver_list[DRIVER_MAKS];
 static tak_bertanda32_t g_driver_count = 0;
 static bool_t g_driver_init = SALAH;
 
@@ -61,15 +55,30 @@ static bool_t g_driver_init = SALAH;
  */
 
 /*
- * ic_driver_register - Registrasi driver baru
+ * ic_driver_find - Cari driver untuk kategori
  */
-status_t ic_driver_register(const char *nama,
-                             ic_kategori_t kategori,
-                             status_t (*init)(ic_perangkat_t *),
-                             status_t (*reset)(ic_perangkat_t *),
-                             void (*cleanup)(ic_perangkat_t *))
+static ic_driver_internal_t *ic_driver_find(ic_kategori_t kategori)
 {
-    ic_driver_t *driver;
+    tak_bertanda32_t i;
+    
+    for (i = 0; i < DRIVER_MAKS; i++) {
+        if (g_driver_list[i].terdaftar &&
+            g_driver_list[i].kategori == kategori) {
+            return &g_driver_list[i];
+        }
+    }
+    
+    return NULL;
+}
+
+/*
+ * ic_driver_register - Registrasi driver dengan signature standar dari ic.h
+ */
+status_t ic_driver_register(const char *nama, ic_kategori_t kategori,
+                             ic_driver_init_fn init, ic_driver_probe_fn probe,
+                             ic_driver_remove_fn remove)
+{
+    ic_driver_internal_t *driver;
     tak_bertanda32_t i;
     
     if (nama == NULL || init == NULL) {
@@ -101,30 +110,13 @@ status_t ic_driver_register(const char *nama,
     
     driver->kategori = kategori;
     driver->init = init;
-    driver->reset = reset;
-    driver->cleanup = cleanup;
+    driver->reset = probe;
+    driver->cleanup = remove;
     driver->terdaftar = BENAR;
     
     g_driver_count++;
     
     return STATUS_BERHASIL;
-}
-
-/*
- * ic_driver_find - Cari driver untuk kategori
- */
-ic_driver_t *ic_driver_find(ic_kategori_t kategori)
-{
-    tak_bertanda32_t i;
-    
-    for (i = 0; i < DRIVER_MAKS; i++) {
-        if (g_driver_list[i].terdaftar &&
-            g_driver_list[i].kategori == kategori) {
-            return &g_driver_list[i];
-        }
-    }
-    
-    return NULL;
 }
 
 /*
@@ -136,9 +128,9 @@ ic_driver_t *ic_driver_find(ic_kategori_t kategori)
 /*
  * ic_driver_init_perangkat - Inisialisasi perangkat dengan driver
  */
-status_t ic_driver_init_perangkat(ic_perangkat_t *perangkat)
+status_t ic_driver_init_perangangkat(ic_perangkat_t *perangkat)
 {
-    ic_driver_t *driver;
+    ic_driver_internal_t *driver;
     
     if (perangkat == NULL || perangkat->entri == NULL) {
         return STATUS_PARAM_NULL;
@@ -163,7 +155,7 @@ status_t ic_driver_init_perangkat(ic_perangkat_t *perangkat)
  */
 status_t ic_driver_reset_perangkat(ic_perangkat_t *perangkat)
 {
-    ic_driver_t *driver;
+    ic_driver_internal_t *driver;
     
     if (perangkat == NULL || perangkat->entri == NULL) {
         return STATUS_PARAM_NULL;
@@ -182,7 +174,7 @@ status_t ic_driver_reset_perangkat(ic_perangkat_t *perangkat)
  */
 void ic_driver_cleanup_perangkat(ic_perangkat_t *perangkat)
 {
-    ic_driver_t *driver;
+    ic_driver_internal_t *driver;
     
     if (perangkat == NULL || perangkat->entri == NULL) {
         return;
@@ -207,7 +199,7 @@ tak_bertanda32_t ic_driver_read(ic_perangkat_t *perangkat,
                                  void *buf,
                                  ukuran_t size)
 {
-    ic_driver_t *driver;
+    ic_driver_internal_t *driver;
     
     if (perangkat == NULL || buf == NULL || size == 0) {
         return 0;
@@ -228,7 +220,7 @@ tak_bertanda32_t ic_driver_write(ic_perangkat_t *perangkat,
                                   const void *buf,
                                   ukuran_t size)
 {
-    ic_driver_t *driver;
+    ic_driver_internal_t *driver;
     
     if (perangkat == NULL || buf == NULL || size == 0) {
         return 0;

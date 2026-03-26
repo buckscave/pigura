@@ -14,11 +14,11 @@
 
 /*
  * ===========================================================================
- * VARIABEL LOKAL
+ * VARIABEL GLOBAL
  * ===========================================================================
  */
 
-static bool_t g_probe_diinisialisasi = SALAH;
+bool_t g_probe_diinisialisasi = SALAH;
 static tak_bertanda32_t g_probe_jumlah_total = 0;
 
 /*
@@ -57,15 +57,39 @@ ic_perangkat_t *ic_probe_tambah_perangkat(ic_bus_t bus,
                                            tak_bertanda8_t func_num)
 {
     ic_perangkat_t *perangkat;
+    ic_konteks_t *konteks;
     
-    perangkat = ic_deteksi_perangkat(bus, bus_num, dev_num, func_num);
-    if (perangkat == NULL) {
+    konteks = ic_konteks_dapatkan();
+    if (konteks == NULL) {
         return NULL;
     }
     
-    perangkat->terdeteksi = BENAR;
-    perangkat->status = IC_STATUS_TERDETEKSI;
+    if (konteks->jumlah_perangkat >= IC_MAKS_PERANGKAT) {
+        return NULL;
+    }
     
+    perangkat = &konteks->perangkat[konteks->jumlah_perangkat];
+    
+    /* Inisialisasi perangkat */
+    perangkat->magic = IC_MAGIC;
+    perangkat->id = konteks->jumlah_perangkat;
+    perangkat->bus = bus;
+    perangkat->bus_num = bus_num;
+    perangkat->dev_num = dev_num;
+    perangkat->func_num = func_num;
+    perangkat->vendor_id = 0;
+    perangkat->device_id = 0;
+    perangkat->class_code = 0;
+    perangkat->revision = 0;
+    perangkat->entri = NULL;
+    perangkat->param_hasil = NULL;
+    perangkat->jumlah_param_hasil = 0;
+    perangkat->status = IC_STATUS_TERDETEKSI;
+    perangkat->terdeteksi = BENAR;
+    perangkat->teridentifikasi = SALAH;
+    perangkat->ditest = SALAH;
+    
+    konteks->jumlah_perangkat++;
     g_probe_jumlah_total++;
     
     return perangkat;
@@ -121,46 +145,55 @@ tak_bertanda32_t ic_probe_baca_class(ic_perangkat_t *perangkat)
 /*
  * ic_probe_set_info - Set informasi perangkat
  */
-void ic_probe_set_info(ic_perangkat_t *perangkat,
-                        tak_bertanda16_t vendor_id,
-                        tak_bertanda16_t device_id,
-                        tak_bertanda32_t class_code,
-                        tak_bertanda8_t revision)
+status_t ic_probe_set_info(ic_perangkat_t *perangkat,
+                            tak_bertanda16_t vendor_id,
+                            tak_bertanda16_t device_id,
+                            tak_bertanda32_t class_code,
+                            tak_bertanda8_t revision)
 {
     if (perangkat == NULL) {
-        return;
+        return STATUS_PARAM_NULL;
     }
     
     perangkat->vendor_id = vendor_id;
     perangkat->device_id = device_id;
     perangkat->class_code = class_code;
     perangkat->revision = revision;
+    
+    return STATUS_BERHASIL;
 }
 
 /*
  * ic_probe_set_bar - Set Base Address Register
  */
-void ic_probe_set_bar(ic_perangkat_t *perangkat,
-                       tak_bertanda32_t index,
-                       alamat_fisik_t alamat,
-                       tak_bertanda32_t ukuran)
+status_t ic_probe_set_bar(ic_perangkat_t *perangkat,
+                           tak_bertanda32_t index,
+                           alamat_fisik_t alamat,
+                           tak_bertanda32_t ukuran)
 {
-    if (perangkat == NULL || index >= 6) {
-        return;
+    if (perangkat == NULL) {
+        return STATUS_PARAM_NULL;
+    }
+    if (index >= 6) {
+        return STATUS_PARAM_INVALID;
     }
     
     perangkat->bar[index] = alamat;
     perangkat->bar_ukuran[index] = ukuran;
+    
+    return STATUS_BERHASIL;
 }
 
 /*
  * ic_probe_set_irq - Set IRQ number
  */
-void ic_probe_set_irq(ic_perangkat_t *perangkat, tak_bertanda32_t irq)
+status_t ic_probe_set_irq(ic_perangkat_t *perangkat, tak_bertanda32_t irq)
 {
     if (perangkat == NULL) {
-        return;
+        return STATUS_PARAM_NULL;
     }
     
     perangkat->irq = irq;
+    
+    return STATUS_BERHASIL;
 }

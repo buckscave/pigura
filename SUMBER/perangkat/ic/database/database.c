@@ -308,6 +308,21 @@ extern status_t ic_muat_display_database(void);
 extern status_t ic_muat_input_database(void);
 extern status_t ic_muat_usb_database(void);
 
+/* Forward declarations untuk loader kategori baru */
+extern status_t ic_muat_mobile_soc_database(void);
+extern status_t ic_muat_arm_cpu_database(void);
+extern status_t ic_muat_mobile_gpu_database(void);
+extern status_t ic_muat_touchscreen_database(void);
+extern status_t ic_muat_bluetooth_database(void);
+extern status_t ic_muat_camera_database(void);
+extern status_t ic_muat_stylus_database(void);
+extern status_t ic_muat_fingerprint_database(void);
+extern status_t ic_muat_sensor_database(void);
+extern status_t ic_muat_hdmi_database(void);
+extern status_t ic_muat_gps_database(void);
+extern status_t ic_muat_sim_database(void);
+extern status_t ic_muat_usbc_database(void);
+
 /*
  * ic_database_muat - Muat database dari semua kategori
  */
@@ -341,6 +356,47 @@ status_t ic_database_muat(void)
     
     /* Muat database USB */
     hasil = ic_muat_usb_database();
+    
+    /* === DATABASE BARU === */
+    
+    /* Muat database Mobile SoC */
+    hasil = ic_muat_mobile_soc_database();
+    
+    /* Muat database ARM CPU cores */
+    hasil = ic_muat_arm_cpu_database();
+    
+    /* Muat database Mobile GPU */
+    hasil = ic_muat_mobile_gpu_database();
+    
+    /* Muat database Touchscreen */
+    hasil = ic_muat_touchscreen_database();
+    
+    /* Muat database Bluetooth */
+    hasil = ic_muat_bluetooth_database();
+    
+    /* Muat database Camera */
+    hasil = ic_muat_camera_database();
+    
+    /* Muat database Stylus */
+    hasil = ic_muat_stylus_database();
+    
+    /* Muat database Fingerprint */
+    hasil = ic_muat_fingerprint_database();
+    
+    /* Muat database Sensor */
+    hasil = ic_muat_sensor_database();
+    
+    /* Muat database HDMI */
+    hasil = ic_muat_hdmi_database();
+    
+    /* Muat database GPS */
+    hasil = ic_muat_gps_database();
+    
+    /* Muat database SIM */
+    hasil = ic_muat_sim_database();
+    
+    /* Muat database USB-C */
+    hasil = ic_muat_usbc_database();
     
     return STATUS_BERHASIL;
 }

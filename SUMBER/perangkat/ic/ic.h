@@ -51,10 +51,11 @@
 #define IC_SATUAN_PANJANG_MAKS 16
 
 /* Jumlah maksimum */
-#define IC_MAKS_ENTRI 256
-#define IC_MAKS_PARAM_PER_KATEGORI 32
-#define IC_MAKS_KATEGORI 16
-#define IC_MAKS_PERANGKAT 128
+#define IC_MAKS_ENTRI 512
+#define IC_MAKS_PARAM_PER_KATEGORI 64
+#define IC_MAKS_KATEGORI 32
+#define IC_MAKS_PERANGKAT 256
+#define IC_MAKS_DRIVER 64
 
 /* Toleransi default untuk test parameter */
 #define IC_TOLERANSI_DEFAULT_MIN 5   /* 5% */
@@ -82,7 +83,21 @@ typedef enum {
     IC_KATEGORI_POWER = 12,
     IC_KATEGORI_TIMER = 13,
     IC_KATEGORI_DMA = 14,
-    IC_KATEGORI_LAINNYA = 15
+    IC_KATEGORI_BLUETOOTH = 15,
+    IC_KATEGORI_CAMERA = 16,
+    IC_KATEGORI_TOUCHSCREEN = 17,
+    IC_KATEGORI_STYLUS = 18,
+    IC_KATEGORI_FINGERPRINT = 19,
+    IC_KATEGORI_SENSOR = 20,
+    IC_KATEGORI_GPS = 21,
+    IC_KATEGORI_HDMI = 22,
+    IC_KATEGORI_SIM = 23,
+    IC_KATEGORI_USBC = 24,
+    IC_KATEGORI_TOUCHPAD = 25,
+    IC_KATEGORI_SOC = 26,
+    IC_KATEGORI_PMIC = 27,
+    IC_KATEGORI_CODEC = 28,
+    IC_KATEGORI_LAINNYA = 29
 } ic_kategori_t;
 
 /*
@@ -133,8 +148,18 @@ typedef enum {
     IC_BUS_SPI = 5,
     IC_BUS_MMIO = 6,
     IC_BUS_ISA = 7,
-    IC_BUS_APB = 8,     /* ARM Peripheral Bus */
-    IC_BUS_AXI = 9      /* ARM Advanced eXtensible Interface */
+    IC_BUS_APB = 8,
+    IC_BUS_AXI = 9,
+    IC_BUS_SDIO = 10,
+    IC_BUS_UART = 11,
+    IC_BUS_GPIO = 12,
+    IC_BUS_HSI = 13,
+    IC_BUS_MIPI = 14,
+    IC_BUS_I2S = 15,
+    IC_BUS_CAN = 16,
+    IC_BUS_LPC = 17,
+    IC_BUS_BLUETOOTH = 18,
+    IC_BUS_WIRELESS = 19
 } ic_bus_t;
 
 /*
@@ -394,6 +419,13 @@ ic_perangkat_t *ic_deteksi_perangkat(ic_bus_t bus, tak_bertanda8_t bus_num,
 status_t ic_identifikasi(ic_perangkat_t *perangkat);
 
 /*
+ * ic_identifikasi_semua - Identifikasi semua perangkat terdeteksi
+ *
+ * Return: STATUS_BERHASIL jika berhasil
+ */
+status_t ic_identifikasi_semua(void);
+
+/*
  * ic_cari_database - Cari entri di database berdasarkan ID
  *
  * Parameter:
@@ -605,6 +637,34 @@ tanda32_t ic_probe_pci(void);
 tanda32_t ic_probe_usb(void);
 
 /*
+ * ic_probe_i2c - Scan bus I2C
+ *
+ * Return: Jumlah perangkat ditemukan, atau nilai negatif jika error
+ */
+tanda32_t ic_probe_i2c(void);
+
+/*
+ * ic_probe_spi - Scan bus SPI
+ *
+ * Return: Jumlah perangkat ditemukan, atau nilai negatif jika error
+ */
+tanda32_t ic_probe_spi(void);
+
+/*
+ * ic_probe_mmio - Scan MMIO space
+ *
+ * Return: Jumlah perangkat ditemukan, atau nilai negatif jika error
+ */
+tanda32_t ic_probe_mmio(void);
+
+/*
+ * ic_probe_sdio - Scan SDIO bus
+ *
+ * Return: Jumlah perangkat ditemukan, atau nilai negatif jika error
+ */
+tanda32_t ic_probe_sdio(void);
+
+/*
  * ===========================================================================
  * VARIABEL GLOBAL
  * ===========================================================================
@@ -615,5 +675,256 @@ extern ic_konteks_t g_ic_konteks;
 
 /* Flag inisialisasi */
 extern bool_t g_ic_diinisialisasi;
+
+/* Flag inisialisasi probe */
+extern bool_t g_probe_diinisialisasi;
+
+/*
+ * ===========================================================================
+ * FUNGSI ENTRI DATABASE
+ * ===========================================================================
+ */
+
+/*
+ * ic_entri_buat - Buat entri database baru
+ *
+ * Parameter:
+ *   nama     - Nama IC
+ *   vendor   - Nama vendor
+ *   seri     - Seri/tipe IC
+ *   kategori - Kategori IC
+ *   rentang  - Rentang kinerja
+ *
+ * Return: Pointer ke entri atau NULL jika gagal
+ */
+ic_entri_t *ic_entri_buat(const char *nama, const char *vendor,
+                           const char *seri, ic_kategori_t kategori,
+                           ic_rentang_t rentang);
+
+/*
+ * ic_entri_cari_param - Cari parameter dalam entri berdasarkan nama
+ *
+ * Parameter:
+ *   entri - Pointer ke entri
+ *   nama  - Nama parameter yang dicari
+ *
+ * Return: Pointer ke parameter atau NULL jika tidak ditemukan
+ */
+ic_parameter_t *ic_entri_cari_param(ic_entri_t *entri, const char *nama);
+
+/*
+ * ic_entri_cari_param_id - Cari parameter dalam entri berdasarkan ID
+ *
+ * Parameter:
+ *   entri   - Pointer ke entri
+ *   param_id - ID parameter yang dicari
+ *
+ * Return: Pointer ke parameter atau NULL jika tidak ditemukan
+ */
+ic_parameter_t *ic_entri_cari_param_id(ic_entri_t *entri, tak_bertanda32_t param_id);
+
+/*
+ * ic_entri_tambah_param - Tambah parameter ke entri
+ *
+ * Parameter:
+ *   entri     - Pointer ke entri
+ *   nama      - Nama parameter
+ *   tipe      - Tipe parameter
+ *   satuan    - Satuan parameter
+ *   nilai_min - Nilai minimum
+ *   nilai_max - Nilai maksimum
+ *
+ * Return: STATUS_BERHASIL jika berhasil
+ */
+status_t ic_entri_tambah_param(ic_entri_t *entri,
+                                 const char *nama,
+                                 ic_param_tipe_t tipe,
+                                 const char *satuan,
+                                 tak_bertanda64_t nilai_min,
+                                 tak_bertanda64_t nilai_max);
+
+/*
+ * ic_parameter_inisialisasi_kategori - Inisialisasi parameter berdasarkan kategori
+ *
+ * Parameter:
+ *   entri - Pointer ke entri
+ *
+ * Return: STATUS_BERHASIL jika berhasil
+ */
+status_t ic_parameter_inisialisasi_kategori(ic_entri_t *entri);
+
+/*
+ * ic_pool_entri_bebaskan - Bebaskan entri dari pool
+ *
+ * Parameter:
+ *   entri - Pointer ke entri yang akan dibebaskan
+ */
+void ic_pool_entri_bebaskan(ic_entri_t *entri);
+
+/*
+ * ===========================================================================
+ * FUNGSI PROBE HELPER
+ * ===========================================================================
+ */
+
+/*
+ * ic_probe_tambah_perangkat - Tambah perangkat baru saat probe
+ *
+ * Parameter:
+ *   bus      - Tipe bus
+ *   bus_num  - Nomor bus
+ *   dev_num  - Nomor device
+ *   func_num - Nomor fungsi
+ *
+ * Return: Pointer ke perangkat atau NULL jika gagal
+ */
+ic_perangkat_t *ic_probe_tambah_perangkat(ic_bus_t bus,
+                                           tak_bertanda8_t bus_num,
+                                           tak_bertanda8_t dev_num,
+                                           tak_bertanda8_t func_num);
+
+/*
+ * ic_probe_set_info - Set informasi perangkat
+ *
+ * Parameter:
+ *   perangkat  - Pointer ke perangkat
+ *   vendor_id  - Vendor ID
+ *   device_id  - Device ID
+ *   class_code - Class code
+ *   revision   - Revision ID
+ *
+ * Return: STATUS_BERHASIL jika berhasil
+ */
+status_t ic_probe_set_info(ic_perangkat_t *perangkat,
+                            tak_bertanda16_t vendor_id,
+                            tak_bertanda16_t device_id,
+                            tak_bertanda32_t class_code,
+                            tak_bertanda8_t revision);
+
+/*
+ * ic_probe_set_bar - Set Base Address Register
+ *
+ * Parameter:
+ *   perangkat   - Pointer ke perangkat
+ *   index       - Indeks BAR (0-5)
+ *   alamat      - Alamat BAR
+ *   ukuran      - Ukuran BAR
+ *
+ * Return: STATUS_BERHASIL jika berhasil
+ */
+status_t ic_probe_set_bar(ic_perangkat_t *perangkat,
+                           tak_bertanda32_t index,
+                           alamat_fisik_t alamat,
+                           tak_bertanda32_t ukuran);
+
+/*
+ * ic_probe_set_irq - Set IRQ perangkat
+ *
+ * Parameter:
+ *   perangkat - Pointer ke perangkat
+ *   irq       - Nomor IRQ
+ *
+ * Return: STATUS_BERHASIL jika berhasil
+ */
+status_t ic_probe_set_irq(ic_perangkat_t *perangkat, tak_bertanda32_t irq);
+
+/*
+ * ===========================================================================
+ * FUNGSI DRIVER
+ * ===========================================================================
+ */
+
+/* Tipe driver function */
+typedef status_t (*ic_driver_init_fn)(ic_perangkat_t *perangkat);
+typedef status_t (*ic_driver_probe_fn)(ic_perangkat_t *perangkat);
+typedef void (*ic_driver_remove_fn)(ic_perangkat_t *perangkat);
+
+/* Struktur driver */
+typedef struct {
+    char nama[IC_NAMA_PANJANG_MAKS];
+    ic_kategori_t kategori;
+    ic_driver_init_fn init;
+    ic_driver_probe_fn probe;
+    ic_driver_remove_fn remove;
+    void *data;
+} ic_driver_t;
+
+/*
+ * ic_driver_register - Registrasi driver
+ *
+ * Parameter:
+ *   nama      - Nama driver
+ *   kategori  - Kategori perangkat
+ *   init      - Fungsi inisialisasi
+ *   probe     - Fungsi probe
+ *   remove    - Fungsi remove
+ *
+ * Return: STATUS_BERHASIL jika berhasil
+ */
+status_t ic_driver_register(const char *nama, ic_kategori_t kategori,
+                             ic_driver_init_fn init, ic_driver_probe_fn probe,
+                             ic_driver_remove_fn remove);
+
+/*
+ * ===========================================================================
+ * FUNGSI HELPER PEMBUATAN ENTRI
+ * ===========================================================================
+ */
+
+/*
+ * ic_buat_entri_cpu - Buat entri CPU
+ */
+ic_entri_t *ic_buat_entri_cpu(tak_bertanda16_t vendor_id,
+                               tak_bertanda16_t device_id,
+                               const char *nama,
+                               const char *vendor,
+                               const char *seri,
+                               ic_rentang_t rentang);
+
+/*
+ * ic_buat_entri_gpu - Buat entri GPU
+ */
+ic_entri_t *ic_buat_entri_gpu(tak_bertanda16_t vendor_id,
+                               tak_bertanda16_t device_id,
+                               const char *nama,
+                               const char *vendor,
+                               const char *seri,
+                               ic_rentang_t rentang);
+
+/*
+ * ic_buat_entri_storage - Buat entri storage
+ */
+ic_entri_t *ic_buat_entri_storage(tak_bertanda16_t vendor_id,
+                                   tak_bertanda16_t device_id,
+                                   const char *nama,
+                                   const char *vendor,
+                                   const char *seri,
+                                   ic_rentang_t rentang);
+
+/*
+ * ic_buat_entri_network - Buat entri network
+ */
+ic_entri_t *ic_buat_entri_network(tak_bertanda16_t vendor_id,
+                                   tak_bertanda16_t device_id,
+                                   const char *nama,
+                                   const char *vendor,
+                                   const char *seri,
+                                   ic_rentang_t rentang);
+
+/*
+ * ===========================================================================
+ * FUNGSI STRING UTILITAS
+ * ===========================================================================
+ */
+
+/*
+ * ic_salinnama - Salin nama dengan batas panjang
+ *
+ * Parameter:
+ *   tujuan - Buffer tujuan
+ *   sumber - String sumber
+ *   panjang - Panjang maksimum
+ */
+void ic_salinnama(char *tujuan, const char *sumber, ukuran_t panjang);
 
 #endif /* PERANGKAT_IC_H */

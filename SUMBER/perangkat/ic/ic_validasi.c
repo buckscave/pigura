@@ -76,6 +76,7 @@ static bool_t ic_validasi_dalam_toleransi(tak_bertanda64_t nilai,
     tak_bertanda64_t batas_min;
     tak_bertanda64_t batas_maks;
     tak_bertanda64_t delta;
+    tak_bertanda64_t toleransi_nilai;
     
     /* Hitung delta dengan proteksi overflow */
     if (referensi > nilai) {
@@ -84,19 +85,25 @@ static bool_t ic_validasi_dalam_toleransi(tak_bertanda64_t nilai,
         delta = nilai - referensi;
     }
     
-    /* Hitung batas toleransi */
-    batas_min = (referensi * toleransi) / 100;
-    batas_maks = referensi + batas_min;
+    /* Hitung nilai toleransi dalam satuan absolut */
+    toleransi_nilai = (referensi * toleransi) / 100;
     
+    /* Hitung batas toleransi */
+    batas_min = referensi - toleransi_nilai;
+    if (batas_min > referensi) {
+        /* Underflow, gunakan minimum */
+        batas_min = 0;
+    }
+    
+    batas_maks = referensi + toleransi_nilai;
     if (batas_maks < referensi) {
         /* Overflow, gunakan maksimum */
         batas_maks = TAK_BERTANDA64_MAX;
     }
     
-    batas_min = referensi - batas_min;
-    if (batas_min > referensi) {
-        /* Underflow, gunakan minimum */
-        batas_min = 0;
+    /* Cek apakah delta dalam batas toleransi */
+    if (delta <= toleransi_nilai) {
+        return BENAR;
     }
     
     return ic_validasi_rentang(nilai, batas_min, batas_maks);

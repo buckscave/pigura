@@ -70,29 +70,43 @@ static tak_bertanda32_t g_usb_device_count = 0;
 
 /*
  * usb_hub_detect - Deteksi device pada hub
+ * Fungsi placeholder untuk penggunaan masa depan
  */
+__attribute__((unused))
 static status_t usb_hub_detect(tak_bertanda32_t controller,
                                 tak_bertanda32_t hub,
                                 tanda32_t *count)
 {
+    /* Suppress unused parameter warnings */
+    (void)controller;
+    (void)hub;
+    (void)count;
     /* Placeholder - memerlukan USB host controller */
     return STATUS_BERHASIL;
 }
 
 /*
  * usb_device_get_descriptor - Dapatkan device descriptor
+ * Fungsi placeholder untuk penggunaan masa depan
  */
+__attribute__((unused))
 static status_t usb_device_get_descriptor(tak_bertanda32_t controller,
                                            tak_bertanda32_t device,
                                            usb_device_descriptor_t *desc)
 {
+    /* Suppress unused parameter warnings */
+    (void)controller;
+    (void)device;
+    (void)desc;
     /* Placeholder - memerlukan USB host controller */
     return STATUS_BERHASIL;
 }
 
 /*
  * usb_device_probe - Probe satu USB device
+ * Fungsi placeholder untuk penggunaan masa depan
  */
+__attribute__((unused))
 static status_t usb_device_probe(tak_bertanda32_t controller,
                                   tak_bertanda32_t device,
                                   tanda32_t *count)
@@ -161,9 +175,6 @@ static status_t usb_device_probe(tak_bertanda32_t controller,
 tanda32_t ic_probe_usb(void)
 {
     tanda32_t count = 0;
-    tak_bertanda32_t controller;
-    tak_bertanda32_t device;
-    status_t hasil;
     
     if (!g_probe_diinisialisasi) {
         return -1;
@@ -172,7 +183,7 @@ tanda32_t ic_probe_usb(void)
     /* Scan setiap controller */
     /* Placeholder - implementasi sebenarnya memerlukan USB HC */
     
-    g_usb_device_count = count;
+    g_usb_device_count = (tak_bertanda32_t)count;
     
     return count;
 }

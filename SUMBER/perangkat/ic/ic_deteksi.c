@@ -532,6 +532,34 @@ const char *ic_kategori_nama(ic_kategori_t kategori)
         return "Timer";
     case IC_KATEGORI_DMA:
         return "DMA";
+    case IC_KATEGORI_BLUETOOTH:
+        return "Bluetooth";
+    case IC_KATEGORI_CAMERA:
+        return "Camera";
+    case IC_KATEGORI_TOUCHSCREEN:
+        return "Touchscreen";
+    case IC_KATEGORI_STYLUS:
+        return "Stylus";
+    case IC_KATEGORI_FINGERPRINT:
+        return "Fingerprint";
+    case IC_KATEGORI_SENSOR:
+        return "Sensor";
+    case IC_KATEGORI_GPS:
+        return "GPS";
+    case IC_KATEGORI_HDMI:
+        return "HDMI";
+    case IC_KATEGORI_SIM:
+        return "SIM";
+    case IC_KATEGORI_USBC:
+        return "USB-C";
+    case IC_KATEGORI_TOUCHPAD:
+        return "Touchpad";
+    case IC_KATEGORI_SOC:
+        return "SoC";
+    case IC_KATEGORI_PMIC:
+        return "PMIC";
+    case IC_KATEGORI_CODEC:
+        return "Codec";
     case IC_KATEGORI_LAINNYA:
         return "Lainnya";
     default:
@@ -582,6 +610,22 @@ const char *ic_bus_nama(ic_bus_t bus)
         return "APB";
     case IC_BUS_AXI:
         return "AXI";
+    case IC_BUS_SDIO:
+        return "SDIO";
+    case IC_BUS_UART:
+        return "UART";
+    case IC_BUS_GPIO:
+        return "GPIO";
+    case IC_BUS_HSI:
+        return "HSI";
+    case IC_BUS_MIPI:
+        return "MIPI";
+    case IC_BUS_I2S:
+        return "I2S";
+    case IC_BUS_CAN:
+        return "CAN";
+    case IC_BUS_LPC:
+        return "LPC";
     default:
         return "Tidak Diketahui";
     }
