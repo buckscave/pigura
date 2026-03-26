@@ -219,6 +219,13 @@ typedef struct register_context {
 #endif /* ARSITEKTUR */
 
 /*
+ * Alias untuk kompatibilitas
+ * interrupt_frame_t adalah alias untuk register_context_t
+ * Digunakan oleh syscall handler dan interrupt handler
+ */
+typedef register_context_t interrupt_frame_t;
+
+/*
  * ===========================================================================
  * STRUKTUR DATA PANIC (PANIC DATA STRUCTURES)
  * ===========================================================================

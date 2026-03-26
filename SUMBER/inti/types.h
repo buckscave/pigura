@@ -112,9 +112,11 @@ typedef unsigned long long tak_bertanda64_t;
 #if defined(PIGURA_ARSITEKTUR_64BIT)
     typedef tak_bertanda64_t ukuran_t;
     typedef tanda64_t jarak_t;
+    typedef tanda64_t tak_bertandas_t;  /* Signed size (ssize_t) */
 #else
     typedef tak_bertanda32_t ukuran_t;
     typedef tanda32_t jarak_t;
+    typedef tanda32_t tak_bertandas_t;  /* Signed size (ssize_t) */
 #endif
 
 /* Tipe untuk jarak antara dua pointer (setara ptrdiff_t) - didefinisikan setelah intptr_t */
@@ -222,6 +224,27 @@ typedef tak_bertanda64_t udetik_t;
 
 /* Tipe untuk nanoseconds */
 typedef tak_bertanda64_t ndetik_t;
+
+/* Tipe untuk microseconds (useconds_t) */
+typedef tak_bertanda32_t useconds_t;
+
+/* Tipe untuk clock ID */
+typedef tak_bertanda32_t clockid_t;
+
+/* Tipe untuk signal handler */
+typedef void (*sighandler_t)(int);
+
+/* Nilai khusus untuk signal handler */
+#define SIG_DFL ((sighandler_t)0)
+#define SIG_IGN ((sighandler_t)1)
+#define SIG_ERR ((sighandler_t)-1)
+
+/*
+ * Alias untuk kompatibilitas POSIX
+ */
+typedef waktu_t time_t;             /* Alias untuk waktu_t */
+typedef ukuran_t size_t;            /* Alias untuk ukuran_t */
+typedef jarak_ptr_t ptrdiff_t;      /* Alias untuk jarak_ptr_t */
 
 /*
  * ===========================================================================
@@ -808,5 +831,58 @@ STATIC_ASSERT_SIZE(tak_bertanda8_t, 1);
 STATIC_ASSERT_SIZE(tak_bertanda16_t, 2);
 STATIC_ASSERT_SIZE(tak_bertanda32_t, 4);
 STATIC_ASSERT_SIZE(tak_bertanda64_t, 8);
+
+/*
+ * ===========================================================================
+ * STRUKTUR STANDAR (STANDARD STRUCTURES)
+ * ===========================================================================
+ * Definisi struktur data standar yang digunakan oleh syscall.
+ */
+
+/* Struktur untuk waktu dengan presisi tinggi */
+struct timespec {
+    waktu_t tv_sec;     /* Detik */
+    tanda64_t tv_nsec;   /* Nanodetik */
+};
+
+/* Struktur untuk timeval */
+struct timeval {
+    waktu_t tv_sec;     /* Detik */
+    tanda64_t tv_usec;   /* Microdetik */
+};
+
+/* Struktur untuk informasi sistem (uname) */
+struct utsname {
+    char sysname[65];   /* Nama sistem operasi */
+    char nodename[65];  /* Nama node dalam network */
+    char release[65];   /* Release level sistem */
+    char version[65];   /* Versi sistem */
+    char machine[65];   /* Tipe hardware */
+};
+
+/* Struktur untuk status file (stat) */
+struct stat {
+    dev_t st_dev;       /* Device */
+    ino_t st_ino;       /* Inode */
+    mode_t st_mode;     /* Mode/permission */
+    tak_bertanda32_t st_nlink;  /* Jumlah hard link */
+    uid_t st_uid;       /* User ID owner */
+    gid_t st_gid;       /* Group ID owner */
+    dev_t st_rdev;      /* Device type (jika special file) */
+    off_t st_size;      /* Ukuran total dalam byte */
+    waktu_t st_atime;   /* Waktu akses terakhir */
+    waktu_t st_mtime;   /* Waktu modifikasi terakhir */
+    waktu_t st_ctime;   /* Waktu perubahan status terakhir */
+    tak_bertanda64_t st_blksize; /* Ukuran block I/O optimal */
+    tak_bertanda64_t st_blocks;  /* Jumlah 512-byte blocks */
+};
+
+/* Struktur untuk sigaction */
+struct sigaction {
+    sighandler_t sa_handler;    /* Handler signal */
+    tak_bertanda32_t sa_mask;   /* Signal mask tambahan */
+    tak_bertanda32_t sa_flags;  /* Flags */
+    void (*sa_restorer)(void);  /* Fungsi restorer */
+};
 
 #endif /* INTI_TYPES_H */

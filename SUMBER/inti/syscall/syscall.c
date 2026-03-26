@@ -6,11 +6,23 @@
  * Berkas ini berisi fungsi-fungsi untuk menangani system call
  * dari user space dan mengarahkannya ke handler yang sesuai.
  *
- * Versi: 1.0
+ * Versi: 1.2
  * Tanggal: 2025
  */
 
 #include "../kernel.h"
+
+/*
+ * ============================================================================
+ * DEKLARASI FORWARD
+ * ============================================================================
+ */
+
+/* Forward declaration untuk syscall_register_handlers di dispatcher.c */
+extern void syscall_register_handlers(void);
+
+/* Forward declaration untuk syscall_handler */
+tanda64_t syscall_handler(register_context_t *ctx);
 
 /*
  * ============================================================================
@@ -66,8 +78,8 @@ static spinlock_t syscall_lock = {0};
  *
  * Return: -ERROR_NOSYS
  */
-static long syscall_default_handler(long arg1, long arg2, long arg3,
-                                    long arg4, long arg5, long arg6)
+static tanda64_t syscall_default_handler(tanda64_t arg1, tanda64_t arg2, tanda64_t arg3,
+                                          tanda64_t arg4, tanda64_t arg5, tanda64_t arg6)
 {
     /* Suppress unused warnings */
     (void)arg1; (void)arg2; (void)arg3;
@@ -122,11 +134,11 @@ static bool_t syscall_check_permission(tak_bertanda32_t syscall_num)
  *   syscall_num - Nomor syscall
  *   args        - Array argumen
  */
-static void syscall_log_call(tak_bertanda32_t syscall_num, long *args)
+static void syscall_log_call(tak_bertanda32_t syscall_num, tanda64_t *args)
 {
     /* Hanya log jika debug mode */
 #ifdef DEBUG_SYSCALL
-    kernel_printf("[SYSCALL] num=%u args=[%lx,%lx,%lx,%lx,%lx,%lx]\n",
+    kernel_printf("[SYSCALL] num=%u args=[%llx,%llx,%llx,%llx,%llx,%llx]\n",
                   syscall_num, args[0], args[1], args[2],
                   args[3], args[4], args[5]);
 #else
@@ -171,7 +183,7 @@ status_t syscall_init(void)
     syscall_register_handlers();
 
     /* Setup interrupt handler */
-    interupsi_set_handler(SYSCALL_INT_VECTOR, syscall_handler);
+    isr_set_handler(SYSCALL_INT_VECTOR, (isr_handler_t)syscall_handler);
 
     syscall_initialized = BENAR;
 
@@ -244,37 +256,84 @@ status_t syscall_unregister(tak_bertanda32_t syscall_num)
  * Dipanggil dari assembly (syscall_entry.S).
  *
  * Parameter:
- *   frame - Pointer ke stack frame
+ *   ctx - Pointer ke konteks register
  *
  * Return: Nilai return syscall
  */
-long syscall_handler(interrupt_frame_t *frame)
+tanda64_t syscall_handler(register_context_t *ctx)
 {
     tak_bertanda32_t syscall_num;
-    long args[SYSCALL_ARG_MAKS];
-    long result;
+    tanda64_t args[SYSCALL_ARG_MAKS];
+    tanda64_t result;
     syscall_fn_t handler;
 
-    if (!syscall_initialized || frame == NULL) {
+    if (!syscall_initialized || ctx == NULL) {
         return -ERROR_NOSYS;
     }
 
-    /* Ambil nomor syscall dari EAX */
-    syscall_num = (tak_bertanda32_t)frame->eax;
+    /*
+     * Ambil nomor syscall dan argumen dari register.
+     * Menggunakan conditional compilation untuk mendukung berbagai arsitektur.
+     */
+#if defined(ARSITEKTUR_X86_64)
+    /* x86_64: RAX = syscall number, argumen di RDI, RSI, RDX, R10, R8, R9 */
+    syscall_num = (tak_bertanda32_t)ctx->rax;
+    args[0] = (tanda64_t)ctx->rdi;
+    args[1] = (tanda64_t)ctx->rsi;
+    args[2] = (tanda64_t)ctx->rdx;
+    args[3] = (tanda64_t)ctx->r10;
+    args[4] = (tanda64_t)ctx->r8;
+    args[5] = (tanda64_t)ctx->r9;
+
+#elif defined(ARSITEKTUR_X86)
+    /* x86 (32-bit): EAX = syscall number, argumen di EBX, ECX, EDX, ESI, EDI, EBP */
+    /* Pada x86, register_context memiliki field r[0..15] untuk kompatibilitas */
+    /* Kita perlu mendapatkan nilai dari stack frame yang dibuat assembly */
+    /* Untuk saat ini, gunakan stack pointer untuk mengakses argumen */
+    syscall_num = (tak_bertanda32_t)ctx->rax;  /* r[0] = eax */
+    args[0] = (tanda64_t)ctx->rbx;  /* r[1] = ebx */
+    args[1] = (tanda64_t)ctx->rcx;  /* r[2] = ecx */
+    args[2] = (tanda64_t)ctx->rdx;  /* r[3] = edx */
+    args[3] = (tanda64_t)ctx->rsi;  /* r[4] = esi */
+    args[4] = (tanda64_t)ctx->rdi;  /* r[5] = edi */
+    args[5] = (tanda64_t)ctx->rbp;  /* r[6] = ebp */
+
+#elif defined(ARSITEKTUR_ARM) || defined(ARSITEKTUR_ARMV7)
+    /* ARM 32-bit: r7 = syscall number, argumen di r0-r5 */
+    syscall_num = (tak_bertanda32_t)ctx->r[7];
+    args[0] = (tanda64_t)ctx->r[0];
+    args[1] = (tanda64_t)ctx->r[1];
+    args[2] = (tanda64_t)ctx->r[2];
+    args[3] = (tanda64_t)ctx->r[3];
+    args[4] = (tanda64_t)ctx->r[4];
+    args[5] = (tanda64_t)ctx->r[5];
+
+#elif defined(ARSITEKTUR_ARM64)
+    /* ARM64: x8 = syscall number, argumen di x0-x5 */
+    syscall_num = (tak_bertanda32_t)ctx->x[8];
+    args[0] = (tanda64_t)ctx->x[0];
+    args[1] = (tanda64_t)ctx->x[1];
+    args[2] = (tanda64_t)ctx->x[2];
+    args[3] = (tanda64_t)ctx->x[3];
+    args[4] = (tanda64_t)ctx->x[4];
+    args[5] = (tanda64_t)ctx->x[5];
+
+#else
+    /* Fallback: gunakan struktur generik */
+    syscall_num = (tak_bertanda32_t)ctx->exception_no;
+    args[0] = 0;
+    args[1] = 0;
+    args[2] = 0;
+    args[3] = 0;
+    args[4] = 0;
+    args[5] = 0;
+#endif
 
     /* Validasi nomor syscall */
     if (syscall_num >= SYSCALL_MAX) {
         syscall_stats.errors++;
         return -ERROR_NOSYS;
     }
-
-    /* Ambil argumen dari stack/registers */
-    args[0] = (long)frame->ebx;
-    args[1] = (long)frame->ecx;
-    args[2] = (long)frame->edx;
-    args[3] = (long)frame->esi;
-    args[4] = (long)frame->edi;
-    args[5] = (long)frame->ebp;
 
     /* Log untuk debug */
     syscall_log_call(syscall_num, args);
@@ -393,9 +452,9 @@ void syscall_print_table(void)
  *
  * Return: Hasil syscall
  */
-long syscall_execute(tak_bertanda32_t syscall_num,
-                     long arg1, long arg2, long arg3,
-                     long arg4, long arg5, long arg6)
+tanda64_t syscall_execute(tak_bertanda32_t syscall_num,
+                           tanda64_t arg1, tanda64_t arg2, tanda64_t arg3,
+                           tanda64_t arg4, tanda64_t arg5, tanda64_t arg6)
 {
     syscall_fn_t handler;
 
@@ -432,11 +491,11 @@ long syscall_execute(tak_bertanda32_t syscall_num,
  *
  * Return: Hasil syscall
  */
-long syscall_from_user(tak_bertanda32_t syscall_num, long *args,
-                       tak_bertanda32_t arg_count)
+tanda64_t syscall_from_user(tak_bertanda32_t syscall_num, tanda64_t *args,
+                             tak_bertanda32_t arg_count)
 {
     tak_bertanda32_t i;
-    long result;
+    tanda64_t result;
 
     /* Validasi syscall number */
     if (syscall_num >= SYSCALL_MAX) {
@@ -450,7 +509,7 @@ long syscall_from_user(tak_bertanda32_t syscall_num, long *args,
 
     /* Validasi pointer user */
     for (i = 0; i < arg_count; i++) {
-        if (args[i] != 0 && !validasi_pointer_user((void *)args[i])) {
+        if (args[i] != 0 && !validasi_pointer_user((void *)(alamat_ptr_t)args[i])) {
             return -ERROR_FAULT;
         }
     }

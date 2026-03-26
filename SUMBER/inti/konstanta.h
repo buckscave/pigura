@@ -499,6 +499,16 @@
 #define SYS_IOCTL 38
 #define SYS_READDIR 39
 #define SYS_GETINFO 40
+#define SYS_REBOOT 41
+#define SYS_MOUNT 42
+#define SYS_UMOUNT 43
+#define SYS_NICE 44
+#define SYS_GETEUID 45
+#define SYS_GETEGID 46
+#define SYS_UNAME 47
+#define SYS_ALARM 48
+#define SYS_GETPRIORITY 49
+#define SYS_SETPRIORITY 50
 #define SYS_JUMLAH 64
 
 /* Argumen syscall maksimum */

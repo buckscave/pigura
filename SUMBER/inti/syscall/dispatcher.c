@@ -6,7 +6,7 @@
  * Berkas ini berisi fungsi-fungsi untuk mengarahkan system call
  * ke handler yang sesuai berdasarkan nomor system call.
  *
- * Versi: 1.0
+ * Versi: 1.1
  * Tanggal: 2025
  */
 
@@ -14,8 +14,74 @@
 
 /*
  * ============================================================================
+ * DEKLARASI FUNGSI EKSTERNAL
+ * ============================================================================
+ */
+
+/* Deklarasi fungsi syscall_register dari syscall.c */
+extern status_t syscall_register(tak_bertanda32_t syscall_num, syscall_fn_t handler);
+
+/*
+ * ============================================================================
+ * DEKLARASI FORWARD FUNGSI SYS_*
+ * ============================================================================
+ * Fungsi-fungsi ini diimplementasikan di file lain (tabel.c atau proses/)
+ */
+
+/* Handler proses */
+extern tanda32_t sys_execve(const char *path, char *const argv[],
+                            char *const envp[]);
+extern void sys_exit(tanda32_t status);
+extern pid_t sys_getpid(void);
+extern pid_t sys_getppid(void);
+extern pid_t sys_waitpid(pid_t pid, tanda32_t *status, tak_bertanda32_t opt);
+
+/* Handler memori */
+extern void *sys_brk(alamat_virtual_t addr);
+extern void *sys_sbrk(tanda32_t increment);
+extern void *sys_mmap(void *addr, ukuran_t len, tak_bertanda32_t prot,
+                      tak_bertanda32_t flags, tak_bertanda32_t fd,
+                      tak_bertanda32_t offset);
+extern tanda32_t sys_munmap(void *addr, ukuran_t len);
+
+/* Handler berkas */
+extern tak_bertandas_t sys_read(tak_bertanda32_t fd, void *buf, ukuran_t count);
+extern tak_bertandas_t sys_write(tak_bertanda32_t fd, const void *buf, ukuran_t count);
+extern tanda32_t sys_open(const char *path, tak_bertanda32_t flags, mode_t mode);
+extern tanda32_t sys_close(tak_bertanda32_t fd);
+extern off_t sys_lseek(tak_bertanda32_t fd, off_t offset, tak_bertanda32_t whence);
+extern tanda32_t sys_stat(const char *path, void *statbuf);
+extern tanda32_t sys_fstat(tak_bertanda32_t fd, void *statbuf);
+extern tanda32_t sys_mkdir(const char *path, mode_t mode);
+extern tanda32_t sys_rmdir(const char *path);
+extern tanda32_t sys_unlink(const char *path);
+extern tanda32_t sys_chdir(const char *path);
+extern char *sys_getcwd(char *buf, ukuran_t size);
+
+/* Handler duplikasi */
+extern tanda32_t sys_dup(tak_bertanda32_t oldfd);
+extern tanda32_t sys_dup2(tak_bertanda32_t oldfd, tak_bertanda32_t newfd);
+extern tanda32_t sys_pipe(tak_bertanda32_t pipefd[2]);
+
+/* Handler sinyal */
+extern tanda32_t sys_kill(pid_t pid, tak_bertanda32_t sig);
+extern void *sys_signal(tak_bertanda32_t sig, void *handler);
+extern tanda32_t sys_sigaction(tak_bertanda32_t sig, const void *act, void *oldact);
+
+/* Handler waktu */
+extern waktu_t sys_time(waktu_t *tloc);
+extern tanda32_t sys_clock_gettime(tak_bertanda32_t clk_id, void *tp);
+extern tak_bertanda32_t sys_sleep(tak_bertanda32_t seconds);
+extern tak_bertanda32_t sys_usleep(tak_bertanda32_t microseconds);
+
+/* Handler scheduler */
+extern void sys_yield(void);
+
+/*
+ * ============================================================================
  * FUNGSI HANDLER SYSCALL INDIVIDUAL
  * ============================================================================
+ * Catatan: Handler menggunakan tanda64_t untuk kompatibilitas dengan syscall_fn_t
  */
 
 /*
@@ -23,11 +89,11 @@
  * ----------------
  * Handler sys_read.
  */
-static long sys_read_handler(long fd, long buf, long count, long arg4,
-                             long arg5, long arg6)
+static tanda64_t sys_read_handler(tanda64_t fd, tanda64_t buf, tanda64_t count,
+                                   tanda64_t arg4, tanda64_t arg5, tanda64_t arg6)
 {
     (void)arg4; (void)arg5; (void)arg6;
-    return (long)sys_read((int)fd, (void *)buf, (ukuran_t)count);
+    return (tanda64_t)sys_read((tak_bertanda32_t)fd, (void *)(alamat_ptr_t)buf, (ukuran_t)count);
 }
 
 /*
@@ -35,11 +101,11 @@ static long sys_read_handler(long fd, long buf, long count, long arg4,
  * -----------------
  * Handler sys_write.
  */
-static long sys_write_handler(long fd, long buf, long count, long arg4,
-                              long arg5, long arg6)
+static tanda64_t sys_write_handler(tanda64_t fd, tanda64_t buf, tanda64_t count,
+                                    tanda64_t arg4, tanda64_t arg5, tanda64_t arg6)
 {
     (void)arg4; (void)arg5; (void)arg6;
-    return (long)sys_write((int)fd, (const void *)buf, (ukuran_t)count);
+    return (tanda64_t)sys_write((tak_bertanda32_t)fd, (const void *)(alamat_ptr_t)buf, (ukuran_t)count);
 }
 
 /*
@@ -47,11 +113,11 @@ static long sys_write_handler(long fd, long buf, long count, long arg4,
  * ----------------
  * Handler sys_open.
  */
-static long sys_open_handler(long path, long flags, long mode, long arg4,
-                             long arg5, long arg6)
+static tanda64_t sys_open_handler(tanda64_t path, tanda64_t flags, tanda64_t mode,
+                                   tanda64_t arg4, tanda64_t arg5, tanda64_t arg6)
 {
     (void)arg4; (void)arg5; (void)arg6;
-    return (long)sys_open((const char *)path, (int)flags, (mode_t)mode);
+    return (tanda64_t)sys_open((const char *)(alamat_ptr_t)path, (tak_bertanda32_t)flags, (mode_t)mode);
 }
 
 /*
@@ -59,11 +125,11 @@ static long sys_open_handler(long path, long flags, long mode, long arg4,
  * -----------------
  * Handler sys_close.
  */
-static long sys_close_handler(long fd, long arg2, long arg3, long arg4,
-                              long arg5, long arg6)
+static tanda64_t sys_close_handler(tanda64_t fd, tanda64_t arg2, tanda64_t arg3,
+                                    tanda64_t arg4, tanda64_t arg5, tanda64_t arg6)
 {
     (void)arg2; (void)arg3; (void)arg4; (void)arg5; (void)arg6;
-    return (long)sys_close((int)fd);
+    return (tanda64_t)sys_close((tak_bertanda32_t)fd);
 }
 
 /*
@@ -71,12 +137,12 @@ static long sys_close_handler(long fd, long arg2, long arg3, long arg4,
  * ----------------
  * Handler sys_fork.
  */
-static long sys_fork_handler(long arg1, long arg2, long arg3, long arg4,
-                             long arg5, long arg6)
+static tanda64_t sys_fork_handler(tanda64_t arg1, tanda64_t arg2, tanda64_t arg3,
+                                   tanda64_t arg4, tanda64_t arg5, tanda64_t arg6)
 {
     (void)arg1; (void)arg2; (void)arg3;
     (void)arg4; (void)arg5; (void)arg6;
-    return (long)sys_fork();
+    return (tanda64_t)sys_fork();
 }
 
 /*
@@ -84,12 +150,13 @@ static long sys_fork_handler(long arg1, long arg2, long arg3, long arg4,
  * ----------------
  * Handler sys_execve.
  */
-static long sys_exec_handler(long path, long argv, long envp, long arg4,
-                             long arg5, long arg6)
+static tanda64_t sys_exec_handler(tanda64_t path, tanda64_t argv, tanda64_t envp,
+                                   tanda64_t arg4, tanda64_t arg5, tanda64_t arg6)
 {
     (void)arg4; (void)arg5; (void)arg6;
-    return (long)sys_execve((const char *)path, (char *const *)argv,
-                            (char *const *)envp);
+    return (tanda64_t)sys_execve((const char *)(alamat_ptr_t)path,
+                                  (char *const *)(alamat_ptr_t)argv,
+                                  (char *const *)(alamat_ptr_t)envp);
 }
 
 /*
@@ -97,11 +164,11 @@ static long sys_exec_handler(long path, long argv, long envp, long arg4,
  * ----------------
  * Handler sys_exit.
  */
-static long sys_exit_handler(long status, long arg2, long arg3, long arg4,
-                             long arg5, long arg6)
+static tanda64_t sys_exit_handler(tanda64_t status, tanda64_t arg2, tanda64_t arg3,
+                                   tanda64_t arg4, tanda64_t arg5, tanda64_t arg6)
 {
     (void)arg2; (void)arg3; (void)arg4; (void)arg5; (void)arg6;
-    sys_exit((int)status);
+    sys_exit((tanda32_t)status);
     return 0;  /* Never reached */
 }
 
@@ -110,12 +177,12 @@ static long sys_exit_handler(long status, long arg2, long arg3, long arg4,
  * ------------------
  * Handler sys_getpid.
  */
-static long sys_getpid_handler(long arg1, long arg2, long arg3, long arg4,
-                               long arg5, long arg6)
+static tanda64_t sys_getpid_handler(tanda64_t arg1, tanda64_t arg2, tanda64_t arg3,
+                                     tanda64_t arg4, tanda64_t arg5, tanda64_t arg6)
 {
     (void)arg1; (void)arg2; (void)arg3;
     (void)arg4; (void)arg5; (void)arg6;
-    return (long)sys_getpid();
+    return (tanda64_t)sys_getpid();
 }
 
 /*
@@ -123,12 +190,12 @@ static long sys_getpid_handler(long arg1, long arg2, long arg3, long arg4,
  * -------------------
  * Handler sys_getppid.
  */
-static long sys_getppid_handler(long arg1, long arg2, long arg3, long arg4,
-                                long arg5, long arg6)
+static tanda64_t sys_getppid_handler(tanda64_t arg1, tanda64_t arg2, tanda64_t arg3,
+                                      tanda64_t arg4, tanda64_t arg5, tanda64_t arg6)
 {
     (void)arg1; (void)arg2; (void)arg3;
     (void)arg4; (void)arg5; (void)arg6;
-    return (long)sys_getppid();
+    return (tanda64_t)sys_getppid();
 }
 
 /*
@@ -136,11 +203,11 @@ static long sys_getppid_handler(long arg1, long arg2, long arg3, long arg4,
  * ---------------
  * Handler sys_brk.
  */
-static long sys_brk_handler(long addr, long arg2, long arg3, long arg4,
-                            long arg5, long arg6)
+static tanda64_t sys_brk_handler(tanda64_t addr, tanda64_t arg2, tanda64_t arg3,
+                                  tanda64_t arg4, tanda64_t arg5, tanda64_t arg6)
 {
     (void)arg2; (void)arg3; (void)arg4; (void)arg5; (void)arg6;
-    return (long)sys_brk((alamat_virtual_t)addr);
+    return (tanda64_t)(alamat_ptr_t)sys_brk((alamat_virtual_t)addr);
 }
 
 /*
@@ -148,11 +215,11 @@ static long sys_brk_handler(long addr, long arg2, long arg3, long arg4,
  * ----------------
  * Handler sys_sbrk.
  */
-static long sys_sbrk_handler(long increment, long arg2, long arg3, long arg4,
-                             long arg5, long arg6)
+static tanda64_t sys_sbrk_handler(tanda64_t increment, tanda64_t arg2, tanda64_t arg3,
+                                   tanda64_t arg4, tanda64_t arg5, tanda64_t arg6)
 {
     (void)arg2; (void)arg3; (void)arg4; (void)arg5; (void)arg6;
-    return (long)sys_sbrk((tanda32_t)increment);
+    return (tanda64_t)(alamat_ptr_t)sys_sbrk((tanda32_t)increment);
 }
 
 /*
@@ -160,11 +227,12 @@ static long sys_sbrk_handler(long increment, long arg2, long arg3, long arg4,
  * ----------------
  * Handler sys_mmap.
  */
-static long sys_mmap_handler(long addr, long len, long prot, long flags,
-                             long fd, long offset)
+static tanda64_t sys_mmap_handler(tanda64_t addr, tanda64_t len, tanda64_t prot,
+                                   tanda64_t flags, tanda64_t fd, tanda64_t offset)
 {
-    return (long)sys_mmap((void *)addr, (ukuran_t)len, (int)prot,
-                          (int)flags, (int)fd, (off_t)offset);
+    return (tanda64_t)(alamat_ptr_t)sys_mmap((void *)(alamat_ptr_t)addr, (ukuran_t)len,
+                                              (tak_bertanda32_t)prot, (tak_bertanda32_t)flags,
+                                              (tak_bertanda32_t)fd, (tak_bertanda32_t)offset);
 }
 
 /*
@@ -172,11 +240,11 @@ static long sys_mmap_handler(long addr, long len, long prot, long flags,
  * ------------------
  * Handler sys_munmap.
  */
-static long sys_munmap_handler(long addr, long len, long arg3, long arg4,
-                               long arg5, long arg6)
+static tanda64_t sys_munmap_handler(tanda64_t addr, tanda64_t len, tanda64_t arg3,
+                                     tanda64_t arg4, tanda64_t arg5, tanda64_t arg6)
 {
     (void)arg3; (void)arg4; (void)arg5; (void)arg6;
-    return (long)sys_munmap((void *)addr, (ukuran_t)len);
+    return (tanda64_t)sys_munmap((void *)(alamat_ptr_t)addr, (ukuran_t)len);
 }
 
 /*
@@ -184,11 +252,11 @@ static long sys_munmap_handler(long addr, long len, long arg3, long arg4,
  * -----------------
  * Handler sys_sleep.
  */
-static long sys_sleep_handler(long seconds, long arg2, long arg3, long arg4,
-                              long arg5, long arg6)
+static tanda64_t sys_sleep_handler(tanda64_t seconds, tanda64_t arg2, tanda64_t arg3,
+                                    tanda64_t arg4, tanda64_t arg5, tanda64_t arg6)
 {
     (void)arg2; (void)arg3; (void)arg4; (void)arg5; (void)arg6;
-    return (long)sys_sleep((tak_bertanda32_t)seconds);
+    return (tanda64_t)sys_sleep((tak_bertanda32_t)seconds);
 }
 
 /*
@@ -196,11 +264,11 @@ static long sys_sleep_handler(long seconds, long arg2, long arg3, long arg4,
  * ------------------
  * Handler sys_usleep.
  */
-static long sys_usleep_handler(long usec, long arg2, long arg3, long arg4,
-                               long arg5, long arg6)
+static tanda64_t sys_usleep_handler(tanda64_t usec, tanda64_t arg2, tanda64_t arg3,
+                                     tanda64_t arg4, tanda64_t arg5, tanda64_t arg6)
 {
     (void)arg2; (void)arg3; (void)arg4; (void)arg5; (void)arg6;
-    return (long)sys_usleep((tak_bertanda32_t)usec);
+    return (tanda64_t)sys_usleep((tak_bertanda32_t)usec);
 }
 
 /*
@@ -208,11 +276,11 @@ static long sys_usleep_handler(long usec, long arg2, long arg3, long arg4,
  * ------------------
  * Handler sys_getcwd.
  */
-static long sys_getcwd_handler(long buf, long size, long arg3, long arg4,
-                               long arg5, long arg6)
+static tanda64_t sys_getcwd_handler(tanda64_t buf, tanda64_t size, tanda64_t arg3,
+                                     tanda64_t arg4, tanda64_t arg5, tanda64_t arg6)
 {
     (void)arg3; (void)arg4; (void)arg5; (void)arg6;
-    return (long)sys_getcwd((char *)buf, (ukuran_t)size);
+    return (tanda64_t)(alamat_ptr_t)sys_getcwd((char *)(alamat_ptr_t)buf, (ukuran_t)size);
 }
 
 /*
@@ -220,11 +288,11 @@ static long sys_getcwd_handler(long buf, long size, long arg3, long arg4,
  * -----------------
  * Handler sys_chdir.
  */
-static long sys_chdir_handler(long path, long arg2, long arg3, long arg4,
-                              long arg5, long arg6)
+static tanda64_t sys_chdir_handler(tanda64_t path, tanda64_t arg2, tanda64_t arg3,
+                                    tanda64_t arg4, tanda64_t arg5, tanda64_t arg6)
 {
     (void)arg2; (void)arg3; (void)arg4; (void)arg5; (void)arg6;
-    return (long)sys_chdir((const char *)path);
+    return (tanda64_t)sys_chdir((const char *)(alamat_ptr_t)path);
 }
 
 /*
@@ -232,11 +300,11 @@ static long sys_chdir_handler(long path, long arg2, long arg3, long arg4,
  * -----------------
  * Handler sys_mkdir.
  */
-static long sys_mkdir_handler(long path, long mode, long arg3, long arg4,
-                              long arg5, long arg6)
+static tanda64_t sys_mkdir_handler(tanda64_t path, tanda64_t mode, tanda64_t arg3,
+                                    tanda64_t arg4, tanda64_t arg5, tanda64_t arg6)
 {
     (void)arg3; (void)arg4; (void)arg5; (void)arg6;
-    return (long)sys_mkdir((const char *)path, (mode_t)mode);
+    return (tanda64_t)sys_mkdir((const char *)(alamat_ptr_t)path, (mode_t)mode);
 }
 
 /*
@@ -244,11 +312,11 @@ static long sys_mkdir_handler(long path, long mode, long arg3, long arg4,
  * -----------------
  * Handler sys_rmdir.
  */
-static long sys_rmdir_handler(long path, long arg2, long arg3, long arg4,
-                              long arg5, long arg6)
+static tanda64_t sys_rmdir_handler(tanda64_t path, tanda64_t arg2, tanda64_t arg3,
+                                    tanda64_t arg4, tanda64_t arg5, tanda64_t arg6)
 {
     (void)arg2; (void)arg3; (void)arg4; (void)arg5; (void)arg6;
-    return (long)sys_rmdir((const char *)path);
+    return (tanda64_t)sys_rmdir((const char *)(alamat_ptr_t)path);
 }
 
 /*
@@ -256,11 +324,11 @@ static long sys_rmdir_handler(long path, long arg2, long arg3, long arg4,
  * ------------------
  * Handler sys_unlink.
  */
-static long sys_unlink_handler(long path, long arg2, long arg3, long arg4,
-                               long arg5, long arg6)
+static tanda64_t sys_unlink_handler(tanda64_t path, tanda64_t arg2, tanda64_t arg3,
+                                     tanda64_t arg4, tanda64_t arg5, tanda64_t arg6)
 {
     (void)arg2; (void)arg3; (void)arg4; (void)arg5; (void)arg6;
-    return (long)sys_unlink((const char *)path);
+    return (tanda64_t)sys_unlink((const char *)(alamat_ptr_t)path);
 }
 
 /*
@@ -268,11 +336,11 @@ static long sys_unlink_handler(long path, long arg2, long arg3, long arg4,
  * ----------------
  * Handler sys_stat.
  */
-static long sys_stat_handler(long path, long statbuf, long arg3, long arg4,
-                             long arg5, long arg6)
+static tanda64_t sys_stat_handler(tanda64_t path, tanda64_t statbuf, tanda64_t arg3,
+                                   tanda64_t arg4, tanda64_t arg5, tanda64_t arg6)
 {
     (void)arg3; (void)arg4; (void)arg5; (void)arg6;
-    return (long)sys_stat((const char *)path, (struct stat *)statbuf);
+    return (tanda64_t)sys_stat((const char *)(alamat_ptr_t)path, (void *)(alamat_ptr_t)statbuf);
 }
 
 /*
@@ -280,11 +348,11 @@ static long sys_stat_handler(long path, long statbuf, long arg3, long arg4,
  * -----------------
  * Handler sys_fstat.
  */
-static long sys_fstat_handler(long fd, long statbuf, long arg3, long arg4,
-                              long arg5, long arg6)
+static tanda64_t sys_fstat_handler(tanda64_t fd, tanda64_t statbuf, tanda64_t arg3,
+                                    tanda64_t arg4, tanda64_t arg5, tanda64_t arg6)
 {
     (void)arg3; (void)arg4; (void)arg5; (void)arg6;
-    return (long)sys_fstat((int)fd, (struct stat *)statbuf);
+    return (tanda64_t)sys_fstat((tak_bertanda32_t)fd, (void *)(alamat_ptr_t)statbuf);
 }
 
 /*
@@ -292,11 +360,11 @@ static long sys_fstat_handler(long fd, long statbuf, long arg3, long arg4,
  * -----------------
  * Handler sys_lseek.
  */
-static long sys_lseek_handler(long fd, long offset, long whence, long arg4,
-                              long arg5, long arg6)
+static tanda64_t sys_lseek_handler(tanda64_t fd, tanda64_t offset, tanda64_t whence,
+                                    tanda64_t arg4, tanda64_t arg5, tanda64_t arg6)
 {
     (void)arg4; (void)arg5; (void)arg6;
-    return (long)sys_lseek((int)fd, (off_t)offset, (int)whence);
+    return (tanda64_t)sys_lseek((tak_bertanda32_t)fd, (off_t)offset, (tak_bertanda32_t)whence);
 }
 
 /*
@@ -304,11 +372,11 @@ static long sys_lseek_handler(long fd, long offset, long whence, long arg4,
  * ---------------
  * Handler sys_dup.
  */
-static long sys_dup_handler(long fd, long arg2, long arg3, long arg4,
-                            long arg5, long arg6)
+static tanda64_t sys_dup_handler(tanda64_t fd, tanda64_t arg2, tanda64_t arg3,
+                                  tanda64_t arg4, tanda64_t arg5, tanda64_t arg6)
 {
     (void)arg2; (void)arg3; (void)arg4; (void)arg5; (void)arg6;
-    return (long)sys_dup((int)fd);
+    return (tanda64_t)sys_dup((tak_bertanda32_t)fd);
 }
 
 /*
@@ -316,11 +384,11 @@ static long sys_dup_handler(long fd, long arg2, long arg3, long arg4,
  * ----------------
  * Handler sys_dup2.
  */
-static long sys_dup2_handler(long oldfd, long newfd, long arg3, long arg4,
-                             long arg5, long arg6)
+static tanda64_t sys_dup2_handler(tanda64_t oldfd, tanda64_t newfd, tanda64_t arg3,
+                                   tanda64_t arg4, tanda64_t arg5, tanda64_t arg6)
 {
     (void)arg3; (void)arg4; (void)arg5; (void)arg6;
-    return (long)sys_dup2((int)oldfd, (int)newfd);
+    return (tanda64_t)sys_dup2((tak_bertanda32_t)oldfd, (tak_bertanda32_t)newfd);
 }
 
 /*
@@ -328,11 +396,11 @@ static long sys_dup2_handler(long oldfd, long newfd, long arg3, long arg4,
  * ----------------
  * Handler sys_pipe.
  */
-static long sys_pipe_handler(long pipefd, long arg2, long arg3, long arg4,
-                             long arg5, long arg6)
+static tanda64_t sys_pipe_handler(tanda64_t pipefd, tanda64_t arg2, tanda64_t arg3,
+                                   tanda64_t arg4, tanda64_t arg5, tanda64_t arg6)
 {
     (void)arg2; (void)arg3; (void)arg4; (void)arg5; (void)arg6;
-    return (long)sys_pipe((int *)pipefd);
+    return (tanda64_t)sys_pipe((tak_bertanda32_t *)(alamat_ptr_t)pipefd);
 }
 
 /*
@@ -340,11 +408,11 @@ static long sys_pipe_handler(long pipefd, long arg2, long arg3, long arg4,
  * ----------------
  * Handler sys_wait.
  */
-static long sys_wait_handler(long status, long arg2, long arg3, long arg4,
-                             long arg5, long arg6)
+static tanda64_t sys_wait_handler(tanda64_t status, tanda64_t arg2, tanda64_t arg3,
+                                   tanda64_t arg4, tanda64_t arg5, tanda64_t arg6)
 {
     (void)arg2; (void)arg3; (void)arg4; (void)arg5; (void)arg6;
-    return (long)sys_wait((int *)status);
+    return (tanda64_t)sys_wait((tanda32_t *)(alamat_ptr_t)status);
 }
 
 /*
@@ -352,11 +420,11 @@ static long sys_wait_handler(long status, long arg2, long arg3, long arg4,
  * -------------------
  * Handler sys_waitpid.
  */
-static long sys_waitpid_handler(long pid, long status, long options, long arg4,
-                                long arg5, long arg6)
+static tanda64_t sys_waitpid_handler(tanda64_t pid, tanda64_t status, tanda64_t options,
+                                      tanda64_t arg4, tanda64_t arg5, tanda64_t arg6)
 {
     (void)arg4; (void)arg5; (void)arg6;
-    return (long)sys_waitpid((pid_t)pid, (int *)status, (int)options);
+    return (tanda64_t)sys_waitpid((pid_t)pid, (tanda32_t *)(alamat_ptr_t)status, (tak_bertanda32_t)options);
 }
 
 /*
@@ -364,11 +432,11 @@ static long sys_waitpid_handler(long pid, long status, long options, long arg4,
  * ----------------
  * Handler sys_kill.
  */
-static long sys_kill_handler(long pid, long sig, long arg3, long arg4,
-                             long arg5, long arg6)
+static tanda64_t sys_kill_handler(tanda64_t pid, tanda64_t sig, tanda64_t arg3,
+                                   tanda64_t arg4, tanda64_t arg5, tanda64_t arg6)
 {
     (void)arg3; (void)arg4; (void)arg5; (void)arg6;
-    return (long)sys_kill((pid_t)pid, (int)sig);
+    return (tanda64_t)sys_kill((pid_t)pid, (tak_bertanda32_t)sig);
 }
 
 /*
@@ -376,11 +444,11 @@ static long sys_kill_handler(long pid, long sig, long arg3, long arg4,
  * ------------------
  * Handler sys_signal.
  */
-static long sys_signal_handler(long sig, long handler, long arg3, long arg4,
-                               long arg5, long arg6)
+static tanda64_t sys_signal_handler(tanda64_t sig, tanda64_t handler, tanda64_t arg3,
+                                     tanda64_t arg4, tanda64_t arg5, tanda64_t arg6)
 {
     (void)arg3; (void)arg4; (void)arg5; (void)arg6;
-    return (long)sys_signal((int)sig, (sighandler_t)handler);
+    return (tanda64_t)(alamat_ptr_t)sys_signal((tak_bertanda32_t)sig, (void *)(alamat_ptr_t)handler);
 }
 
 /*
@@ -388,12 +456,13 @@ static long sys_signal_handler(long sig, long handler, long arg3, long arg4,
  * ---------------------
  * Handler sys_sigaction.
  */
-static long sys_sigaction_handler(long sig, long act, long oldact, long arg4,
-                                  long arg5, long arg6)
+static tanda64_t sys_sigaction_handler(tanda64_t sig, tanda64_t act, tanda64_t oldact,
+                                        tanda64_t arg4, tanda64_t arg5, tanda64_t arg6)
 {
     (void)arg4; (void)arg5; (void)arg6;
-    return (long)sys_sigaction((int)sig, (const struct sigaction *)act,
-                               (struct sigaction *)oldact);
+    return (tanda64_t)sys_sigaction((tak_bertanda32_t)sig,
+                                     (const void *)(alamat_ptr_t)act,
+                                     (void *)(alamat_ptr_t)oldact);
 }
 
 /*
@@ -401,11 +470,11 @@ static long sys_sigaction_handler(long sig, long act, long oldact, long arg4,
  * ----------------
  * Handler sys_time.
  */
-static long sys_time_handler(long tloc, long arg2, long arg3, long arg4,
-                             long arg5, long arg6)
+static tanda64_t sys_time_handler(tanda64_t tloc, tanda64_t arg2, tanda64_t arg3,
+                                   tanda64_t arg4, tanda64_t arg5, tanda64_t arg6)
 {
     (void)arg2; (void)arg3; (void)arg4; (void)arg5; (void)arg6;
-    return (long)sys_time((time_t *)tloc);
+    return (tanda64_t)sys_time((waktu_t *)(alamat_ptr_t)tloc);
 }
 
 /*
@@ -413,12 +482,11 @@ static long sys_time_handler(long tloc, long arg2, long arg3, long arg4,
  * -------------------
  * Handler sys_gettime.
  */
-static long sys_gettime_handler(long clk_id, long tp, long arg3, long arg4,
-                                long arg5, long arg6)
+static tanda64_t sys_gettime_handler(tanda64_t clk_id, tanda64_t tp, tanda64_t arg3,
+                                      tanda64_t arg4, tanda64_t arg5, tanda64_t arg6)
 {
     (void)arg3; (void)arg4; (void)arg5; (void)arg6;
-    return (long)sys_clock_gettime((clockid_t)clk_id,
-                                   (struct timespec *)tp);
+    return (tanda64_t)sys_clock_gettime((clockid_t)clk_id, (void *)(alamat_ptr_t)tp);
 }
 
 /*
@@ -426,8 +494,8 @@ static long sys_gettime_handler(long clk_id, long tp, long arg3, long arg4,
  * -----------------
  * Handler sys_yield.
  */
-static long sys_yield_handler(long arg1, long arg2, long arg3, long arg4,
-                              long arg5, long arg6)
+static tanda64_t sys_yield_handler(tanda64_t arg1, tanda64_t arg2, tanda64_t arg3,
+                                    tanda64_t arg4, tanda64_t arg5, tanda64_t arg6)
 {
     (void)arg1; (void)arg2; (void)arg3;
     (void)arg4; (void)arg5; (void)arg6;

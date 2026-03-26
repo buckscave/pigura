@@ -35,6 +35,7 @@
 /* Header subsistem */
 #include "hal/hal.h"
 #include "interupsi/isr.h"
+#include "proses/proses.h"
 
 /*
  * ===========================================================================

@@ -299,24 +299,23 @@ bool_t validasi_buffer_user(const void *buf, ukuran_t len, bool_t write)
 }
 
 /*
- * validasi_string_user
- * --------------------
- * Validasi string dari user space.
+ * validasi_string_user_internal
+ * ------------------------------
+ * Validasi string dari user space dengan panjang maksimum.
+ * Fungsi internal yang digunakan oleh validasi_string_user.
  *
  * Parameter:
  *   str - Pointer ke string
- *   max_len - Panjang maksimum (0 = gunakan default)
+ *   max_len - Panjang maksimum
  *
  * Return: BENAR jika valid
  */
-bool_t validasi_string_user(const char *str, ukuran_t max_len)
+static bool_t validasi_string_user_internal(const char *str, ukuran_t max_len)
 {
     alamat_virtual_t addr;
     ukuran_t len;
     ukuran_t checked;
     const char *p;
-
-    validasi_stats.string_checks++;
 
     if (str == NULL) {
         validasi_stats.failures++;
@@ -378,6 +377,39 @@ bool_t validasi_string_user(const char *str, ukuran_t max_len)
 }
 
 /*
+ * validasi_string_user
+ * --------------------
+ * Validasi string dari user space.
+ *
+ * Parameter:
+ *   str - Pointer ke string
+ *
+ * Return: BENAR jika valid
+ */
+bool_t validasi_string_user(const char *str)
+{
+    validasi_stats.string_checks++;
+    return validasi_string_user_internal(str, MAX_STRING_SIZE);
+}
+
+/*
+ * validasi_string_user_n
+ * ----------------------
+ * Validasi string dari user space dengan panjang maksimum tertentu.
+ *
+ * Parameter:
+ *   str - Pointer ke string
+ *   max_len - Panjang maksimum
+ *
+ * Return: BENAR jika valid
+ */
+bool_t validasi_string_user_n(const char *str, ukuran_t max_len)
+{
+    validasi_stats.string_checks++;
+    return validasi_string_user_internal(str, max_len);
+}
+
+/*
  * validasi_string_array_user
  * --------------------------
  * Validasi array string dari user space.
@@ -418,7 +450,7 @@ bool_t validasi_string_array_user(char *const arr[], ukuran_t max_count)
         }
 
         /* Validasi string itu sendiri */
-        if (!validasi_string_user(arr[i], 0)) {
+        if (!validasi_string_user_n(arr[i], 0)) {
             return SALAH;
         }
     }
@@ -526,7 +558,7 @@ bool_t validasi_path(const char *path)
 {
     ukuran_t len;
 
-    if (!validasi_string_user(path, MAKS_PATH_LEN)) {
+    if (!validasi_string_user_n(path, MAKS_PATH_LEN)) {
         return SALAH;
     }
 

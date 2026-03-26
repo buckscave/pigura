@@ -97,6 +97,21 @@
         __res; \
     })
 
+#define SYSCALL6(num, a1, a2, a3, a4, a5, a6) \
+    ({ \
+        long __res; \
+        register long __a6 __asm__("ebp") = (long)(a6); \
+        __asm__ __volatile__( \
+            "int $0x80" \
+            : "=a"(__res) \
+            : "a"(num), "b"((long)(a1)), "c"((long)(a2)), \
+              "d"((long)(a3)), "S"((long)(a4)), "D"((long)(a5)), \
+              "r"(__a6) \
+            : "memory" \
+        ); \
+        __res; \
+    })
+
 /* Cek error dari syscall */
 #define SYSCALL_CHECK(res) \
     do { \
