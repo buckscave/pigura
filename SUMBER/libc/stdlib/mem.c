@@ -24,7 +24,7 @@
 #define MEM_ALIGN_MASK  (MEM_ALIGN - 1)
 
 /* Ukuran minimum block (termasuk header) */
-#define MIN_BLOCK_SIZE  32
+#define MIN_BLOCK_SIZE  64
 
 /* Magic number untuk validasi block */
 #define BLOCK_MAGIC_FREE  0xFEEDFACE
@@ -55,8 +55,8 @@ typedef struct mem_block {
 #define BLOCK_TO_PTR(b)  ((void *)((char *)(b) + HEADER_SIZE))
 #define PTR_TO_BLOCK(p)  ((mem_block_t *)((char *)(p) - HEADER_SIZE))
 
-/* Makro untuk align size */
-#define ALIGN_UP(s) \
+/* Makro untuk align size (local version) */
+#define MEM_ALIGN_UP(s) \
     (((s) + MEM_ALIGN_MASK) & ~MEM_ALIGN_MASK)
 
 /* ============================================================
@@ -187,8 +187,8 @@ void *malloc(size_t size) {
     }
 
     /* Align size */
-    aligned_size = ALIGN_UP(size);
-    if (aligned_size < MIN_BLOCK_SIZE - HEADER_SIZE) {
+    aligned_size = MEM_ALIGN_UP(size);
+    if (aligned_size + HEADER_SIZE < MIN_BLOCK_SIZE) {
         aligned_size = MIN_BLOCK_SIZE - HEADER_SIZE;
     }
 
@@ -307,7 +307,7 @@ void *realloc(void *ptr, size_t size) {
     /* Jika ukuran baru lebih kecil atau sama */
     if (size <= block->size) {
         /* Bisa di-split untuk efisiensi */
-        size_t aligned_size = ALIGN_UP(size);
+        size_t aligned_size = MEM_ALIGN_UP(size);
         if (block->size >= aligned_size + MIN_BLOCK_SIZE) {
             /* Split block */
             mem_block_t *new_block;
@@ -563,7 +563,7 @@ static mem_block_t *split_block(mem_block_t *block, size_t size) {
     remaining = block->size - size - HEADER_SIZE;
 
     /* Hanya split jika sisa cukup besar */
-    if (remaining < MIN_BLOCK_SIZE - HEADER_SIZE) {
+    if (remaining + HEADER_SIZE < MIN_BLOCK_SIZE) {
         return block;
     }
 

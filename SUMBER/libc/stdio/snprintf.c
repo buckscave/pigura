@@ -11,6 +11,8 @@
 #include <stdarg.h>
 #include <string.h>
 #include <errno.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 /* ============================================================
  * KONFIGURASI
@@ -350,9 +352,4 @@ int vdprintf(int fd, const char *format, va_list ap) {
     return written;
 }
 
-/* ============================================================
- * FORWARD DECLARATIONS
- * ============================================================
- */
-extern long write(int fd, const void *buf, size_t count);
-extern void *malloc(size_t size);
+/* End of snprintf.c */

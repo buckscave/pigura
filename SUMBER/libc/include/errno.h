@@ -146,8 +146,54 @@ extern int errno;
 #define ERFKILL    98    /* RF-kill active */
 #define EHWPOISON  99    /* Memory page hardware error */
 
+/* Error tambahan untuk kompatibilitas */
+#define EPERM           1    /* Operation not permitted (alias) */
+#define EWOULDBLOCK     EAGAIN  /* Resource temporarily unavailable */
+#define EDEADLOCK       EDEADLK /* Resource deadlock (alias) */
+
+/* Error Linux tambahan */
+#define EBFONT          100  /* Bad font file format */
+#define ENOSTR          101  /* Device not a stream */
+#define ETIME           102  /* Timer expired */
+#define ENOSR           103  /* Out of streams resources */
+#define ENONET          104  /* Machine is not on network */
+#define ENOPKG          105  /* Package not installed */
+#define EREMOTE         106  /* Object is remote */
+#define EADV            107  /* Advertise error */
+#define ESRMNT          108  /* Srmount error */
+#define ECOMM           109  /* Communication error on send */
+#define EDOTDOT         110  /* RFS specific error */
+#define ENOTUNIQ        111  /* Name not unique on network */
+#define EBADFD          112  /* File descriptor in bad state */
+#define EREMCHG         113  /* Remote address changed */
+#define ELIBACC         114  /* Cannot access shared library */
+#define ELIBBAD         115  /* Accessing corrupted shared library */
+#define ELIBSCN         116  /* .lib section in a.out corrupted */
+#define ELIBMAX         117  /* Too many shared libraries */
+#define ELIBEXEC        118  /* Cannot exec shared library directly */
+#define ERESTART        119  /* Interrupted syscall should be restarted */
+#define ESTRPIPE        120  /* Streams pipe error */
+#define EUSERS          121  /* Too many users */
+#define EHOSTDOWN       122  /* Host is down */
+#define EHOSTUNREACH    123  /* No route to host */
+#define EALREADY        124  /* Operation already in progress */
+#define EINPROGRESS     125  /* Operation now in progress */
+#define ESTALE          126  /* Stale file handle */
+#define EUCLEAN         127  /* Structure needs cleaning */
+#define ENOTNAM         128  /* Not a XENIX named type file */
+#define ENAVAIL         129  /* No XENIX semaphores available */
+#define EISNAM          130  /* Is a named type file */
+#define EREMOTEIO       131  /* Remote I/O error */
+#define ENOMEDIUM       132  /* No medium found */
+#define EMEDIUMTYPE     133  /* Wrong medium type */
+#define ECANCELED       134  /* Operation canceled */
+#define ENOKEY          135  /* Required key not available */
+#define EKEYEXPIRED     136  /* Key has expired */
+#define EKEYREVOKED     137  /* Key has been revoked */
+#define EKEYREJECTED    138  /* Key was rejected by service */
+
 /* Error Pigura OS spesifik */
-#define EPIGURA_BASE   100  /* Base untuk error khusus Pigura */
+#define EPIGURA_BASE   200  /* Base untuk error khusus Pigura */
 
 /* ============================================================
  * MAKRO PEMBANTU
@@ -155,7 +201,7 @@ extern int errno;
  */
 
 /* Jumlah total kode error yang dikenal */
-#define EMAX        127
+#define EMAX        256
 
 /* Cek apakah kode error valid */
 #define IS_VALID_ERRNO(e) ((e) >= 0 && (e) < EMAX)

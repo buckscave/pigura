@@ -4,7 +4,7 @@
  * Header POSIX untuk fungsi sistem operasi standar.
  *
  * Bagian dari Pigura C90 Library
- * Versi: 1.0
+ * Versi: 1.1 - Perbaikan duplikasi dan deklarasi
  */
 
 #ifndef LIBC_UNISTD_H
@@ -15,6 +15,7 @@
  * ============================================================
  */
 #include <stddef.h>
+#include <sys/types.h>
 
 /* ============================================================
  * NULL POINTER
@@ -38,7 +39,7 @@
 #define STDOUT_FILENO 1
 #define STDERR_FILENO 2
 
-/* Seek constants (sama dengan stdio.h) */
+/* Seek constants */
 #ifndef SEEK_SET
 #define SEEK_SET 0
 #endif
@@ -138,25 +139,24 @@
 #define _SC_XOPEN_ENH_I18N   63
 #define _SC_XOPEN_SHM        64
 #define _SC_2_CHAR_TERM      65
-#define _SC_2_UPE            66
-#define _SC_XOPEN_XPG2       67
-#define _SC_XOPEN_XPG3       68
-#define _SC_XOPEN_XPG4       69
-#define _SC_NZERO            70
-#define _SC_XBS5_ILP32_OFF32 71
-#define _SC_XBS5_ILP32_OFFBIG 72
-#define _SC_XBS5_LP64_OFF64  73
-#define _SC_XBS5_LPBIG_OFFBIG 74
-#define _SC_SS_REPL_MAX      75
-#define _SC_TRACE_EVENT_NAME_MAX 76
-#define _SC_TRACE_NAME_MAX   77
-#define _SC_TRACE_SYS_MAX    78
-#define _SC_TRACE_USER_EVENT_MAX 79
-#define _SC_TYPED_MEMORY_OBJECTS 80
-#define _SC_V7_ILP32_OFF32   81
-#define _SC_V7_ILP32_OFFBIG  82
-#define _SC_V7_LP64_OFF64    83
-#define _SC_V7_LPBIG_OFFBIG  84
+#define _SC_XOPEN_XPG2       66
+#define _SC_XOPEN_XPG3       67
+#define _SC_XOPEN_XPG4       68
+#define _SC_NZERO            69
+#define _SC_XBS5_ILP32_OFF32 70
+#define _SC_XBS5_ILP32_OFFBIG 71
+#define _SC_XBS5_LP64_OFF64  72
+#define _SC_XBS5_LPBIG_OFFBIG 73
+#define _SC_SS_REPL_MAX      74
+#define _SC_TRACE_EVENT_NAME_MAX 75
+#define _SC_TRACE_NAME_MAX   76
+#define _SC_TRACE_SYS_MAX    77
+#define _SC_TRACE_USER_EVENT_MAX 78
+#define _SC_TYPED_MEMORY_OBJECTS 79
+#define _SC_V7_ILP32_OFF32   80
+#define _SC_V7_ILP32_OFFBIG  81
+#define _SC_V7_LP64_OFF64    82
+#define _SC_V7_LPBIG_OFFBIG  83
 
 /* Options untuk confstr */
 #define _CS_PATH             0
@@ -175,236 +175,36 @@
 #define _CS_POSIX_V7_LPBIG_OFFBIG_LIBS 13
 #define _CS_POSIX_V7_THREADS_CFLAGS 14
 #define _CS_POSIX_V7_THREADS_LDFLAGS 15
-#define _CS_POSIX_V7_WIDTH_RESTRICTED_ENVS 16
-#define _CS_V7_ENV           17
-
-/* ============================================================
- * TIPE DATA
- * ============================================================
- */
-
-/* Tipe untuk PID */
-typedef int pid_t;
-
-/* Tipe untuk UID */
-typedef unsigned int uid_t;
-
-/* Tipe untuk GID */
-typedef unsigned int gid_t;
-
-/* Tipe untuk off_t */
-typedef long long off_t;
-
-/* Tipe untuk ssize_t */
-typedef long ssize_t;
-
-/* Tipe untuk useconds_t */
-typedef unsigned int useconds_t;
-
-/* Tipe untuk intptr_t */
-typedef long intptr_t;
+#define _CS_V7_ENV           16
 
 /* ============================================================
  * FUNGSI I/O
  * ============================================================
  */
 
-/*
- * read - Baca dari file descriptor
- *
- * Parameter:
- *   fd   - File descriptor
- *   buf  - Buffer tujuan
- *   count - Jumlah byte maksimum
- *
- * Return: Jumlah byte yang dibaca, atau -1 jika error
- */
 extern ssize_t read(int fd, void *buf, size_t count);
-
-/*
- * write - Tulis ke file descriptor
- *
- * Parameter:
- *   fd    - File descriptor
- *   buf   - Buffer sumber
- *   count - Jumlah byte
- *
- * Return: Jumlah byte yang ditulis, atau -1 jika error
- */
 extern ssize_t write(int fd, const void *buf, size_t count);
-
-/*
- * pread - Baca dari posisi tertentu
- *
- * Parameter:
- *   fd    - File descriptor
- *   buf   - Buffer tujuan
- *   count - Jumlah byte
- *   offset - Posisi awal
- *
- * Return: Jumlah byte yang dibaca, atau -1 jika error
- */
 extern ssize_t pread(int fd, void *buf, size_t count, off_t offset);
-
-/*
- * pwrite - Tulis ke posisi tertentu
- *
- * Parameter:
- *   fd    - File descriptor
- *   buf   - Buffer sumber
- *   count - Jumlah byte
- *   offset - Posisi awal
- *
- * Return: Jumlah byte yang ditulis, atau -1 jika error
- */
-extern ssize_t pwrite(int fd, const void *buf, size_t count,
-                      off_t offset);
-
-/*
- * close - Tutup file descriptor
- *
- * Parameter:
- *   fd - File descriptor
- *
- * Return: 0 jika berhasil, -1 jika error
- */
+extern ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset);
 extern int close(int fd);
-
-/*
- * dup - Duplikasi file descriptor
- *
- * Parameter:
- *   fd - File descriptor
- *
- * Return: File descriptor baru, atau -1 jika error
- */
 extern int dup(int fd);
-
-/*
- * dup2 - Duplikasi ke file descriptor tertentu
- *
- * Parameter:
- *   fd  - File descriptor lama
- *   fd2 - File descriptor baru
- *
- * Return: fd2 jika berhasil, -1 jika error
- */
 extern int dup2(int fd, int fd2);
+extern off_t lseek(int fd, off_t offset, int whence);
 
 /* ============================================================
  * FUNGSI FILE
  * ============================================================
  */
 
-/*
- * open - Buka file
- *
- * Parameter:
- *   pathname - Nama file
- *   flags    - Flag pembukaan
- *   ...      - Mode (jika O_CREAT digunakan)
- *
- * Return: File descriptor, atau -1 jika error
- */
 extern int open(const char *pathname, int flags, ...);
-
-/*
- * creat - Buat file
- *
- * Parameter:
- *   pathname - Nama file
- *   mode     - Mode akses
- *
- * Return: File descriptor, atau -1 jika error
- */
 extern int creat(const char *pathname, mode_t mode);
-
-/*
- * access - Cek akses file
- *
- * Parameter:
- *   pathname - Nama file
- *   mode     - Mode akses (F_OK, R_OK, W_OK, X_OK)
- *
- * Return: 0 jika diizinkan, -1 jika tidak
- */
 extern int access(const char *pathname, int mode);
-
-/*
- * unlink - Hapus file
- *
- * Parameter:
- *   pathname - Nama file
- *
- * Return: 0 jika berhasil, -1 jika error
- */
 extern int unlink(const char *pathname);
-
-/*
- * link - Buat hard link
- *
- * Parameter:
- *   oldpath - Path lama
- *   newpath - Path baru
- *
- * Return: 0 jika berhasil, -1 jika error
- */
 extern int link(const char *oldpath, const char *newpath);
-
-/*
- * symlink - Buat symbolic link
- *
- * Parameter:
- *   target   - Target link
- *   linkpath - Path link
- *
- * Return: 0 jika berhasil, -1 jika error
- */
 extern int symlink(const char *target, const char *linkpath);
-
-/*
- * readlink - Baca target symbolic link
- *
- * Parameter:
- *   pathname - Path link
- *   buf      - Buffer tujuan
- *   bufsiz   - Ukuran buffer
- *
- * Return: Jumlah byte yang dibaca, atau -1 jika error
- */
 extern ssize_t readlink(const char *pathname, char *buf, size_t bufsiz);
-
-/*
- * rename - Ubah nama file
- *
- * Parameter:
- *   oldpath - Nama lama
- *   newpath - Nama baru
- *
- * Return: 0 jika berhasil, -1 jika error
- */
 extern int rename(const char *oldpath, const char *newpath);
-
-/*
- * truncate - Truncate file
- *
- * Parameter:
- *   path   - Nama file
- *   length - Panjang baru
- *
- * Return: 0 jika berhasil, -1 jika error
- */
 extern int truncate(const char *path, off_t length);
-
-/*
- * ftruncate - Truncate file via descriptor
- *
- * Parameter:
- *   fd     - File descriptor
- *   length - Panjang baru
- *
- * Return: 0 jika berhasil, -1 jika error
- */
 extern int ftruncate(int fd, off_t length);
 
 /* ============================================================
@@ -412,56 +212,10 @@ extern int ftruncate(int fd, off_t length);
  * ============================================================
  */
 
-/*
- * chdir - Ubah current working directory
- *
- * Parameter:
- *   path - Path direktori baru
- *
- * Return: 0 jika berhasil, -1 jika error
- */
 extern int chdir(const char *path);
-
-/*
- * fchdir - Ubah cwd via file descriptor
- *
- * Parameter:
- *   fd - File descriptor direktori
- *
- * Return: 0 jika berhasil, -1 jika error
- */
 extern int fchdir(int fd);
-
-/*
- * getcwd - Dapatkan current working directory
- *
- * Parameter:
- *   buf  - Buffer tujuan
- *   size - Ukuran buffer
- *
- * Return: Pointer ke buf, atau NULL jika error
- */
 extern char *getcwd(char *buf, size_t size);
-
-/*
- * mkdir - Buat direktori
- *
- * Parameter:
- *   pathname - Nama direktori
- *   mode     - Mode akses
- *
- * Return: 0 jika berhasil, -1 jika error
- */
 extern int mkdir(const char *pathname, mode_t mode);
-
-/*
- * rmdir - Hapus direktori kosong
- *
- * Parameter:
- *   pathname - Nama direktori
- *
- * Return: 0 jika berhasil, -1 jika error
- */
 extern int rmdir(const char *pathname);
 
 /* ============================================================
@@ -469,166 +223,23 @@ extern int rmdir(const char *pathname);
  * ============================================================
  */
 
-/*
- * getpid - Dapatkan process ID
- *
- * Return: PID proses saat ini
- */
 extern pid_t getpid(void);
-
-/*
- * getppid - Dapatkan parent process ID
- *
- * Return: PID proses parent
- */
 extern pid_t getppid(void);
-
-/*
- * getuid - Dapatkan user ID
- *
- * Return: UID proses saat ini
- */
 extern uid_t getuid(void);
-
-/*
- * geteuid - Dapatkan effective user ID
- *
- * Return: EUID proses saat ini
- */
 extern uid_t geteuid(void);
-
-/*
- * getgid - Dapatkan group ID
- *
- * Return: GID proses saat ini
- */
 extern gid_t getgid(void);
-
-/*
- * getegid - Dapatkan effective group ID
- *
- * Return: EGID proses saat ini
- */
 extern gid_t getegid(void);
-
-/*
- * setuid - Set user ID
- *
- * Parameter:
- *   uid - UID baru
- *
- * Return: 0 jika berhasil, -1 jika error
- */
 extern int setuid(uid_t uid);
-
-/*
- * setgid - Set group ID
- *
- * Parameter:
- *   gid - GID baru
- *
- * Return: 0 jika berhasil, -1 jika error
- */
 extern int setgid(gid_t gid);
-
-/*
- * fork - Buat proses baru
- *
- * Return: 0 di child, PID child di parent, -1 jika error
- */
 extern pid_t fork(void);
-
-/*
- * execve - Execute program
- *
- * Parameter:
- *   pathname - Path program
- *   argv     - Argumen
- *   envp     - Environment
- *
- * Return: -1 jika error (tidak return jika berhasil)
- */
-extern int execve(const char *pathname, char *const argv[],
-                  char *const envp[]);
-
-/*
- * execv - Execute program dengan environment saat ini
- *
- * Parameter:
- *   pathname - Path program
- *   argv     - Argumen
- *
- * Return: -1 jika error
- */
+extern int execve(const char *pathname, char *const argv[], char *const envp[]);
 extern int execv(const char *pathname, char *const argv[]);
-
-/*
- * execvp - Execute program dengan PATH search
- *
- * Parameter:
- *   file - Nama program
- *   argv - Argumen
- *
- * Return: -1 jika error
- */
 extern int execvp(const char *file, char *const argv[]);
-
-/*
- * execvpe - Execute dengan PATH search dan custom env
- *
- * Parameter:
- *   file - Nama program
- *   argv - Argumen
- *   envp - Environment
- *
- * Return: -1 jika error
- */
-extern int execvpe(const char *file, char *const argv[],
-                   char *const envp[]);
-
-/*
- * _exit - Exit tanpa cleanup
- *
- * Parameter:
- *   status - Exit status
- */
-extern void _exit(int status) __attribute__((noreturn));
-
-/*
- * sleep - Sleep dalam detik
- *
- * Parameter:
- *   seconds - Durasi sleep
- *
- * Return: 0 atau sisa waktu jika terinterupsi
- */
+extern int execvpe(const char *file, char *const argv[], char *const envp[]);
+extern void _exit(int status);
 extern unsigned int sleep(unsigned int seconds);
-
-/*
- * usleep - Sleep dalam microsecond
- *
- * Parameter:
- *   usec - Durasi sleep dalam microsecond
- *
- * Return: 0 jika berhasil, -1 jika error
- */
 extern int usleep(useconds_t usec);
-
-/*
- * alarm - Set alarm signal
- *
- * Parameter:
- *   seconds - Waktu alarm (0 untuk cancel)
- *
- * Return: Waktu sisa alarm sebelumnya
- */
 extern unsigned int alarm(unsigned int seconds);
-
-/*
- * pause - Tunggu signal
- *
- * Return: -1 dengan errno=EINTR setelah signal
- */
 extern int pause(void);
 
 /* ============================================================
@@ -636,102 +247,15 @@ extern int pause(void);
  * ============================================================
  */
 
-/*
- * sysconf - Dapatkan konfigurasi sistem
- *
- * Parameter:
- *   name - Nama konfigurasi (_SC_*)
- *
- * Return: Nilai konfigurasi, atau -1 jika error
- */
 extern long sysconf(int name);
-
-/*
- * pathconf - Dapatkan konfigurasi path
- *
- * Parameter:
- *   path - Path yang diperiksa
- *   name - Nama konfigurasi (_PC_*)
- *
- * Return: Nilai konfigurasi, atau -1 jika error
- */
 extern long pathconf(const char *path, int name);
-
-/*
- * fpathconf - Dapatkan konfigurasi via fd
- *
- * Parameter:
- *   fd   - File descriptor
- *   name - Nama konfigurasi
- *
- * Return: Nilai konfigurasi, atau -1 jika error
- */
 extern long fpathconf(int fd, int name);
-
-/*
- * confstr - Dapatkan string konfigurasi
- *
- * Parameter:
- *   name  - Nama konfigurasi (_CS_*)
- *   buf   - Buffer tujuan
- *   len   - Ukuran buffer
- *
- * Return: Panjang string yang diperlukan
- */
 extern size_t confstr(int name, char *buf, size_t len);
-
-/*
- * gethostname - Dapatkan hostname sistem
- *
- * Parameter:
- *   name - Buffer tujuan
- *   len  - Ukuran buffer
- *
- * Return: 0 jika berhasil, -1 jika error
- */
 extern int gethostname(char *name, size_t len);
-
-/*
- * sethostname - Set hostname sistem
- *
- * Parameter:
- *   name - Hostname baru
- *   len  - Panjang hostname
- *
- * Return: 0 jika berhasil, -1 jika error
- */
 extern int sethostname(const char *name, size_t len);
-
-/*
- * getpagesize - Dapatkan ukuran halaman memori
- *
- * Return: Ukuran halaman dalam byte
- */
 extern int getpagesize(void);
-
-/*
- * sync - Flush semua buffer filesystem
- */
 extern void sync(void);
-
-/*
- * fsync - Flush buffer file ke disk
- *
- * Parameter:
- *   fd - File descriptor
- *
- * Return: 0 jika berhasil, -1 jika error
- */
 extern int fsync(int fd);
-
-/*
- * fdatasync - Flush data file ke disk (tanpa metadata)
- *
- * Parameter:
- *   fd - File descriptor
- *
- * Return: 0 jika berhasil, -1 jika error
- */
 extern int fdatasync(int fd);
 
 /* ============================================================
@@ -739,25 +263,7 @@ extern int fdatasync(int fd);
  * ============================================================
  */
 
-/*
- * pipe - Buat pipe
- *
- * Parameter:
- *   pipefd - Array untuk menyimpan fd [read, write]
- *
- * Return: 0 jika berhasil, -1 jika error
- */
 extern int pipe(int pipefd[2]);
-
-/*
- * pipe2 - Buat pipe dengan flags
- *
- * Parameter:
- *   pipefd - Array untuk menyimpan fd
- *   flags  - Flags (O_CLOEXEC, O_DIRECT, O_NONBLOCK)
- *
- * Return: 0 jika berhasil, -1 jika error
- */
 extern int pipe2(int pipefd[2], int flags);
 
 #endif /* LIBC_UNISTD_H */

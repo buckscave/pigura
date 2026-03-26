@@ -14,6 +14,7 @@
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <errno.h>
+#include <unistd.h>
 
 /* ============================================================
  * DEKLARASI SYSCALL
@@ -245,7 +246,7 @@ ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
  */
 ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags) {
     long result;
-    size_t total_len;
+    size_t total_len = 0;
     size_t i;
 
     /* Validasi parameter */
@@ -424,6 +425,4 @@ ssize_t sendfile(int out_fd, int in_fd, off_t *offset, size_t count) {
     return total_sent;
 }
 
-/* Fungsi lseek dan read dideklarasikan di tempat lain */
-extern off_t lseek(int fd, off_t offset, int whence);
-extern ssize_t read(int fd, void *buf, size_t count);
+/* End of file */

@@ -57,20 +57,6 @@
 1:
 .endm
 
-/*
- * SYSCALL_INSN - Instruksi syscall
- *
- * Pada ARM lama, gunakan SWI. Pada ARM baru, gunakan SVC.
- * SVC #0 adalah bentuk modern dari SWI 0x0.
- */
-.macro SYSCALL_INSN
-#ifdef __ARM_ARCH_2__
-    swi     0x0
-#else
-    svc     #0
-#endif
-.endm
-
 /* ========================================================================
  * FUNGSI SYSCALL DASAR
  * ======================================================================== */

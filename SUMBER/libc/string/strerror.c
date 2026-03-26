@@ -207,6 +207,7 @@ char *strerror(int errnum) {
         int digits = 0;
         int temp;
         int pos;
+        int j;
 
         /* Hitung jumlah digit */
         temp = num;
@@ -225,7 +226,7 @@ char *strerror(int errnum) {
         /* Tambahkan digit dari belakang */
         strerror_buffer[pos + digits] = '\0';
         temp = num;
-        for (int j = digits - 1; j >= 0; j--) {
+        for (j = digits - 1; j >= 0; j--) {
             strerror_buffer[pos + j] = '0' + (temp % 10);
             temp /= 10;
         }
@@ -307,6 +308,7 @@ int strerror_r(int errnum, char *buf, size_t buflen) {
         int num = errnum;
         int digits = 0;
         int temp;
+        int j;
 
         /* Hitung jumlah digit */
         temp = num;
@@ -330,7 +332,7 @@ int strerror_r(int errnum, char *buf, size_t buflen) {
         strcpy(buf, "Unknown error ");
         temp = num;
         buf[msglen] = '\0';
-        for (int j = digits - 1; j >= 0; j--) {
+        for (j = digits - 1; j >= 0; j--) {
             buf[14 + j] = '0' + (temp % 10);
             temp /= 10;
         }

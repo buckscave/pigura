@@ -45,7 +45,6 @@ static int env_initialized = 0;
 
 /* Environment buffer internal (jika tidak ada dari kernel) */
 static char *env_internal[ENV_MAX_ENTRIES];
-static int env_count = 0;
 
 /* ============================================================
  * FUNGSI PEMBANTU

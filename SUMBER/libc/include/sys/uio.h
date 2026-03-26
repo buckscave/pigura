@@ -4,7 +4,7 @@
  * Header untuk scatter/gather I/O sesuai standar POSIX.
  *
  * Bagian dari Pigura C90 Library
- * Versi: 1.0
+ * Versi: 1.1 - Perbaikan duplikasi dan kompatibilitas C89
  */
 
 #ifndef LIBC_SYS_UIO_H
@@ -25,22 +25,9 @@
 #endif
 
 /* ============================================================
- * STRUKTUR IVEC
- * ============================================================
- * Struktur untuk satu I/O vector element.
- * Digunakan untuk scatter/gather I/O operations.
- */
-
-struct iovec {
-    void  *iov_base;  /* Base address of buffer */
-    size_t iov_len;   /* Length of buffer */
-};
-
-/* ============================================================
  * STRUKTUR UIO
  * ============================================================
  * Struktur untuk menyimpan informasi I/O operation.
- * Digunakan oleh sistem operasi untuk tracking I/O.
  */
 
 enum uio_rw {
@@ -70,82 +57,34 @@ struct uio {
 
 /*
  * readv - Scatter read
- *
- * Parameter:
- *   fd   - File descriptor
- *   iov  - Array I/O vectors
- *   iovcnt - Jumlah vectors
- *
- * Return: Total bytes read, atau -1 jika error
  */
 extern ssize_t readv(int fd, const struct iovec *iov, int iovcnt);
 
 /*
  * writev - Scatter write
- *
- * Parameter:
- *   fd   - File descriptor
- *   iov  - Array I/O vectors
- *   iovcnt - Jumlah vectors
- *
- * Return: Total bytes written, atau -1 jika error
  */
 extern ssize_t writev(int fd, const struct iovec *iov, int iovcnt);
 
 /*
  * preadv - Scatter read at offset
- *
- * Parameter:
- *   fd     - File descriptor
- *   iov    - Array I/O vectors
- *   iovcnt - Jumlah vectors
- *   offset - File offset
- *
- * Return: Total bytes read, atau -1 jika error
  */
 extern ssize_t preadv(int fd, const struct iovec *iov, int iovcnt,
                       off_t offset);
 
 /*
  * pwritev - Scatter write at offset
- *
- * Parameter:
- *   fd     - File descriptor
- *   iov    - Array I/O vectors
- *   iovcnt - Jumlah vectors
- *   offset - File offset
- *
- * Return: Total bytes written, atau -1 jika error
  */
 extern ssize_t pwritev(int fd, const struct iovec *iov, int iovcnt,
                        off_t offset);
 
 /*
  * preadv2 - Scatter read at offset dengan flags
- *
- * Parameter:
- *   fd     - File descriptor
- *   iov    - Array I/O vectors
- *   iovcnt - Jumlah vectors
- *   offset - File offset
- *   flags  - Flags (RWF_*)
- *
- * Return: Total bytes read, atau -1 jika error
  */
 extern ssize_t preadv2(int fd, const struct iovec *iov, int iovcnt,
                        off_t offset, int flags);
 
 /*
  * pwritev2 - Scatter write at offset dengan flags
- *
- * Parameter:
- *   fd     - File descriptor
- *   iov    - Array I/O vectors
- *   iovcnt - Jumlah vectors
- *   offset - File offset
- *   flags  - Flags (RWF_*)
- *
- * Return: Total bytes written, atau -1 jika error
  */
 extern ssize_t pwritev2(int fd, const struct iovec *iov, int iovcnt,
                         off_t offset, int flags);
@@ -168,78 +107,20 @@ extern ssize_t pwritev2(int fd, const struct iovec *iov, int iovcnt,
 
 /*
  * uiomove - Pindahkan data ke/dari uio
- *
- * Parameter:
- *   cp    - Kernel buffer
- *   n     - Jumlah bytes
- *   rw    - Direction (UIO_READ atau UIO_WRITE)
- *   uio   - UIO structure
- *
- * Return: 0 jika berhasil, error code jika gagal
- *
- * Catatan: Fungsi internal kernel, biasanya tidak
- *          tersedia di user-space.
  */
 extern int uiomove(void *cp, size_t n, enum uio_rw rw,
                    struct uio *uio);
 
 /*
  * iovec_count_total - Hitung total bytes dalam iovec array
- *
- * Parameter:
- *   iov    - Array I/O vectors
- *   iovcnt - Jumlah vectors
- *
- * Return: Total bytes
  */
-static inline size_t iovec_count_total(const struct iovec *iov,
-                                        int iovcnt) {
-    size_t total = 0;
-    int i;
-    for (i = 0; i < iovcnt; i++) {
-        total += iov[i].iov_len;
-    }
-    return total;
-}
+extern size_t iovec_count_total(const struct iovec *iov, int iovcnt);
 
 /*
  * iovec_validate - Validasi iovec array
- *
- * Parameter:
- *   iov    - Array I/O vectors
- *   iovcnt - Jumlah vectors
- *   max_bytes - Maksimum bytes yang diizinkan
- *
- * Return: 0 jika valid, -1 jika tidak valid
  */
-static inline int iovec_validate(const struct iovec *iov,
-                                  int iovcnt, size_t max_bytes) {
-    int i;
-    size_t total = 0;
-    
-    if (iov == NULL || iovcnt <= 0) {
-        return -1;
-    }
-    
-    for (i = 0; i < iovcnt; i++) {
-        if (iov[i].iov_base == NULL && iov[i].iov_len > 0) {
-            return -1;
-        }
-        
-        /* Check for overflow */
-        if (total + iov[i].iov_len < total) {
-            return -1;
-        }
-        
-        total += iov[i].iov_len;
-        
-        if (total > max_bytes) {
-            return -1;
-        }
-    }
-    
-    return 0;
-}
+extern int iovec_validate(const struct iovec *iov, int iovcnt,
+                          size_t max_bytes);
 
 /* ============================================================
  * KONSTANTA LIMIT
@@ -251,6 +132,6 @@ static inline int iovec_validate(const struct iovec *iov,
 #define UIO_MAXIOV      IOV_MAX
 
 /* Maximum total I/O size */
-#define UIO_MAXSIZE     (INT_MAX)
+#define UIO_MAXSIZE     (2147483647)
 
 #endif /* LIBC_SYS_UIO_H */

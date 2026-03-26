@@ -52,6 +52,23 @@ static const char *ampm[2] = { "AM", "PM" };
  * ============================================================
  */
 
+/* Forward declaration */
+static int is_leap_year(int year);
+static long __get_timezone(void);
+
+/*
+ * is_leap_year - Cek tahun kabisat
+ */
+static int is_leap_year(int year) {
+    return ((year % 4 == 0) && (year % 100 != 0)) || (year % 400 == 0);
+}
+
+/* Helper untuk timezone */
+static long __get_timezone(void) {
+    /* Default UTC */
+    return 0;
+}
+
 /*
  * write_number - Tulis angka ke buffer
  *
@@ -221,11 +238,6 @@ static int iso_week_of_year(const struct tm *tm, int *year) {
     return week;
 }
 
-/* Helper untuk is_leap_year - didefinisikan di sini untuk kemandirian */
-static int is_leap_year_local(int year) {
-    return ((year % 4 == 0) && (year % 100 != 0)) || (year % 400 == 0);
-}
-
 /* ============================================================
  * STRFTIME - FORMAT WAKTU KE STRING
  * ============================================================
@@ -287,7 +299,6 @@ size_t strftime(char *s, size_t maxsize, const char *format,
     size_t written = 0;
     char *buf = s;
     int temp_year;
-    int temp_week;
 
     /* Validasi parameter */
     if (s == NULL || format == NULL || tm == NULL) {

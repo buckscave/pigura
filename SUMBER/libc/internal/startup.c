@@ -283,26 +283,26 @@ void _start(void) {
     __asm__ __volatile__(
         "mov (%%rsp), %0\n\t"
         "lea 8(%%rsp), %1\n\t"
-        "lea 16(%%rsp, %0, 8), %2\n\t"
-        : "=r"(argc), "=r"(argv), "=r"(envp)
+        : "=r"(argc), "=r"(argv)
     );
+    /* Calculate envp: argv + argc + 1 (for NULL terminator), then + 1 more for envp start */
+    envp = argv + argc + 1;
 #elif defined(__i386__)
     /* x86: argc di [esp], argv di [esp+4] */
     __asm__ __volatile__(
         "mov (%%esp), %0\n\t"
         "lea 4(%%esp), %1\n\t"
-        "lea 8(%%esp, %0, 4), %2\n\t"
-        : "=r"(argc), "=r"(argv), "=r"(envp)
+        : "=r"(argc), "=r"(argv)
     );
+    envp = argv + argc + 1;
 #elif defined(__aarch64__)
     /* ARM64: x0 = argc, x1 = argv */
     __asm__ __volatile__(
         "mov %0, x0\n\t"
         "mov %1, x1\n\t"
-        "add %2, x1, %0, lsl #3\n\t"
-        "add %2, %2, #8\n\t"
-        : "=r"(argc), "=r"(argv), "=r"(envp)
+        : "=r"(argc), "=r"(argv)
     );
+    envp = argv + argc + 1;
 #else
     /* Default: panggil fungsi helper */
     __get_args(&argc, &argv, &envp);

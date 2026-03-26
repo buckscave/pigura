@@ -4,7 +4,7 @@
  * Implementasi fungsi I/O standar POSIX.
  *
  * Bagian dari Pigura C90 Library
- * Versi: 1.0
+ * Versi: 2.0 - Disinkronkan dengan syscall Pigura OS
  *
  * Fungsi yang diimplementasikan:
  * - read()    - Membaca dari file descriptor
@@ -17,30 +17,9 @@
  */
 
 #include <sys/types.h>
+#include <sys/syscall.h>   /* Syscall numbers dari header terpusat */
 #include <errno.h>
 #include <unistd.h>
-
-/* ============================================================
- * SYSCALL WRAPPER
- * ============================================================
- * Deklarasi fungsi syscall kernel untuk arsitektur x86_64.
- */
-
-/* Syscall number untuk x86_64 Linux */
-#define SYS_read    0
-#define SYS_write   1
-#define SYS_close   3
-#define SYS_dup     32
-#define SYS_dup2    33
-#define SYS_pread64 17
-#define SYS_pwrite64 18
-
-/* Fungsi wrapper syscall assembly */
-extern long __syscall0(long n);
-extern long __syscall1(long n, long a1);
-extern long __syscall2(long n, long a1, long a2);
-extern long __syscall3(long n, long a1, long a2, long a3);
-extern long __syscall4(long n, long a1, long a2, long a3, long a4);
 
 /* ============================================================
  * FUNGSI HELPER
@@ -88,7 +67,7 @@ ssize_t read(int fd, void *buf, size_t count) {
     }
 
     /* Panggil syscall read */
-    result = __syscall3(SYS_read, (long)fd, (long)buf, (long)count);
+    result = syscall3(SYS_READ, (long)fd, (long)buf, (long)count);
 
     return __set_errno(result);
 }
@@ -113,7 +92,7 @@ ssize_t write(int fd, const void *buf, size_t count) {
     }
 
     /* Panggil syscall write */
-    result = __syscall3(SYS_write, (long)fd, (long)buf, (long)count);
+    result = syscall3(SYS_WRITE, (long)fd, (long)buf, (long)count);
 
     return __set_errno(result);
 }
@@ -145,11 +124,24 @@ ssize_t pread(int fd, void *buf, size_t count, off_t offset) {
         return -1;
     }
 
-    /* Panggil syscall pread64 */
-    result = __syscall4(SYS_pread64, (long)fd, (long)buf,
-                        (long)count, (long)offset);
-
-    return __set_errno(result);
+    /* Implementasi dengan lseek + read + lseek (simple) */
+    /* Catatan: Kernel Pigura perlu syscall pread terpisah untuk efisiensi */
+    off_t old_offset = lseek(fd, 0, SEEK_CUR);
+    if (old_offset < 0) {
+        return -1;
+    }
+    
+    if (lseek(fd, offset, SEEK_SET) < 0) {
+        return -1;
+    }
+    
+    result = syscall3(SYS_READ, (long)fd, (long)buf, (long)count);
+    ssize_t bytes_read = __set_errno(result);
+    
+    /* Kembalikan offset ke posisi semula */
+    lseek(fd, old_offset, SEEK_SET);
+    
+    return bytes_read;
 }
 
 /*
@@ -179,11 +171,23 @@ ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset) {
         return -1;
     }
 
-    /* Panggil syscall pwrite64 */
-    result = __syscall4(SYS_pwrite64, (long)fd, (long)buf,
-                        (long)count, (long)offset);
-
-    return __set_errno(result);
+    /* Implementasi dengan lseek + write + lseek (simple) */
+    off_t old_offset = lseek(fd, 0, SEEK_CUR);
+    if (old_offset < 0) {
+        return -1;
+    }
+    
+    if (lseek(fd, offset, SEEK_SET) < 0) {
+        return -1;
+    }
+    
+    result = syscall3(SYS_WRITE, (long)fd, (long)buf, (long)count);
+    ssize_t bytes_written = __set_errno(result);
+    
+    /* Kembalikan offset ke posisi semula */
+    lseek(fd, old_offset, SEEK_SET);
+    
+    return bytes_written;
 }
 
 /*
@@ -204,7 +208,7 @@ int close(int fd) {
     }
 
     /* Panggil syscall close */
-    result = __syscall1(SYS_close, (long)fd);
+    result = syscall1(SYS_CLOSE, (long)fd);
 
     return __set_errno(result);
 }
@@ -229,7 +233,7 @@ int dup(int oldfd) {
     }
 
     /* Panggil syscall dup */
-    result = __syscall1(SYS_dup, (long)oldfd);
+    result = syscall1(SYS_DUP, (long)oldfd);
 
     return __set_errno(result);
 }
@@ -257,13 +261,11 @@ int dup2(int oldfd, int newfd) {
 
     /* Kasus khusus: oldfd == newfd */
     if (oldfd == newfd) {
-        /* Periksa apakah oldfd valid */
-        /* syscall dup2 akan handle ini, tapi kita bisa optimasi */
         return newfd;
     }
 
     /* Panggil syscall dup2 */
-    result = __syscall2(SYS_dup2, (long)oldfd, (long)newfd);
+    result = syscall2(SYS_DUP2, (long)oldfd, (long)newfd);
 
     return __set_errno(result);
 }

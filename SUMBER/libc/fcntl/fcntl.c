@@ -356,7 +356,7 @@ int posix_fallocate(int fd, off_t offset, off_t len) {
  *
  * Return: Jumlah byte yang di-readahead, atau -1 jika error
  */
-ssize_t readahead(int fd, off64_t offset, size_t count) {
+ssize_t readahead(int fd, off_t offset, size_t count) {
     long result;
 
     if (fd < 0) {
@@ -364,7 +364,7 @@ ssize_t readahead(int fd, off64_t offset, size_t count) {
         return -1;
     }
 
-    extern long __syscall_readahead(int fd, off64_t offset, size_t count);
+    extern long __syscall_readahead(int fd, off_t offset, size_t count);
     result = __syscall_readahead(fd, offset, count);
 
     if (result < 0) {

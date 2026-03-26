@@ -57,19 +57,6 @@ static const int days_per_month[12] = {
     31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31
 };
 
-/* Nama hari (0 = Minggu) */
-static const char *weekday_names[7] = {
-    "Minggu", "Senin", "Selasa", "Rabu",
-    "Kamis", "Jumat", "Sabtu"
-};
-
-/* Nama bulan (0 = Januari) */
-static const char *month_names[12] = {
-    "Januari", "Februari", "Maret", "April",
-    "Mei", "Juni", "Juli", "Agustus",
-    "September", "Oktober", "November", "Desember"
-};
-
 /* ============================================================
  * VARIABEL GLOBAL
  * ============================================================

@@ -48,7 +48,6 @@ static struct hostent hostent_buf;
 static char *host_aliases[MAX_ALIASES + 1];
 static char *host_addr_list[MAX_ADDR_LIST + 1];
 static char host_name_buf[MAX_LINE_LENGTH];
-static char host_alias_buf[MAX_LINE_LENGTH];
 static struct in_addr host_addr_buf[MAX_ADDR_LIST];
 
 /* Buffer statis untuk getservbyname/getservbyport */
@@ -56,12 +55,14 @@ static struct servent servent_buf;
 static char *serv_aliases[MAX_ALIASES + 1];
 static char serv_name_buf[MAX_LINE_LENGTH];
 static char serv_proto_buf[32];
-static char serv_alias_buf[MAX_LINE_LENGTH];
 
 /* ============================================================
  * DEKLARASI FUNGSI INTERNAL
  * ============================================================
  */
+
+/* Forward declaration */
+struct hostent *gethostbyname2(const char *name, int family);
 
 /* Fungsi parsing */
 static int parse_hosts_line(const char *line, struct hostent *result);
@@ -103,7 +104,6 @@ struct hostent *gethostbyname(const char *name) {
  */
 struct hostent *gethostbyname2(const char *name, int family) {
     struct in_addr addr;
-    char line[MAX_LINE_LENGTH];
     int found;
 
     /* Validasi parameter */
@@ -277,7 +277,6 @@ struct hostent *gethostbyaddr(const void *addr, socklen_t len, int family) {
  * Return: Pointer ke struct servent, atau NULL jika error
  */
 struct servent *getservbyname(const char *name, const char *proto) {
-    struct servent *serv;
     int i;
 
     /* Validasi parameter */
@@ -681,8 +680,6 @@ const char *hstrerror(int err) {
         case NO_RECOVERY:
             return "Unknown server error";
         case NO_DATA:
-            return "No address associated with name";
-        case NO_ADDRESS:
             return "No address associated with name";
         default:
             return "Unknown error";

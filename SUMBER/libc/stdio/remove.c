@@ -4,23 +4,25 @@
  * Implementasi fungsi remove dan rename.
  *
  * Bagian dari Pigura C90 Library
- * Versi: 1.0
+ * Versi: 2.0 - Disinkronkan dengan syscall Pigura OS
  */
 
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <sys/syscall.h>
+
+/* ============================================================
+ * FORWARD DECLARATIONS
+ * ============================================================
+ */
+int _sys_rename(const char *old, const char *new);
 
 /* ============================================================
  * REMOVE
  * ============================================================
  * Hapus file atau direktori kosong.
- *
- * Parameter:
- *   filename - Nama file yang dihapus
- *
- * Return: 0 jika berhasil, non-zero jika gagal
  */
 int remove(const char *filename) {
     struct stat st;
@@ -47,12 +49,6 @@ int remove(const char *filename) {
  * RENAME
  * ============================================================
  * Ubah nama file atau pindahkan file.
- *
- * Parameter:
- *   old - Nama lama
- *   new - Nama baru
- *
- * Return: 0 jika berhasil, non-zero jika gagal
  */
 int rename(const char *old, const char *new) {
     /* Validasi parameter */
@@ -74,16 +70,9 @@ int rename(const char *old, const char *new) {
  * _SYS_RENAME (Internal)
  * ============================================================
  * Wrapper untuk syscall rename.
- *
- * Parameter:
- *   old - Nama lama
- *   new - Nama baru
- *
- * Return: 0 jika berhasil, -1 jika gagal
  */
 int _sys_rename(const char *old, const char *new) {
-    /* Syscall number untuk rename bervariasi per arsitektur */
-    /* Untuk sementara, gunakan implementasi userspace */
+    /* Implementasi userspace menggunakan link + unlink */
 
     /* Link file baru */
     if (link(old, new) != 0) {
@@ -106,14 +95,10 @@ int _sys_rename(const char *old, const char *new) {
  * LINK (POSIX)
  * ============================================================
  * Buat hard link.
- *
- * Parameter:
- *   oldpath - Path file asli
- *   newpath - Path link baru
- *
- * Return: 0 jika berhasil, -1 jika gagal
  */
 int link(const char *oldpath, const char *newpath) {
+    long result;
+
     /* Validasi parameter */
     if (oldpath == NULL || *oldpath == '\0') {
         errno = EINVAL;
@@ -125,43 +110,48 @@ int link(const char *oldpath, const char *newpath) {
         return -1;
     }
 
-    /* Gunakan syscall link */
-    return syscall(SYS_link, oldpath, newpath);
+    /* Gunakan syscall link - SYS_LINK dari syscall.h */
+    result = syscall2(SYS_LINK, (long)oldpath, (long)newpath);
+
+    if (result < 0) {
+        errno = (int)(-result);
+        return -1;
+    }
+    return (int)result;
 }
 
 /* ============================================================
  * UNLINK (POSIX)
  * ============================================================
  * Hapus nama file (link).
- *
- * Parameter:
- *   pathname - Nama file yang dihapus
- *
- * Return: 0 jika berhasil, -1 jika gagal
  */
 int unlink(const char *pathname) {
+    long result;
+
     /* Validasi parameter */
     if (pathname == NULL || *pathname == '\0') {
         errno = EINVAL;
         return -1;
     }
 
-    /* Gunakan syscall unlink */
-    return syscall(SYS_unlink, pathname);
+    /* Gunakan syscall unlink - SYS_UNLINK dari syscall.h */
+    result = syscall1(SYS_UNLINK, (long)pathname);
+
+    if (result < 0) {
+        errno = (int)(-result);
+        return -1;
+    }
+    return (int)result;
 }
 
 /* ============================================================
  * SYMLINK (POSIX)
  * ============================================================
  * Buat symbolic link.
- *
- * Parameter:
- *   target   - Target link
- *   linkpath - Path link baru
- *
- * Return: 0 jika berhasil, -1 jika gagal
  */
 int symlink(const char *target, const char *linkpath) {
+    long result;
+
     /* Validasi parameter */
     if (target == NULL || *target == '\0') {
         errno = EINVAL;
@@ -173,23 +163,24 @@ int symlink(const char *target, const char *linkpath) {
         return -1;
     }
 
-    /* Gunakan syscall symlink */
-    return syscall(SYS_symlink, target, linkpath);
+    /* Gunakan syscall symlink - SYS_SYMLINK dari syscall.h */
+    result = syscall2(SYS_SYMLINK, (long)target, (long)linkpath);
+
+    if (result < 0) {
+        errno = (int)(-result);
+        return -1;
+    }
+    return (int)result;
 }
 
 /* ============================================================
  * READLINK (POSIX)
  * ============================================================
  * Baca target symbolic link.
- *
- * Parameter:
- *   pathname - Path link
- *   buf      - Buffer tujuan
- *   bufsiz   - Ukuran buffer
- *
- * Return: Jumlah byte yang dibaca, atau -1 jika gagal
  */
 ssize_t readlink(const char *pathname, char *buf, size_t bufsiz) {
+    long result;
+
     /* Validasi parameter */
     if (pathname == NULL || *pathname == '\0') {
         errno = EINVAL;
@@ -201,87 +192,96 @@ ssize_t readlink(const char *pathname, char *buf, size_t bufsiz) {
         return -1;
     }
 
-    /* Gunakan syscall readlink */
-    return syscall(SYS_readlink, pathname, buf, bufsiz);
+    /* Gunakan syscall readlink - SYS_READLINK dari syscall.h */
+    result = syscall3(SYS_READLINK, (long)pathname, (long)buf, (long)bufsiz);
+
+    if (result < 0) {
+        errno = (int)(-result);
+        return -1;
+    }
+    return (ssize_t)result;
 }
 
 /* ============================================================
  * RMDIR (POSIX)
  * ============================================================
  * Hapus direktori kosong.
- *
- * Parameter:
- *   pathname - Nama direktori
- *
- * Return: 0 jika berhasil, -1 jika gagal
  */
 int rmdir(const char *pathname) {
+    long result;
+
     /* Validasi parameter */
     if (pathname == NULL || *pathname == '\0') {
         errno = EINVAL;
         return -1;
     }
 
-    /* Gunakan syscall rmdir */
-    return syscall(SYS_rmdir, pathname);
+    /* Gunakan syscall rmdir - SYS_RMDIR dari syscall.h */
+    result = syscall1(SYS_RMDIR, (long)pathname);
+
+    if (result < 0) {
+        errno = (int)(-result);
+        return -1;
+    }
+    return (int)result;
 }
 
 /* ============================================================
  * MKDIR (POSIX)
  * ============================================================
  * Buat direktori.
- *
- * Parameter:
- *   pathname - Nama direktori
- *   mode     - Mode permission
- *
- * Return: 0 jika berhasil, -1 jika gagal
  */
 int mkdir(const char *pathname, mode_t mode) {
+    long result;
+
     /* Validasi parameter */
     if (pathname == NULL || *pathname == '\0') {
         errno = EINVAL;
         return -1;
     }
 
-    /* Gunakan syscall mkdir */
-    return syscall(SYS_mkdir, pathname, mode);
+    /* Gunakan syscall mkdir - SYS_MKDIR dari syscall.h */
+    result = syscall2(SYS_MKDIR, (long)pathname, (long)mode);
+
+    if (result < 0) {
+        errno = (int)(-result);
+        return -1;
+    }
+    return (int)result;
 }
 
 /* ============================================================
  * ACCESS (POSIX)
  * ============================================================
  * Cek akses file.
- *
- * Parameter:
- *   pathname - Nama file
- *   mode     - Mode akses (F_OK, R_OK, W_OK, X_OK)
- *
- * Return: 0 jika diizinkan, -1 jika tidak
  */
 int access(const char *pathname, int mode) {
+    long result;
+
     /* Validasi parameter */
     if (pathname == NULL || *pathname == '\0') {
         errno = EINVAL;
         return -1;
     }
 
-    /* Gunakan syscall access */
-    return syscall(SYS_access, pathname, mode);
+    /* Gunakan syscall access - SYS_ACCESS dari syscall.h */
+    result = syscall2(SYS_ACCESS, (long)pathname, (long)mode);
+
+    if (result < 0) {
+        errno = (int)(-result);
+        return -1;
+    }
+    return (int)result;
 }
 
 /* ============================================================
  * STAT (POSIX)
  * ============================================================
  * Dapatkan informasi file.
- *
- * Parameter:
- *   pathname - Nama file
- *   statbuf  - Buffer untuk menyimpan informasi
- *
- * Return: 0 jika berhasil, -1 jika gagal
  */
 int stat(const char *pathname, struct stat *statbuf) {
+    long result;
+
     /* Validasi parameter */
     if (pathname == NULL || *pathname == '\0') {
         errno = EINVAL;
@@ -293,47 +293,12 @@ int stat(const char *pathname, struct stat *statbuf) {
         return -1;
     }
 
-    /* Gunakan syscall stat */
-    return syscall(SYS_stat, pathname, statbuf);
+    /* Gunakan syscall stat - SYS_STAT dari syscall.h */
+    result = syscall2(SYS_STAT, (long)pathname, (long)statbuf);
+
+    if (result < 0) {
+        errno = (int)(-result);
+        return -1;
+    }
+    return (int)result;
 }
-
-/* ============================================================
- * SYSCALL DEFINITIONS
- * ============================================================
- * Syscall numbers bervariasi per arsitektur.
- * Definisi ini adalah placeholder.
- */
-#ifndef SYS_link
-#define SYS_link        9
-#endif
-
-#ifndef SYS_unlink
-#define SYS_unlink      10
-#endif
-
-#ifndef SYS_symlink
-#define SYS_symlink     83
-#endif
-
-#ifndef SYS_readlink
-#define SYS_readlink    85
-#endif
-
-#ifndef SYS_rmdir
-#define SYS_rmdir       40
-#endif
-
-#ifndef SYS_mkdir
-#define SYS_mkdir       39
-#endif
-
-#ifndef SYS_access
-#define SYS_access      33
-#endif
-
-#ifndef SYS_stat
-#define SYS_stat        4
-#endif
-
-/* Syscall wrapper */
-extern long syscall(long number, ...);

@@ -27,6 +27,9 @@ extern FILE *_stdin;
 extern FILE *_stdout;
 extern FILE *_stderr;
 
+/* Forward declaration */
+int _flush_buffer(FILE *stream);
+
 /* ============================================================
  * FFLUSH
  * ============================================================
@@ -38,10 +41,6 @@ extern FILE *_stderr;
  * Return: 0 jika berhasil, EOF jika gagal
  */
 int fflush(FILE *stream) {
-    ssize_t written;
-    size_t total;
-    unsigned char *p;
-
     /* Jika stream NULL, flush semua stream output */
     if (stream == NULL) {
         int result = 0;

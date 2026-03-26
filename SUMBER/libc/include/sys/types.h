@@ -4,7 +4,7 @@
  * Header untuk tipe data sistem sesuai standar POSIX.
  *
  * Bagian dari Pigura C90 Library
- * Versi: 1.0
+ * Versi: 1.1 - Perbaikan duplikasi dan penambahan tipe
  */
 
 #ifndef LIBC_SYS_TYPES_H
@@ -149,10 +149,15 @@ typedef int pthread_once_t;
 /* Tipe untuk ID types */
 typedef unsigned int id_t;
 
-/* Tipe untuk CPU set */
-typedef struct {
-    unsigned long __bits[16];
-} cpu_set_t;
+/* ============================================================
+ * STRUKTUR IOVEC
+ * ============================================================
+ * Struktur untuk scatter/gather I/O
+ */
+struct iovec {
+    void  *iov_base;  /* Starting address */
+    size_t iov_len;   /* Number of bytes */
+};
 
 /* ============================================================
  * KONSTANTA UKURAN
@@ -177,9 +182,12 @@ typedef struct {
 #define OPEN_MAX         1024
 
 /* ============================================================
- * MAKRO CPU SET
+ * TIPE CPU SET
  * ============================================================
  */
+typedef struct {
+    unsigned long __bits[16];
+} cpu_set_t;
 
 /* CPU set operations */
 #define CPU_SETSIZE      1024
@@ -217,8 +225,9 @@ typedef struct {
     })
 
 /* ============================================================
- * MAKRO UNTUK MODE/TYPE
+ * MAKRO UNTUK MODE/TYPE (hanya definisi unik)
  * ============================================================
+ * Catatan: Definisi lengkap S_* ada di sys/stat.h
  */
 
 /* Mask untuk file type */
@@ -241,30 +250,5 @@ typedef struct {
 #define S_ISFIFO(m) (((m) & S_IFMT) == S_IFIFO)
 #define S_ISLNK(m)  (((m) & S_IFMT) == S_IFLNK)
 #define S_ISSOCK(m) (((m) & S_IFMT) == S_IFSOCK)
-
-/* Permission bits */
-#define S_ISUID     04000     /* Set-user-ID */
-#define S_ISGID     02000     /* Set-group-ID */
-#define S_ISVTX     01000     /* Sticky bit */
-
-#define S_IRWXU     00700     /* Owner permissions */
-#define S_IRUSR     00400     /* Owner read */
-#define S_IWUSR     00200     /* Owner write */
-#define S_IXUSR     00100     /* Owner execute */
-
-#define S_IRWXG     00070     /* Group permissions */
-#define S_IRGRP     00040     /* Group read */
-#define S_IWGRP     00020     /* Group write */
-#define S_IXGRP     00010     /* Group execute */
-
-#define S_IRWXO     00007     /* Other permissions */
-#define S_IROTH     00004     /* Other read */
-#define S_IWOTH     00002     /* Other write */
-#define S_IXOTH     00001     /* Other execute */
-
-/* All permissions */
-#define S_IRWXUGO   (S_IRWXU | S_IRWXG | S_IRWXO)
-#define S_IALLUGO   (S_ISUID | S_ISGID | S_ISVTX)
-#define S_IRWXUGO   (S_IRWXU | S_IRWXG | S_IRWXO)
 
 #endif /* LIBC_SYS_TYPES_H */

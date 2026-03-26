@@ -93,6 +93,9 @@ typedef unsigned int uid_t;
 #define SIGRTMAX    63  /* Realtime signal max */
 
 /* Jumlah total signal */
+#ifndef NSIG
+#define NSIG        64
+#endif
 #define _NSIG       64
 
 /* ============================================================

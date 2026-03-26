@@ -4,7 +4,7 @@
  * Implementasi fungsi manajemen proses POSIX.
  *
  * Bagian dari Pigura C90 Library
- * Versi: 1.0
+ * Versi: 2.0 - Disinkronkan dengan syscall Pigura OS
  *
  * Fungsi yang diimplementasikan:
  * - getpid()   - Mendapatkan ID proses
@@ -23,34 +23,11 @@
  */
 
 #include <sys/types.h>
+#include <sys/syscall.h>   /* Syscall numbers dari header terpusat */
 #include <errno.h>
 #include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
-
-/* ============================================================
- * SYSCALL WRAPPER
- * ============================================================
- * Deklarasi fungsi syscall kernel untuk arsitektur x86_64.
- */
-
-/* Syscall number untuk x86_64 Linux */
-#define SYS_getpid   39
-#define SYS_getppid  110
-#define SYS_getuid   102
-#define SYS_geteuid  107
-#define SYS_getgid   104
-#define SYS_getegid  108
-#define SYS_setuid   105
-#define SYS_setgid   103
-#define SYS_fork     57
-#define SYS_execve   59
-
-/* Fungsi wrapper syscall assembly */
-extern long __syscall0(long n);
-extern long __syscall1(long n, long a1);
-extern long __syscall2(long n, long a1, long a2);
-extern long __syscall3(long n, long a1, long a2, long a3);
 
 /* ============================================================
  * FUNGSI HELPER
@@ -118,7 +95,7 @@ static uid_t __set_errno_uid(long result) {
 pid_t getpid(void) {
     long result;
 
-    result = __syscall0(SYS_getpid);
+    result = syscall0(SYS_GETPID);
 
     /* getpid tidak pernah gagal */
     return (pid_t)result;
@@ -132,7 +109,7 @@ pid_t getpid(void) {
 pid_t getppid(void) {
     long result;
 
-    result = __syscall0(SYS_getppid);
+    result = syscall0(SYS_GETPPID);
 
     /* getppid tidak pernah gagal */
     return (pid_t)result;
@@ -146,7 +123,7 @@ pid_t getppid(void) {
 uid_t getuid(void) {
     long result;
 
-    result = __syscall0(SYS_getuid);
+    result = syscall0(SYS_GETUID);
 
     /* getuid tidak pernah gagal */
     return (uid_t)result;
@@ -156,14 +133,12 @@ uid_t getuid(void) {
  * geteuid - Mendapatkan effective user ID
  *
  * Return: Effective user ID proses
+ *
+ * Catatan: Pigura OS menggunakan single UID, jadi geteuid = getuid
  */
 uid_t geteuid(void) {
-    long result;
-
-    result = __syscall0(SYS_geteuid);
-
-    /* geteuid tidak pernah gagal */
-    return (uid_t)result;
+    /* Pigura OS: single UID model */
+    return getuid();
 }
 
 /*
@@ -174,7 +149,7 @@ uid_t geteuid(void) {
 gid_t getgid(void) {
     long result;
 
-    result = __syscall0(SYS_getgid);
+    result = syscall0(SYS_GETGID);
 
     /* getgid tidak pernah gagal */
     return (gid_t)result;
@@ -184,14 +159,12 @@ gid_t getgid(void) {
  * getegid - Mendapatkan effective group ID
  *
  * Return: Effective group ID proses
+ *
+ * Catatan: Pigura OS menggunakan single GID, jadi getegid = getgid
  */
 gid_t getegid(void) {
-    long result;
-
-    result = __syscall0(SYS_getegid);
-
-    /* getegid tidak pernah gagal */
-    return (gid_t)result;
+    /* Pigura OS: single GID model */
+    return getgid();
 }
 
 /* ============================================================
@@ -210,7 +183,7 @@ gid_t getegid(void) {
 int setuid(uid_t uid) {
     long result;
 
-    result = __syscall1(SYS_setuid, (long)uid);
+    result = syscall1(SYS_SETUID, (long)uid);
 
     return __set_errno(result);
 }
@@ -226,7 +199,7 @@ int setuid(uid_t uid) {
 int setgid(gid_t gid) {
     long result;
 
-    result = __syscall1(SYS_setgid, (long)gid);
+    result = syscall1(SYS_SETGID, (long)gid);
 
     return __set_errno(result);
 }
@@ -244,7 +217,7 @@ int setgid(gid_t gid) {
 pid_t fork(void) {
     long result;
 
-    result = __syscall0(SYS_fork);
+    result = syscall0(SYS_FORK);
 
     return __set_errno_pid(result);
 }
@@ -274,8 +247,8 @@ int execve(const char *pathname, char *const argv[],
         return -1;
     }
 
-    result = __syscall3(SYS_execve, (long)pathname,
-                        (long)argv, (long)envp);
+    result = syscall3(SYS_EXEC, (long)pathname,
+                      (long)argv, (long)envp);
 
     /* Jika sampai di sini, execve gagal */
     return __set_errno(result);
@@ -435,10 +408,13 @@ int execvpe(const char *file, char *const argv[], char *const envp[]) {
 
     /* Cari PATH di envp */
     path_copy = NULL;
-    for (int i = 0; envp[i] != NULL; i++) {
-        if (strncmp(envp[i], "PATH=", 5) == 0) {
-            path_copy = strdup(envp[i] + 5);
-            break;
+    {
+        int i;
+        for (i = 0; envp[i] != NULL; i++) {
+            if (strncmp(envp[i], "PATH=", 5) == 0) {
+                path_copy = strdup(envp[i] + 5);
+                break;
+            }
         }
     }
 

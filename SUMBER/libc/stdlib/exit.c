@@ -4,7 +4,7 @@
  * Implementasi fungsi terminasi program.
  *
  * Bagian dari Pigura C90 Library
- * Versi: 1.0
+ * Versi: 2.0 - Disinkronkan dengan syscall Pigura OS
  *
  * Fungsi yang diimplementasikan:
  *   - abort()  : Terminasi abnormal program
@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <errno.h>
+#include <sys/syscall.h>   /* Syscall numbers dari header terpusat */
 
 /* ============================================================
  * KONFIGURASI
@@ -55,14 +56,35 @@ static int in_exit = 0;
  * ============================================================
  */
 
-/* Syscall untuk exit */
-extern void __syscall_exit(int status) __attribute__((noreturn));
-
 /* Fungsi cleanup dari stdio */
 extern void __stdio_cleanup(void);
 
 /* Fungsi cleanup dari stdlib */
 extern void __stdlib_cleanup(void);
+
+/* ============================================================
+ * HELPER FUNCTION
+ * ============================================================
+ */
+
+/*
+ * __syscall_exit - Wrapper untuk syscall exit
+ *
+ * Parameter:
+ *   status - Exit status
+ *
+ * Tidak kembali.
+ */
+static void __syscall_exit(int status) __attribute__((noreturn));
+static void __syscall_exit(int status) {
+    /* Gunakan syscall exit Pigura OS */
+    syscall1(SYS_EXIT, (long)status);
+
+    /* Never reached, but added for noreturn */
+    for (;;) {
+        /* Infinite loop as fallback */
+    }
+}
 
 /* ============================================================
  * IMPLEMENTASI FUNGSI
@@ -71,11 +93,6 @@ extern void __stdlib_cleanup(void);
 
 /*
  * atexit - Daftarkan fungsi untuk dipanggil saat exit
- *
- * Parameter:
- *   func - Fungsi yang didaftarkan
- *
- * Return: 0 jika berhasil, non-zero jika gagal
  */
 int atexit(void (*func)(void)) {
     /* Validasi parameter */
@@ -98,11 +115,6 @@ int atexit(void (*func)(void)) {
 
 /*
  * at_quick_exit - Daftarkan fungsi untuk quick_exit
- *
- * Parameter:
- *   func - Fungsi yang didaftarkan
- *
- * Return: 0 jika berhasil, non-zero jika gagal
  */
 int at_quick_exit(void (*func)(void)) {
     /* Validasi parameter */

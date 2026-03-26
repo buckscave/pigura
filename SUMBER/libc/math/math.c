@@ -4,11 +4,14 @@
  * Implementasi fungsi matematika.
  *
  * Bagian dari Pigura C90 Library
- * Versi: 1.0
+ * Versi: 1.1 - Perbaikan konflik macro
  *
  * Implementasi menggunakan algoritma numerik
  * standar dengan presisi ganda (double).
  */
+
+/* Define ini sebelum include math.h untuk menghindari konflik macro */
+#define __LIBC_MATH_C
 
 #include <math.h>
 #include <errno.h>
@@ -466,7 +469,6 @@ double cbrt(double x) {
  */
 double pow(double x, double y) {
     double result;
-    int i;
     int exp_int;
 
     /* Kasus khusus */

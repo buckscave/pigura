@@ -12,6 +12,12 @@
 #include <errno.h>
 #include <unistd.h>
 
+/* Undefine macros yang akan diimplementasikan sebagai fungsi */
+#undef putchar
+#undef getchar
+#undef getc
+#undef putc
+
 /* ============================================================
  * FPUTC
  * ============================================================

@@ -209,20 +209,21 @@ syscall4:
     push    %ebp
     mov     %esp, %ebp
 
-    SAVE_ARGS                       /* Simpan EBX, ESI, EDI, EBP (EBP sudah disimpan) */
-    /* Setelah push ebp, ebx, esi, edi, ebp: ESP berubah */
+    push    %ebx                    /* Simpan EBX (callee-saved) */
+    push    %esi                    /* Simpan ESI (callee-saved) */
 
-    mov     24(%ebp), %eax          /* Nomor syscall (offset berubah karena save args) */
-    mov     28(%ebp), %ebx          /* Argumen 1 */
-    mov     32(%ebp), %ecx          /* Argumen 2 */
-    mov     36(%ebp), %edx          /* Argumen 3 */
-    mov     40(%ebp), %esi          /* Argumen 4 */
+    mov     8(%ebp), %eax           /* Nomor syscall */
+    mov     12(%ebp), %ebx          /* Argumen 1 */
+    mov     16(%ebp), %ecx          /* Argumen 2 */
+    mov     20(%ebp), %edx          /* Argumen 3 */
+    mov     24(%ebp), %esi          /* Argumen 4 */
 
     int     $0x80
 
     SYSCALL_ERROR
 
-    RESTORE_ARGS                    /* Kembalikan EBX, ESI, EDI, EBP */
+    pop     %esi                    /* Kembalikan ESI */
+    pop     %ebx                    /* Kembalikan EBX */
     pop     %ebp
     ret
     .size syscall4, . - syscall4
@@ -253,12 +254,12 @@ syscall5:
     push    %esi
     push    %edi
 
-    mov     20(%ebp), %eax          /* Nomor syscall */
-    mov     24(%ebp), %ebx          /* Argumen 1 */
-    mov     28(%ebp), %ecx          /* Argumen 2 */
-    mov     32(%ebp), %edx          /* Argumen 3 */
-    mov     36(%ebp), %esi          /* Argumen 4 */
-    mov     40(%ebp), %edi          /* Argumen 5 */
+    mov     8(%ebp), %eax           /* Nomor syscall */
+    mov     12(%ebp), %ebx          /* Argumen 1 */
+    mov     16(%ebp), %ecx          /* Argumen 2 */
+    mov     20(%ebp), %edx          /* Argumen 3 */
+    mov     24(%ebp), %esi          /* Argumen 4 */
+    mov     28(%ebp), %edi          /* Argumen 5 */
 
     int     $0x80
 
@@ -291,32 +292,21 @@ syscall5:
  * CATATAN:
  *   Karena x86 hanya memiliki 6 register untuk argumen,
  *   kita perlu menggunakan EBP untuk argumen ke-6.
- *   Ini berarti kita perlu menyimpan EBP sebelum menggunakannya.
+ *   Frame pointer disimpan di stack dan dipulihkan setelah syscall.
  */
     .global syscall6
     .type syscall6, @function
 syscall6:
-    push    %ebp                    /* Simpan frame pointer lama */
-    mov     %esp, %ebp              /* Setup frame pointer baru */
+    /* Simpan frame pointer lama dan setup frame baru */
+    push    %ebp
+    mov     %esp, %ebp
 
-    /* Simpan register callee-saved yang akan kita gunakan */
+    /* Simpan callee-saved registers yang akan digunakan */
     push    %ebx
     push    %esi
     push    %edi
 
-    /*
-     * Stack layout sekarang (dari bawah ke atas):
-     * [ebp+20] = a6
-     * [ebp+16] = a5
-     * [ebp+12] = a4
-     * [ebp+8]  = a3
-     * [ebp-4]  = edi yang disimpan
-     * [ebp-8]  = esi yang disimpan
-     * [ebp-12] = ebx yang disimpan
-     * [ebp]    = ebp lama
-     * [ebp+4]  = return address
-     *
-     * TAPI, parameter berada di stack sebelum pemanggilan:
+    /* Load argumen dari stack:
      * [ebp+8]  = num
      * [ebp+12] = a1
      * [ebp+16] = a2
@@ -325,37 +315,41 @@ syscall6:
      * [ebp+28] = a5
      * [ebp+32] = a6
      */
-
     mov     8(%ebp), %eax           /* Nomor syscall */
     mov     12(%ebp), %ebx          /* Argumen 1 */
     mov     16(%ebp), %ecx          /* Argumen 2 */
     mov     20(%ebp), %edx          /* Argumen 3 */
     mov     24(%ebp), %esi          /* Argumen 4 */
     mov     28(%ebp), %edi          /* Argumen 5 */
-    push    32(%ebp)                /* Argumen 6 - push ke stack, lalu pop ke ebp */
-    pop     %ebp                    /* Gunakan ebp untuk argumen 6 */
-    /* PERHATIAN: Ini merusak frame pointer, tapi OK untuk syscall */
 
+    /* Simpan frame pointer saat ini di stack */
+    /* Catatan: Ini menambah item di stack, tapi tidak mengubah ebp */
+    push    %ebp
+
+    /* Load argumen 6 ke EBP - gunakan offset yang benar */
+    mov     32(%ebp), %ebp          /* Argumen 6 */
+
+    /* Sekarang semua register siap:
+     * EAX = num, EBX = a1, ECX = a2, EDX = a3
+     * ESI = a4, EDI = a5, EBP = a6
+     */
     int     $0x80
 
-    /* Simpan hasil sebelum mengembalikan stack */
-    push    %eax                    /* Simpan hasil syscall */
+    /* Simpan hasil syscall */
+    push    %eax
 
-    /* Kita perlu mengembalikan ebp ke nilai frame pointer yang benar */
-    /* Sayangnya, kita sudah mengubah ebp. Kita perlu cara lain. */
-    /* Mari kita gunakan pendekatan berbeda: simpan argumen 6 di stack */
+    /* Pulihkan frame pointer dari stack */
+    pop     %eax                    /* Ambil hasil kembali ke EAX */
+    pop     %ebp                    /* Pulihkan frame pointer */
 
-    /* Sebenarnya, cara yang benar adalah: */
-    /* Pop hasil syscall */
-    pop     %eax
-
+    /* Handle error */
     SYSCALL_ERROR
 
-    /* Kembalikan register yang disimpan */
+    /* Pulihkan callee-saved registers */
     pop     %edi
     pop     %esi
     pop     %ebx
-    pop     %ebp                    /* Kembalikan frame pointer lama */
+    pop     %ebp                    /* Pulihkan frame pointer asli */
     ret
     .size syscall6, . - syscall6
 
@@ -369,12 +363,10 @@ syscall6_alt:
     push    %ebp
     mov     %esp, %ebp
 
-    /* Simpan argumen 6 di stack untuk sementara */
-    /* Kemudian load semua argumen */
-
-    push    %ebx                    /* Simpan EBX */
-    push    %esi                    /* Simpan ESI */
-    push    %edi                    /* Simpan EDI */
+    /* Simpan callee-saved registers */
+    push    %ebx
+    push    %esi
+    push    %edi
 
     /* Load argumen */
     mov     8(%ebp), %eax           /* Nomor syscall */
@@ -384,14 +376,11 @@ syscall6_alt:
     mov     24(%ebp), %esi          /* Argumen 4 */
     mov     28(%ebp), %edi          /* Argumen 5 */
 
-    /* Argumen 6 perlu dimasukkan ke EBP, tapi kita sudah menyimpan EBP lama */
-    /* Solusi: gunakan stack untuk menyimpan EBP, lalu restore setelah syscall */
-
-    /* Simpan EBP saat ini (frame pointer) */
+    /* Simpan frame pointer saat ini di stack */
     push    %ebp
 
-    /* Load argumen 6 ke EBP */
-    mov     36(%ebp), %ebp          /* Argumen 6 (offset dari ebp sebelum push ebp) */
+    /* Load argumen 6 ke EBP - offset yang benar */
+    mov     32(%ebp), %ebp          /* Argumen 6 */
 
     /* Sekarang: EAX=num, EBX=a1, ECX=a2, EDX=a3, ESI=a4, EDI=a5, EBP=a6 */
     int     $0x80

@@ -226,32 +226,6 @@ char *gets(char *s) {
 }
 
 /* ============================================================
- * GETC
- * ============================================================
- * Baca satu karakter dari stream (macro version).
- * Implementasi sebagai fungsi untuk kompatibilitas.
- *
- * Parameter:
- *   stream - Stream input
- *
- * Return: Karakter yang dibaca, atau EOF
- */
-int getc(FILE *stream) {
-    return fgetc(stream);
-}
-
-/* ============================================================
- * GETCHAR
- * ============================================================
- * Baca satu karakter dari stdin.
- *
- * Return: Karakter yang dibaca, atau EOF
- */
-int getchar(void) {
-    return fgetc(stdin);
-}
-
-/* ============================================================
  * UNGETC
  * ============================================================
  * Kembalikan karakter ke stream.

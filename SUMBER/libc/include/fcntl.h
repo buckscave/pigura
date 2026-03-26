@@ -4,7 +4,7 @@
  * Header untuk file control options sesuai standar POSIX.
  *
  * Bagian dari Pigura C90 Library
- * Versi: 1.0
+ * Versi: 1.1 - Perbaikan duplikasi dan penambahan konstanta
  */
 
 #ifndef LIBC_FCNTL_H
@@ -76,6 +76,11 @@
 #define F_ADD_SEALS     18  /* Add seals */
 #define F_GET_SEALS     19  /* Get seals */
 
+/* 64-bit versions */
+#define F_GETLK64   20   /* Get lock 64-bit */
+#define F_SETLK64   21   /* Set lock 64-bit non-blocking */
+#define F_SETLKW64  22   /* Set lock 64-bit blocking */
+
 /* Flags untuk F_SETFD/F_GETFD */
 #define FD_CLOEXEC   1   /* Close-on-exec flag */
 
@@ -98,12 +103,12 @@ struct flock {
     pid_t l_pid;     /* PID proses yang locking (untuk F_GETLK) */
 };
 
-/* Struktur untuk file lock (BSD compatibility) */
+/* Struktur untuk file lock 64-bit */
 struct flock64 {
     short l_type;
     short l_whence;
-    long long l_start;
-    long long l_len;
+    off_t l_start;
+    off_t l_len;
     pid_t l_pid;
 };
 
@@ -114,11 +119,6 @@ struct flock64 {
 #define F_RDLCK_LEASE   0   /* Read lease */
 #define F_WRLCK_LEASE   1   /* Write lease */
 #define F_UNLCK_LEASE   2   /* Unlock lease */
-
-/* Lease types */
-#define F_INPROGRESS    0   /* Lease sedang diproses */
-#define F_WRLCK_LEASE   1   /* Write lease */
-#define F_RDLCK_LEASE   2   /* Read lease */
 
 /* ============================================================
  * KONSTANTA UNTUK SEALS
@@ -143,90 +143,45 @@ struct flock64 {
 #define DN_MULTISHOT   0x80000000  /* Multiple notification */
 
 /* ============================================================
- * MODE BIT UNTUK open()
+ * KONSTANTA LOCKF
  * ============================================================
  */
-
-/* Permission bits */
-#define S_ISUID   0x0800   /* Set-user-ID */
-#define S_ISGID   0x0400   /* Set-group-ID */
-#define S_ISVTX   0x0200   /* Sticky bit */
-
-/* Owner permissions */
-#define S_IRWXU   0x01C0   /* Owner: read, write, execute */
-#define S_IRUSR   0x0100   /* Owner read */
-#define S_IWUSR   0x0080   /* Owner write */
-#define S_IXUSR   0x0040   /* Owner execute */
-
-/* Group permissions */
-#define S_IRWXG   0x0038   /* Group: read, write, execute */
-#define S_IRGRP   0x0020   /* Group read */
-#define S_IWGRP   0x0010   /* Group write */
-#define S_IXGRP   0x0008   /* Group execute */
-
-/* Other permissions */
-#define S_IRWXO   0x0007   /* Other: read, write, execute */
-#define S_IROTH   0x0004   /* Other read */
-#define S_IWOTH   0x0002   /* Other write */
-#define S_IXOTH   0x0001   /* Other execute */
-
-/* Mask untuk semua permission */
-#define S_IRWXUGO  (S_IRWXU | S_IRWXG | S_IRWXO)
-#define S_IALLUGO  (S_ISUID | S_ISGID | S_ISVTX)
-#define S_IRWXUGO  (S_IRWXU | S_IRWXG | S_IRWXO)
+#define F_LOCK    0   /* Lock region (blocking) */
+#define F_TLOCK   1   /* Test and lock (non-blocking) */
+#define F_ULOCK   2   /* Unlock region */
+#define F_TEST    3   /* Test for lock */
 
 /* ============================================================
- * DEKLARASI FUNGSI
+ * KONSTANTA FLOCK (BSD)
  * ============================================================
  */
+#define LOCK_SH   1   /* Shared lock */
+#define LOCK_EX   2   /* Exclusive lock */
+#define LOCK_UN   8   /* Unlock */
+#define LOCK_NB   4   /* Non-blocking */
 
-/*
- * open - Buka file
- *
- * Parameter:
- *   pathname - Nama file
- *   flags    - Flag pembukaan (O_RDONLY, O_WRONLY, O_RDWR, dll)
- *   ...      - Mode (diperlukan jika O_CREAT digunakan)
- *
- * Return: File descriptor, atau -1 jika error
+/* ============================================================
+ * SEEK CONSTANTS
+ * ============================================================
  */
-extern int open(const char *pathname, int flags, ...);
+#ifndef SEEK_SET
+#define SEEK_SET 0   /* Dari awal file */
+#endif
+#ifndef SEEK_CUR
+#define SEEK_CUR 1   /* Dari posisi saat ini */
+#endif
+#ifndef SEEK_END
+#define SEEK_END 2   /* Dari akhir file */
+#endif
 
-/*
- * openat - Buka file relatif ke direktori
- *
- * Parameter:
- *   dirfd    - File descriptor direktori (AT_FDCWD untuk cwd)
- *   pathname - Nama file
- *   flags    - Flag pembukaan
- *   ...      - Mode
- *
- * Return: File descriptor, atau -1 jika error
+/* ============================================================
+ * MODE BIT UNTUK open()
+ * ============================================================
+ * Catatan: Definisi S_* lengkap ada di sys/stat.h
  */
-extern int openat(int dirfd, const char *pathname, int flags, ...);
 
-/*
- * creat - Buat file
- *
- * Parameter:
- *   pathname - Nama file
- *   mode     - Mode permission
- *
- * Return: File descriptor, atau -1 jika error
- */
-extern int creat(const char *pathname, mode_t mode);
-
-/*
- * fcntl - Manipulasi file descriptor
- *
- * Parameter:
- *   fd   - File descriptor
- *   cmd  - Perintah (F_*)
- *   ...  - Argumen tambahan (tergantung cmd)
- *
- * Return: Tergantung cmd, atau -1 jika error
- */
-extern int fcntl(int fd, int cmd, ...);
+/* Permission bits - tidak menduplikasi dari sys/stat.h */
+/* Gunakan dari sys/stat.h atau sys/types.h */
 
 /* ============================================================
  * KONSTANTA UNTUK openat()
@@ -247,20 +202,37 @@ extern int fcntl(int fd, int cmd, ...);
 #define AT_STATX_DONT_SYNC    0x4000  /* Jangan sync */
 
 /* ============================================================
+ * DEKLARASI FUNGSI
+ * ============================================================
+ */
+
+/*
+ * open - Buka file
+ */
+extern int open(const char *pathname, int flags, ...);
+
+/*
+ * openat - Buka file relatif ke direktori
+ */
+extern int openat(int dirfd, const char *pathname, int flags, ...);
+
+/*
+ * creat - Buat file
+ */
+extern int creat(const char *pathname, mode_t mode);
+
+/*
+ * fcntl - Manipulasi file descriptor
+ */
+extern int fcntl(int fd, int cmd, ...);
+
+/* ============================================================
  * FUNGSI TAMBAHAN
  * ============================================================
  */
 
 /*
  * posix_fadvise - Beri hint tentang pola akses file
- *
- * Parameter:
- *   fd     - File descriptor
- *   offset - Offset awal
- *   len    - Panjang
- *   advice - Hint (POSIX_FADV_*)
- *
- * Return: 0 jika berhasil, error number jika gagal
  */
 extern int posix_fadvise(int fd, off_t offset, off_t len, int advice);
 
@@ -274,57 +246,39 @@ extern int posix_fadvise(int fd, off_t offset, off_t len, int advice);
 
 /*
  * posix_fallocate - Alokasikan ruang untuk file
- *
- * Parameter:
- *   fd     - File descriptor
- *   offset - Offset awal
- *   len    - Panjang
- *
- * Return: 0 jika berhasil, error number jika gagal
  */
 extern int posix_fallocate(int fd, off_t offset, off_t len);
 
 /*
  * splice - Pindahkan data antara pipe dan file
- *
- * Parameter:
- *   fd_in    - File descriptor input
- *   off_in   - Offset input (NULL untuk pipe)
- *   fd_out   - File descriptor output
- *   off_out  - Offset output (NULL untuk pipe)
- *   len      - Jumlah byte
- *   flags    - Flags
- *
- * Return: Jumlah byte yang dipindahkan, atau -1 jika error
  */
 extern long splice(int fd_in, off_t *off_in, int fd_out,
                    off_t *off_out, size_t len, unsigned int flags);
 
 /*
  * tee - Duplikasi data pipe
- *
- * Parameter:
- *   fd_in  - Pipe input
- *   fd_out - Pipe output
- *   len    - Jumlah byte
- *   flags  - Flags
- *
- * Return: Jumlah byte yang diduplikasi, atau -1 jika error
  */
 extern long tee(int fd_in, int fd_out, size_t len, unsigned int flags);
 
 /*
  * vmsplice - Map user memory ke pipe
- *
- * Parameter:
- *   fd    - Pipe file descriptor
- *   iov   - I/O vectors
- *   nr_segs - Jumlah segments
- *   flags - Flags
- *
- * Return: Jumlah byte, atau -1 jika error
  */
 extern long vmsplice(int fd, const struct iovec *iov,
                      unsigned long nr_segs, unsigned int flags);
+
+/*
+ * readahead - Baca data ke page cache
+ */
+extern ssize_t readahead(int fd, off_t offset, size_t count);
+
+/*
+ * flock - Apply atau remove advisory lock
+ */
+extern int flock(int fd, int operation);
+
+/*
+ * lockf - Apply atau remove POSIX lock
+ */
+extern int lockf(int fd, int cmd, off_t len);
 
 #endif /* LIBC_FCNTL_H */

@@ -72,7 +72,7 @@
     it      lt                      /* If-Then block untuk Thumb mode */
     rsblt   r1, r0, #0              /* Negasikan jika negatif */
     it      lt
-    ldrllt  r2, =errno              /* Load alamat errno jika negatif */
+    ldrlt   r2, =errno              /* Load alamat errno jika negatif */
     it      lt
     strlt   r1, [r2]                /* Simpan error code ke errno */
     it      lt
@@ -722,11 +722,11 @@ syscall0_thumb:
     it      lt
     neglt   r1, r0
     it      lt
-    ldrllt  r2, =errno
+    ldrlt   r2, =errno
     it      lt
     strlt   r1, [r2]
     it      lt
-    movslt  r0, #-1
+    movlt   r0, #-1
     
     bx      lr
     .size syscall0_thumb, . - syscall0_thumb
