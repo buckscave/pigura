@@ -7,9 +7,10 @@
 3. [Hardware Abstraction Layer (HAL)](#hardware-abstraction-layer-hal)
 4. [Multi-Arsitektur](#multi-arsitektur)
 5. [Pigura C90](#pigura-c90)
-6. [Pembagian Bahasa Pemrograman](#pembagian-bahasa-pemrograman)
-7. [Boot Process](#boot-process)
-8. [Memory Layout](#memory-layout)
+6. [Pigura All-in-One Graphics Layer](#pigura-all-in-one-graphics-layer)
+7. [Pembagian Bahasa Pemrograman](#pembagian-bahasa-pemrograman)
+8. [Boot Process](#boot-process)
+9. [Memory Layout](#memory-layout)
 
 ---
 
@@ -24,7 +25,7 @@ Pigura OS adalah sistem operasi **original** yang ditulis dari scratch, bukan fo
 | Identitas | ORIGINAL (dari scratch) |
 | Kernel | Monolithic |
 | Bahasa | Pigura C90 (C89 + POSIX Safe) |
-| UI Layer | Library Terintegrasi (~100 KB) |
+| Graphics Layer | All-in-One (~200 KB) |
 | Driver | Per-IC Series (~600 KB) |
 | Filesystem | FAT32/NTFS/ext2/ISO9660/PiguraFS |
 | Arsitektur | x86/x86_64/ARM/ARMv7/ARM64 |
@@ -36,11 +37,11 @@ Berikut adalah perbandingan kompleksitas antara sistem operasi tradisional dan P
 | Aspek | Linux/Windows | Pigura OS |
 |-------|---------------|-----------|
 | Identitas | Fork/Turunan | ORIGINAL (dari scratch) |
-| UI Layer | X11/Wayland (~500 MB) | Library Terintegrasi (~100 KB) |
+| Graphics Layer | X11/Wayland + GTK/QT + DE (~500 MB) | All-in-One (~200 KB) |
 | Driver Code | Per-vendor (~50 MB) | Per-IC Series (~600 KB) |
 | Runtime | Multiple (~100 MB+) | Minimalist (~50 KB) |
 | LibC | glibc (~3000+ fungsi) | Pigura libc (~160 fungsi) |
-| Total Estimasi | ~650 MB+ | ~5-6 MB |
+| Total Estimasi | ~650 MB+ | ~6-7 MB |
 
 ---
 
@@ -68,7 +69,7 @@ Pigura OS menggunakan model **kernel monolitik** yang dipilih karena beberapa al
 +----------------------------------------------------------+
 |                     USER SPACE                            |
 +----------------------------------------------------------+
-|  Shell  |  Aplikasi  |  LibPigura  |  Dekor             |
+|  Shell  |  Aplikasi  |  PIGURA (All-in-One Graphics)    |
 +----------------------------------------------------------+
 ```
 
@@ -153,71 +154,33 @@ SUMBER/arsitektur/
 │   │   ├── segment_x86.c
 │   │   └── ldt_x86.c
 │   ├── proses/           # Context, TSS, user mode
-│   │   ├── context_x86.S
-│   │   ├── tss_x86.c
-│   │   ├── user_mode_x86.c
-│   │   ├── elf_x86.c
-│   │   └── ring_switch_x86.S
 │   ├── interupsi/        # IDT, ISR, IRQ
-│   │   ├── idt_x86.c
-│   │   ├── isr_x86.S
-│   │   ├── irq_x86.c
-│   │   └── exception_x86.c
 │   ├── hal_x86.c
 │   ├── cpu_x86.c
-│   ├── memori_x86.c
-│   ├── interupsi_x86.c
-│   ├── proses_x86.c
 │   └── syscall_x86.S
 │
 ├── x86_64/               # Intel/AMD 64-bit
 │   ├── boot/             # Long mode setup
-│   │   ├── bootsect.S
-│   │   ├── long_mode.S
-│   │   ├── paging_setup.S
-│   │   └── stage2.c
 │   ├── memori/           # PML4, paging 64-bit
-│   │   ├── gdt_x86_64.c
-│   │   ├── paging_x86_64.c
-│   │   └── pml4_x86_64.c
 │   ├── proses/           # Context 64-bit
 │   ├── interupsi/        # IDT 64-bit
-│   └── ... (mirip x86)
+│   └── ...
 │
 ├── arm/                  # ARM 32-bit generik
 │   ├── boot/             # Vector table, MMU setup
-│   │   ├── boot_arm.S
-│   │   ├── mmu_setup.S
-│   │   └── vector_table.S
 │   ├── memori/           # Page tables, TLB
-│   │   ├── mmu_arm.c
-│   │   ├── page_table_arm.c
-│   │   └── tlb_arm.c
 │   ├── proses/           # Context switching
 │   ├── interupsi/        # GIC, exceptions
 │   └── ...
 │
 ├── armv7/                # ARM Cortex-A series
 │   ├── boot/             # VFP, NEON setup
-│   │   ├── boot_armv7.S
-│   │   ├── mmu_setup.S
-│   │   ├── vfp_setup.S
-│   │   └── neon_setup.S
 │   ├── memori/           # L2 cache
-│   │   ├── mmu_armv7.c
-│   │   ├── page_table_armv7.c
-│   │   └── l2cache_armv7.c
 │   └── ...
 │
 └── arm64/                # AArch64 64-bit
     ├── boot/             # EL levels setup
-    │   ├── boot_arm64.S
-    │   ├── mmu_setup.S
-    │   └── vector_table.S
     ├── memori/           # 4-level paging
-    │   ├── mmu_arm64.c
-    │   ├── page_table_arm64.c
-    │   └── tlb_arm64.c
     └── ...
 ```
 
@@ -261,13 +224,285 @@ Dalam Pigura C90, setiap tugas hanya memiliki SATU fungsi - versi aman:
 
 ---
 
+## Pigura All-in-One Graphics Layer
+
+### Konsep Revolusioner
+
+Pigura OS mengadopsi pendekatan revolusioner dalam arsitektur grafis dengan mengintegrasikan seluruh komponen UI ke dalam satu layer yang disebut **Pigura**. Berbeda dengan Linux yang memisahkan X11/Wayland, GTK/QT, dan Desktop Environment sebagai komponen terpisah, Pigura menggabungkan semuanya dalam satu modul terintegrasi.
+
+### Perbandingan Arsitektur Grafis
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      LINUX TRADISIONAL                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────┐                                               │
+│  │  Aplikasi   │                                               │
+│  └──────┬──────┘                                               │
+│         │                                                       │
+│         v                                                       │
+│  ┌─────────────┐     ┌─────────────────────────────────────┐   │
+│  │  GTK / QT   │     │  Toolkit (~50 MB)                   │   │
+│  └──────┬──────┘     └─────────────────────────────────────┘   │
+│         │                                                       │
+│         v                                                       │
+│  ┌─────────────┐     ┌─────────────────────────────────────┐   │
+│  │ X11/Wayland │     │  Display Server (~500 MB)           │   │
+│  └──────┬──────┘     └─────────────────────────────────────┘   │
+│         │                                                       │
+│         v                                                       │
+│  ┌─────────────┐     ┌─────────────────────────────────────┐   │
+│  │  KMS / DRM  │     │  Kernel Mode Setting                │   │
+│  └──────┬──────┘     └─────────────────────────────────────┘   │
+│         │                                                       │
+│         v                                                       │
+│  ┌─────────────┐                                               │
+│  │ Framebuffer │                                               │
+│  └─────────────┘                                               │
+│                                                                 │
+│  Total: ~500 MB+ kode, 4 layer terpisah                        │
+│  Overhead: IPC, Protocol Parsing, Memory Copy                  │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│                      PIGURA OS                                  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────┐                                               │
+│  │  Aplikasi   │                                               │
+│  └──────┬──────┘                                               │
+│         │                                                       │
+│         v                                                       │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │                      PIGURA                              │   │
+│  │  ┌───────────┬───────────┬───────────┬───────────┐     │   │
+│  │  │ Compositor│ Window Mgr│  Toolkit  │    DE     │     │   │
+│  │  │ (penata/) │(jendela/) │(widget/)  │(terpadu)  │     │   │
+│  │  └───────────┴───────────┴───────────┴───────────┘     │   │
+│  │                                                         │   │
+│  │  ┌───────────────────────────────────────────────────┐ │   │
+│  │  │           Software Rendering (framebuffer/)        │ │   │
+│  │  │  ┌─────────┬─────────┬─────────┬─────────┐       │ │   │
+│  │  │  │ Buffer  │ Canvas  │ Render  │ GPU Acc │       │ │   │
+│  │  │  │ Manager │ Surface │ Engine  │ (opsional)│      │ │   │
+│  │  │  └─────────┴─────────┴─────────┴─────────┘       │ │   │
+│  │  └───────────────────────────────────────────────────┘ │   │
+│  │                                                         │   │
+│  │  Total: ~200 KB                                         │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│         │                                                       │
+│         v                                                       │
+│  ┌─────────────┐                                               │
+│  │Video Driver │     (VBE, UEFI GOP, GPU)                      │
+│  └──────┬──────┘                                               │
+│         │                                                       │
+│         v                                                       │
+│  ┌─────────────┐                                               │
+│  │ Framebuffer │                                               │
+│  └─────────────┘                                               │
+│                                                                 │
+│  Total: ~200 KB kode, 1 layer terintegrasi                     │
+│  Overhead: Minimal (direct call)                               │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Komponen Pigura
+
+#### 1. Compositor (`penata/`)
+
+Compositor bertanggung jawab untuk menggabungkan output dari berbagai aplikasi ke framebuffer final. Fitur utama meliputi:
+
+- **Buffer Management**: Double/triple buffering
+- **Clipping**: Isolasi area render per aplikasi
+- **Z-order**: Pengelolaan urutan jendela
+- **Visual Effects**: Shadow, blur, transparansi, animasi
+
+```
+penata/
+├── inti/           # Core compositor
+├── buffer/         # Buffer management
+├── klip/           # Clipping engine
+├── lapisan/        # Z-order management
+└── efek/           # Visual effects
+```
+
+#### 2. Window Manager (`jendela/`)
+
+Window Manager mengelola posisi, ukuran, dan state jendela aplikasi:
+
+- **Window Creation/Destruction**: Siklus hidup jendela
+- **Window Decoration**: Border, title bar, buttons
+- **Event Routing**: Input ke jendela yang tepat
+- **Stacking Order**: Jendela atas/bawah
+
+```
+jendela/
+├── jendela.c       # Window management
+├── wm.c            # Window manager core
+├── dekorasi.c      # Window decorations
+├── peristiwa.c     # Window events
+└── z_order.c       # Window stacking
+```
+
+#### 3. Event Handler (`peristiwa/`)
+
+Sistem event handling yang merutekan input ke aplikasi yang tepat:
+
+- **Input Events**: Keyboard, mouse, touchscreen
+- **Focus Management**: Jendela aktif
+- **Event Queue**: Antrian event per aplikasi
+- **Event Dispatch**: Routing ke handler
+
+```
+peristiwa/
+├── peristiwa.c     # Event system
+├── pengendali.c    # Event dispatcher
+├── masukan.c       # Input events
+├── penunjuk.c      # Pointer events
+└── fokus.c         # Focus management
+```
+
+#### 4. Toolkit (`widget/`)
+
+Komponen UI siap pakai untuk membangun aplikasi:
+
+- **Basic Widgets**: Button, label, textbox
+- **Containers**: Box, grid, stack
+- **Complex Widgets**: Menu, dialog, scrollbar
+- **Event Handling**: Click, hover, focus
+
+```
+widget/
+├── widget.c        # Widget framework
+├── tombol.c        # Button
+├── kotakteks.c     # Textbox
+├── kotakcentang.c  # Checkbox
+├── bargulir.c      # Scrollbar
+├── menu.c          # Menu
+└── dialog.c        # Dialog
+```
+
+#### 5. Text Engine (`teks/`)
+
+Rendering teks dan manajemen font:
+
+- **Bitmap Font**: Font default 8x8, cepat dan kecil
+- **TTF Support**: Font TrueType (opsional)
+- **Font Cache**: Caching glyph untuk performa
+- **Text Layout**: Alignment, wrapping
+
+```
+teks/
+├── teks.c          # Text rendering
+├── font.c          # Font management
+├── font_bitmap.c   # Bitmap font
+├── font_ttf.c      # TTF support
+├── glyph.c         # Glyph handling
+└── pengolah_teks.c # Text processor
+```
+
+#### 6. Framebuffer Layer (`framebuffer/`)
+
+Software rendering dan buffer management:
+
+- **Buffer Management**: Front/back buffer
+- **Canvas**: Surface untuk menggambar
+- **Render Engine**: CPU/GPU/Hybrid
+- **Primitives**: Titik, garis, kotak, lingkaran, dll
+- **GPU Acceleration**: Opsional, jika GPU tersedia
+
+```
+framebuffer/
+├── framebuffer.c       # Core framebuffer
+├── framebuffer_blit.c  # Blitting
+├── framebuffer_render.c# Rendering
+├── akselerasi_gpu/     # GPU acceleration
+├── buffer/             # Buffer management
+├── kanvas/             # Canvas surface
+└── pengolah/           # Render engine
+```
+
+### Alur Rendering
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    ALUR RENDERING PIGURA                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  1. APLIKASI DRAW                                               │
+│     │                                                           │
+│     v                                                           │
+│  ┌─────────────────┐                                           │
+│  │ Widget Toolkit  │  Button, Textbox, dll                     │
+│  └────────┬────────┘                                           │
+│           │                                                     │
+│           v                                                     │
+│  ┌─────────────────┐                                           │
+│  │  Canvas Buffer  │  Backbuffer per aplikasi                  │
+│  └────────┬────────┘                                           │
+│           │                                                     │
+│           v                                                     │
+│  2. COMPOSITING                                                 │
+│     │                                                           │
+│     v                                                           │
+│  ┌─────────────────┐                                           │
+│  │  Z-order Sort   │  Urutkan jendela                          │
+│  └────────┬────────┘                                           │
+│           │                                                     │
+│           v                                                     │
+│  ┌─────────────────┐                                           │
+│  │ Clip & Blit     │  Gabungkan dengan clipping                │
+│  └────────┬────────┘                                           │
+│           │                                                     │
+│           v                                                     │
+│  ┌─────────────────┐                                           │
+│  │ Apply Effects   │  Shadow, blur, transparansi               │
+│  └────────┬────────┘                                           │
+│           │                                                     │
+│           v                                                     │
+│  3. OUTPUT                                                      │
+│     │                                                           │
+│     v                                                           │
+│  ┌─────────────────┐                                           │
+│  │ Framebuffer     │  Final output                             │
+│  └─────────────────┘                                           │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Driver Video vs GPU
+
+Pigura OS memisahkan secara jelas antara driver video dan driver GPU:
+
+| Aspek | Video Driver | GPU Driver |
+|-------|--------------|------------|
+| Lokasi | `perangkat/tampilan/video/` | `perangkat/tampilan/gpu/` |
+| Fungsi | Inisialisasi display | Akselerasi grafis |
+| Contoh | VBE, UEFI GOP | 2D/3D acceleration |
+| Kompleksitas | Rendah | Tinggi |
+| Ukuran | ~20 KB | ~100 KB |
+
+**Video Driver** bertanggung jawab untuk:
+- Mengatur mode display (resolusi, depth)
+- Mendapatkan alamat framebuffer
+- Inisialisasi dasar hardware display
+
+**GPU Driver** bertanggung jawab untuk:
+- Akselerasi 2D (blit, fill, copy)
+- Akselerasi 3D (vertex, shader)
+- Manajemen memori GPU
+- Command buffer
+
+---
+
 ## Pembagian Bahasa Pemrograman
 
 Pembagian bahasa pemrograman dalam Pigura OS mengikuti prinsip "hanya assembly untuk yang benar-benar diperlukan".
 
 ### Pigura C90
 
-Digunakan untuk seluruh kernel core, driver, filesystem, libc, libpigura, dan aplikasi karena:
+Digunakan untuk seluruh kernel core, driver, filesystem, libc, pigura, dan aplikasi karena:
 - Portabilitas tinggi
 - Keamanan (fungsi bounded)
 - Kemudahan maintenance
@@ -325,6 +560,11 @@ Hanya digunakan untuk operasi-operasi vital yang memerlukan akses hardware langs
 +------------------+
 |  kernel_main()   |  Entry point C
 +------------------+
+         |
+         v
++------------------+
+| pigura_mulai()   |  Initialize graphics
++------------------+
 ```
 
 ### Alur Boot ARM
@@ -350,6 +590,11 @@ Hanya digunakan untuk operasi-operasi vital yang memerlukan akses hardware langs
          v
 +------------------+
 |  kernel_main()   |  Entry point C
++------------------+
+         |
+         v
++------------------+
+| pigura_mulai()   |  Initialize graphics
 +------------------+
 ```
 
@@ -417,5 +662,15 @@ Arsitektur Pigura OS dirancang dengan prinsip:
 3. **Portabel** - Multi-arsitektur dengan HAL
 4. **Aman** - Fungsi bounded, compositor isolasi
 5. **Efisien** - Kernel monolitik, tanpa overhead IPC
+6. **Terintegrasi** - Graphics layer all-in-one
 
-Dengan pendekatan ini, Pigura OS menjadi sistem operasi yang mudah dipahami, dipelihara, dan memiliki identitas sendiri.
+### Inovasi Utama
+
+| Fitur | Inovasi | Keuntungan |
+|-------|---------|------------|
+| Graphics Stack | All-in-One | ~200 KB vs ~500 MB |
+| Driver System | IC Detection | ~600 KB vs ~50 MB |
+| LibC | Pigura C90 | ~160 fungsi vs ~3000+ |
+| Security | Bounded functions | Buffer overflow prevention |
+
+Dengan pendekatan ini, Pigura OS menjadi sistem operasi yang mudah dipahami, dipelihara, dan memiliki identitas sendiri sebagai sistem operasi original Indonesia.
