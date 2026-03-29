@@ -221,7 +221,8 @@ struct hostent *gethostbyaddr(const void *addr, socklen_t len, int family) {
     /* Cek localhost */
     if (in_addr->s_addr == htonl(0x7f000001)) {
         hostent_buf.h_name = host_name_buf;
-        strcpy(host_name_buf, "localhost");
+        strncpy(host_name_buf, "localhost", MAX_LINE_LENGTH - 1);
+        host_name_buf[MAX_LINE_LENGTH - 1] = '\0';
 
         hostent_buf.h_aliases = host_aliases;
         host_aliases[0] = NULL;

@@ -46,7 +46,8 @@ static char *_generate_tmpname(char *buffer) {
     static const char digits[] = "0123456789abcdef";
 
     /* Salin prefix */
-    strcpy(buffer, TMP_PREFIX);
+    strncpy(buffer, TMP_PREFIX, L_tmpnam - 1);
+    buffer[L_tmpnam - 1] = '\0';
     len = TMP_PREFIX_LEN;
 
     /* Tambahkan counter dan PID untuk keunikan */
@@ -190,6 +191,7 @@ char *tempnam(const char *dir, const char *pfx) {
     size_t len;
     unsigned long num;
     int i;
+    int attempts;
     static const char digits[] = "0123456789abcdef";
 
     /* Tentukan direktori */
@@ -212,8 +214,9 @@ char *tempnam(const char *dir, const char *pfx) {
     }
 
     /* Bangun nama */
-    strcpy(buffer, tmpdir);
-    len = strlen(buffer);
+    len = strlen(tmpdir);
+    strncpy(buffer, tmpdir, len);
+    buffer[len] = '\0';
 
     /* Tambahkan separator jika perlu */
     if (len > 0 && buffer[len - 1] != '/') {
@@ -222,24 +225,43 @@ char *tempnam(const char *dir, const char *pfx) {
 
     /* Tambahkan prefix */
     if (pfx != NULL) {
-        strncpy(buffer + len, pfx, 5);
-        len += strlen(buffer + len);
+        size_t pfx_len = strlen(pfx);
+        size_t copy_len = (pfx_len < 5) ? pfx_len : 5;
+        strncpy(buffer + len, pfx, copy_len);
+        len += copy_len;
     } else {
-        strcpy(buffer + len, "tmp");
+        strncpy(buffer + len, "tmp", 3);
         len += 3;
     }
 
-    /* Tambahkan angka unik */
-    num = _tmp_counter++;
-    num ^= (unsigned long)getpid() << 16;
+    buffer[len] = '\0';  /* Null-terminate sebelum uniqueness loop */
 
-    for (i = 0; i < 8; i++) {
-        buffer[len++] = digits[(num >> (28 - i * 4)) & 0xf];
+    /* Loop untuk menemukan nama yang belum ada */
+    attempts = 0;
+    while (attempts < TMP_MAX) {
+        /* Tambahkan angka unik */
+        num = _tmp_counter++;
+        num ^= (unsigned long)getpid() << 16;
+
+        for (i = 0; i < 8; i++) {
+            buffer[len++] = digits[(num >> (28 - i * 4)) & 0xf];
+        }
+        buffer[len] = '\0';
+
+        /* Cek apakah nama sudah ada */
+        if (access(buffer, F_OK) != 0 && errno == ENOENT) {
+            return buffer;
+        }
+
+        /* Reset posisi untuk percobaan berikutnya */
+        len -= 8;
+        attempts++;
     }
 
-    buffer[len] = '\0';
-
-    return buffer;
+    /* Gagal menemukan nama unik */
+    free(buffer);
+    errno = EEXIST;
+    return NULL;
 }
 
 /* ============================================================

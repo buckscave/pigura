@@ -12,29 +12,14 @@
 #include <stdlib.h>
 
 /* ============================================================
- * STRCPY
+ * STRCPY - DIHAPUS
  * ============================================================
- * Salin string dari src ke dest.
+ * Fungsi strcpy() telah DIHAPUS sesuai Pigura C90.
+ * Gunakan strncpy() sebagai pengganti yang aman (bounded).
+ *
+ * typedef char *strcpy_t __attribute__((deprecated(
+ *     "strcpy is unsafe, use strncpy")));
  */
-char *strcpy(char *dest, const char *src) {
-    char *d;
-    
-    if (dest == NULL) {
-        return NULL;
-    }
-    
-    if (src == NULL) {
-        *dest = '\0';
-        return dest;
-    }
-    
-    d = dest;
-    while ((*d++ = *src++) != '\0') {
-        /* Copy sampai null terminator */
-    }
-    
-    return dest;
-}
 
 /* ============================================================
  * STRNCPY
@@ -72,34 +57,11 @@ char *strncpy(char *dest, const char *src, size_t n) {
 }
 
 /* ============================================================
- * STRCAT
+ * STRCAT - DIHAPUS
  * ============================================================
- * Tambahkan src ke akhir dest.
+ * Fungsi strcat() telah DIHAPUS sesuai Pigura C90.
+ * Gunakan strncat() sebagai pengganti yang aman (bounded).
  */
-char *strcat(char *dest, const char *src) {
-    char *d;
-    
-    if (dest == NULL) {
-        return NULL;
-    }
-    
-    if (src == NULL || *src == '\0') {
-        return dest;
-    }
-    
-    /* Cari akhir dest */
-    d = dest;
-    while (*d != '\0') {
-        d++;
-    }
-    
-    /* Copy src ke akhir dest */
-    while ((*d++ = *src++) != '\0') {
-        /* Copy sampai null terminator */
-    }
-    
-    return dest;
-}
 
 /* ============================================================
  * STRNCAT
@@ -426,11 +388,4 @@ char *strtrim_right(char *s) {
     s[len] = '\0';
     
     return s;
-}
-
-/* Stub untuk malloc jika belum ada */
-extern void *malloc(size_t size);
-void *malloc(size_t size) {
-    (void)size;
-    return (void *)0;  /* Stub */
 }

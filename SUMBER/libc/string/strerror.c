@@ -200,7 +200,9 @@ char *strerror(int errnum) {
     /* Error number tidak ditemukan, buat pesan generik */
     /* Catatan: Menggunakan buffer statis (non-reentrant) */
     if (errnum < 0) {
-        strcpy(strerror_buffer, "Unknown error");
+        strncpy(strerror_buffer, "Unknown error",
+                sizeof(strerror_buffer) - 1);
+        strerror_buffer[sizeof(strerror_buffer) - 1] = '\0';
     } else {
         /* Format: "Unknown error NNN" */
         int num = errnum;
@@ -220,7 +222,8 @@ char *strerror(int errnum) {
         }
 
         /* Buat string */
-        strcpy(strerror_buffer, "Unknown error ");
+        strncpy(strerror_buffer, "Unknown error ",
+                sizeof(strerror_buffer) - 1);
         pos = 14; /* strlen("Unknown error ") */
         
         /* Tambahkan digit dari belakang */
@@ -282,7 +285,8 @@ int strerror_r(int errnum, char *buf, size_t buflen) {
             }
             return ERANGE;
         }
-        strcpy(buf, msg);
+        strncpy(buf, msg, buflen - 1);
+        buf[buflen - 1] = '\0';
         return 0;
     }
 
@@ -299,7 +303,8 @@ int strerror_r(int errnum, char *buf, size_t buflen) {
             }
             return ERANGE;
         }
-        strcpy(buf, msg);
+        strncpy(buf, msg, buflen - 1);
+        buf[buflen - 1] = '\0';
         return 0;
     }
 
@@ -329,7 +334,7 @@ int strerror_r(int errnum, char *buf, size_t buflen) {
         }
 
         /* Buat string */
-        strcpy(buf, "Unknown error ");
+        strncpy(buf, "Unknown error ", buflen - 1);
         temp = num;
         buf[msglen] = '\0';
         for (j = digits - 1; j >= 0; j--) {

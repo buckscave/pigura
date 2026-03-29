@@ -4,7 +4,7 @@
  * Implementasi fungsi formatted output.
  *
  * Bagian dari Pigura C90 Library
- * Versi: 1.0
+ * Versi: 1.1 - Perbaikan: bounds checking float, implementasi * width/precision
  */
 
 #include <stdio.h>
@@ -12,6 +12,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
+#include <limits.h>
 
 /* ============================================================
  * KONFIGURASI
@@ -24,6 +25,12 @@
 /* Maksimum padding */
 #define PRINTF_MAX_PAD       256
 
+/* Ukuran buffer konversi angka */
+#define NUM_BUF_SIZE         128
+
+/* Presisi float maksimum yang aman untuk num_buf */
+#define FLOAT_MAX_PRECISION  48
+
 /* ============================================================
  * STRUKTUR OUTPUT
  * ============================================================
@@ -31,13 +38,6 @@
 
 /* Callback untuk output karakter */
 typedef int (*putchar_fn_t)(int c, void *data);
-
-/* Konteks output ke string */
-typedef struct {
-    char *buffer;       /* Buffer output */
-    size_t size;        /* Ukuran buffer */
-    size_t pos;         /* Posisi saat ini */
-} str_ctx_t;
 
 /* Konteks output ke file */
 typedef struct {
@@ -59,18 +59,6 @@ static int _put_to_file(int c, void *data) {
     }
 
     ctx->count++;
-    return 0;
-}
-
-/* Output ke string */
-static int _put_to_str(int c, void *data) {
-    str_ctx_t *ctx = (str_ctx_t *)data;
-
-    if (ctx->pos < ctx->size - 1) {
-        ctx->buffer[ctx->pos++] = (char)c;
-        ctx->buffer[ctx->pos] = '\0';
-    }
-
     return 0;
 }
 
@@ -160,19 +148,63 @@ static int _int_to_str(unsigned long value, char *buffer, int base,
     return len;
 }
 
-/* Konversi float ke string (sederhana) */
-static int _float_to_str(double value, char *buffer, int precision) {
+/* ============================================================
+ * KONVERSI FLOAT KE STRING
+ * ============================================================
+ * Konversi double ke representasi desimal dengan bounds checking.
+ *
+ * Parameter:
+ *   value     - Nilai double yang dikonversi
+ *   buffer    - Buffer tujuan
+ *   buf_size  - Ukuran buffer (termasuk null terminator)
+ *   precision - Jumlah digit desimal (0 untuk tanpa desimal)
+ *
+ * Return: Panjang string yang ditulis, atau 0 jika buffer terlalu kecil
+ *
+ * Catatan: Fungsi ini membatasi precision ke FLOAT_MAX_PRECISION
+ *         untuk mencegah buffer overflow pada num_buf.
+ */
+static int _float_to_str(double value, char *buffer, int buf_size, int precision) {
     long int_part;
     unsigned long frac_part;
     double frac;
     int len = 0;
     int i;
+    int is_negative = 0;
     char temp[32];
+
+    /* Validasi parameter */
+    if (buffer == NULL || buf_size <= 0) {
+        return 0;
+    }
+
+    /* Batasi precision untuk menghindari buffer overflow */
+    if (precision < 0) {
+        precision = 0;
+    }
+    if (precision > FLOAT_MAX_PRECISION) {
+        precision = FLOAT_MAX_PRECISION;
+    }
 
     /* Handle negatif */
     if (value < 0) {
-        buffer[len++] = '-';
+        is_negative = 1;
         value = -value;
+    }
+
+    /* Handle special case: terlalu besar untuk long */
+    if (value >= (double)LONG_MAX) {
+        /* Output indikator overflow */
+        const char *inf_str = "(ovf)";
+        int inf_len = 5;
+        if (is_negative && len < buf_size - 1) {
+            buffer[len++] = '-';
+        }
+        for (i = 0; i < inf_len && len < buf_size - 1; i++) {
+            buffer[len++] = inf_str[i];
+        }
+        buffer[len] = '\0';
+        return len;
     }
 
     /* Ambil bagian integer */
@@ -180,63 +212,99 @@ static int _float_to_str(double value, char *buffer, int precision) {
 
     /* Konversi bagian integer */
     if (int_part == 0) {
-        buffer[len++] = '0';
+        if (len < buf_size - 1) {
+            buffer[len++] = '0';
+        }
     } else {
         int int_len = 0;
         long temp_int = int_part;
 
-        while (temp_int > 0) {
+        while (temp_int > 0 && int_len < 31) {
             temp[int_len++] = '0' + (temp_int % 10);
             temp_int /= 10;
         }
 
         /* Reverse dan copy */
-        for (i = int_len - 1; i >= 0; i--) {
+        for (i = int_len - 1; i >= 0 && len < buf_size - 1; i--) {
             buffer[len++] = temp[i];
         }
     }
 
     /* Tambahkan bagian desimal */
-    if (precision > 0) {
+    if (precision > 0 && len < buf_size - 1) {
+        int avail;  /* Ruang tersisa di buffer setelah titik */
+        int frac_len;
+
+        /* Hitung ruang tersisa: minimum 1 char untuk titik */
+        avail = buf_size - 1 - len;
+
+        /* Tambahkan titik desimal */
         buffer[len++] = '.';
+        avail--;
 
-        frac = value - (double)int_part;
-
-        /* Kalikan untuk presisi */
-        for (i = 0; i < precision; i++) {
-            frac *= 10.0;
+        /* Kurangi precision jika melebihi ruang tersedia */
+        if (precision > avail) {
+            precision = avail;
         }
 
-        frac_part = (unsigned long)(frac + 0.5);
-
-        /* Konversi fraction */
-        if (frac_part == 0) {
-            for (i = 0; i < precision; i++) {
-                buffer[len++] = '0';
-            }
+        if (precision <= 0) {
+            /* Tidak cukup ruang untuk digit desimal, batalkan titik */
+            buffer[--len] = '\0';
         } else {
-            char frac_buf[32];
-            int frac_len = 0;
+            frac = value - (double)int_part;
 
-            while (frac_part > 0 || frac_len < precision) {
-                frac_buf[frac_len++] = '0' + (frac_part % 10);
-                frac_part /= 10;
+            /* Kalikan untuk presisi */
+            for (i = 0; i < precision; i++) {
+                frac *= 10.0;
+            }
 
-                if (frac_len >= precision) {
-                    break;
+            frac_part = (unsigned long)(frac + 0.5);
+
+            /* Konversi fraction */
+            if (frac_part == 0) {
+                for (i = 0; i < precision && len < buf_size - 1; i++) {
+                    buffer[len++] = '0';
+                }
+            } else {
+                char frac_buf[FLOAT_MAX_PRECISION + 1];
+                frac_len = 0;
+
+                while (frac_part > 0 && frac_len < precision) {
+                    frac_buf[frac_len++] = '0' + (frac_part % 10);
+                    frac_part /= 10;
+                }
+
+                /* Pad dengan nol jika perlu */
+                while (frac_len < precision) {
+                    frac_buf[frac_len++] = '0';
+                }
+
+                /* Reverse dan copy */
+                for (i = frac_len - 1; i >= 0 && len < buf_size - 1; i--) {
+                    buffer[len++] = frac_buf[i];
                 }
             }
+        }
+    }
 
-            /* Pad dengan nol jika perlu */
-            while (frac_len < precision) {
-                buffer[len++] = '0';
-                frac_len++;
-            }
-
-            /* Reverse */
-            for (i = frac_len - 1; i >= 0; i--) {
-                buffer[len++] = frac_buf[i];
-            }
+    /* Tambahkan sign di awal */
+    if (is_negative && len > 0 && len < buf_size) {
+        /* Shift buffer 1 posisi ke kanan */
+        int shift_end = (len < buf_size - 1) ? len : buf_size - 2;
+        for (i = shift_end; i > 0; i--) {
+            buffer[i] = buffer[i - 1];
+        }
+        buffer[0] = '-';
+        len++;
+        if (len >= buf_size) {
+            len = buf_size - 1;
+        }
+    } else if (is_negative) {
+        /* Buffer penuh, tulis sign saja */
+        if (buf_size > 0) {
+            buffer[0] = '-';
+            buffer[1] = '\0';
+            len = 1;
         }
     }
 
@@ -268,7 +336,8 @@ static int _float_to_str(double value, char *buffer, int precision) {
 #define LEN_LDBL       8      /* L */
 
 /* Parse format specifier */
-static const char *_parse_format(const char *format, int *flags, int *width,
+static const char *_parse_format(const char *format, va_list *pap,
+                                  int *flags, int *width,
                                   int *precision, int *length, int *spec) {
     const char *p = format;
 
@@ -315,7 +384,13 @@ done_flags:
             p++;
         }
     } else if (*p == '*') {
-        /* Width dari argument (tidak didukung dalam versi ini) */
+        /* Width dari argument */
+        *width = va_arg(*pap, int);
+        if (*width < 0) {
+            /* Negative width berarti left justify */
+            *flags |= FLAG_LEFT;
+            *width = -(*width);
+        }
         p++;
     }
 
@@ -330,7 +405,11 @@ done_flags:
                 p++;
             }
         } else if (*p == '*') {
-            /* Precision dari argument (tidak didukung) */
+            /* Precision dari argument */
+            *precision = va_arg(*pap, int);
+            if (*precision < 0) {
+                *precision = -1;  /* Negative precision = no precision */
+            }
             p++;
         }
     }
@@ -386,8 +465,8 @@ done_flags:
  * ============================================================
  */
 
-static int _do_printf(const char *format, va_list ap,
-                      putchar_fn_t putfn, void *data) {
+int _do_printf(const char *format, va_list ap,
+               putchar_fn_t putfn, void *data) {
     const char *p;
     int count = 0;
     int flags;
@@ -395,7 +474,7 @@ static int _do_printf(const char *format, va_list ap,
     int precision;
     int length;
     int spec;
-    char num_buf[64];
+    char num_buf[NUM_BUF_SIZE];
     int num_len;
     int pad_len;
     int i;
@@ -431,8 +510,8 @@ static int _do_printf(const char *format, va_list ap,
             continue;
         }
 
-        /* Parse format specifier */
-        p = _parse_format(p, &flags, &width, &precision, &length, &spec);
+        /* Parse format specifier (pass va_list pointer for * width/precision) */
+        p = _parse_format(p, &ap, &flags, &width, &precision, &length, &spec);
 
         /* Default precision untuk string dan float */
         if (precision < 0) {
@@ -507,7 +586,24 @@ static int _do_printf(const char *format, va_list ap,
 
             case 'o':
                 /* Octal */
-                uval = va_arg(ap, unsigned int);
+                switch (length) {
+                    case LEN_HH:
+                        uval = (unsigned char)va_arg(ap, unsigned int);
+                        break;
+                    case LEN_H:
+                        uval = (unsigned short)va_arg(ap, unsigned int);
+                        break;
+                    case LEN_L:
+                        uval = va_arg(ap, unsigned long);
+                        break;
+                    case LEN_LL:
+                        uval = va_arg(ap, unsigned long long);
+                        break;
+                    default:
+                        uval = va_arg(ap, unsigned int);
+                        break;
+                }
+
                 num_len = _int_to_str(uval, num_buf, 8, 0);
 
                 if ((flags & FLAG_HASH) && num_buf[0] != '0') {
@@ -523,7 +619,24 @@ static int _do_printf(const char *format, va_list ap,
             case 'x':
             case 'X':
                 /* Hexadecimal */
-                uval = va_arg(ap, unsigned int);
+                switch (length) {
+                    case LEN_HH:
+                        uval = (unsigned char)va_arg(ap, unsigned int);
+                        break;
+                    case LEN_H:
+                        uval = (unsigned short)va_arg(ap, unsigned int);
+                        break;
+                    case LEN_L:
+                        uval = va_arg(ap, unsigned long);
+                        break;
+                    case LEN_LL:
+                        uval = va_arg(ap, unsigned long long);
+                        break;
+                    default:
+                        uval = va_arg(ap, unsigned int);
+                        break;
+                }
+
                 num_len = _int_to_str(uval, num_buf, 16, (spec == 'X'));
 
                 if ((flags & FLAG_HASH) && uval != 0) {
@@ -550,7 +663,7 @@ static int _do_printf(const char *format, va_list ap,
                     is_negative = 1;
                 }
 
-                num_len = _float_to_str(dval, num_buf,
+                num_len = _float_to_str(dval, num_buf, NUM_BUF_SIZE,
                                         (precision >= 0) ? precision : 6);
                 break;
 
@@ -571,7 +684,7 @@ static int _do_printf(const char *format, va_list ap,
 
                 /* Output dengan padding */
                 if (width > 0 && !(flags & FLAG_LEFT)) {
-                    int slen = strlen(strval);
+                    int slen = (int)strlen(strval);
                     if (precision >= 0 && precision < slen) {
                         slen = precision;
                     }
@@ -592,7 +705,7 @@ static int _do_printf(const char *format, va_list ap,
                 }
 
                 if (width > 0 && (flags & FLAG_LEFT)) {
-                    int slen = strlen(strval);
+                    int slen = (int)strlen(strval);
                     if (precision >= 0 && precision < slen) {
                         slen = precision;
                     }
@@ -615,16 +728,16 @@ static int _do_printf(const char *format, va_list ap,
                 /* Write count */
                 switch (length) {
                     case LEN_HH:
-                        *(signed char *)va_arg(ap, signed char *) = count;
+                        *(signed char *)va_arg(ap, signed char *) = (signed char)count;
                         break;
                     case LEN_H:
-                        *(short *)va_arg(ap, short *) = count;
+                        *(short *)va_arg(ap, short *) = (short)count;
                         break;
                     case LEN_L:
-                        *(long *)va_arg(ap, long *) = count;
+                        *(long *)va_arg(ap, long *) = (long)count;
                         break;
                     case LEN_LL:
-                        *(long long *)va_arg(ap, long long *) = count;
+                        *(long long *)va_arg(ap, long long *) = (long long)count;
                         break;
                     default:
                         *(int *)va_arg(ap, int *) = count;
@@ -760,33 +873,6 @@ int fprintf(FILE *stream, const char *format, ...) {
     return (result < 0) ? -1 : ctx.count;
 }
 
-/* sprintf - Output formatted ke string */
-int sprintf(char *str, const char *format, ...) {
-    va_list ap;
-    int result;
-    str_ctx_t ctx;
-
-    if (str == NULL) {
-        errno = EINVAL;
-        return -1;
-    }
-
-    ctx.buffer = str;
-    ctx.size = PRINTF_MAX_OUTPUT;
-    ctx.pos = 0;
-
-    va_start(ap, format);
-    result = _do_printf(format, ap, _put_to_str, &ctx);
-    va_end(ap);
-
-    /* Null terminate */
-    if (ctx.pos < ctx.size) {
-        ctx.buffer[ctx.pos] = '\0';
-    }
-
-    return (result < 0) ? -1 : (int)ctx.pos;
-}
-
 /* vprintf - printf dengan va_list */
 int vprintf(const char *format, va_list ap) {
     file_ctx_t ctx;
@@ -818,27 +904,4 @@ int vfprintf(FILE *stream, const char *format, va_list ap) {
     }
 
     return ctx.count;
-}
-
-/* vsprintf - sprintf dengan va_list */
-int vsprintf(char *str, const char *format, va_list ap) {
-    str_ctx_t ctx;
-
-    if (str == NULL) {
-        errno = EINVAL;
-        return -1;
-    }
-
-    ctx.buffer = str;
-    ctx.size = PRINTF_MAX_OUTPUT;
-    ctx.pos = 0;
-
-    if (_do_printf(format, ap, _put_to_str, &ctx) < 0) {
-        return -1;
-    }
-
-    /* Null terminate */
-    ctx.buffer[ctx.pos] = '\0';
-
-    return (int)ctx.pos;
 }

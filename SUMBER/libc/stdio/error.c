@@ -181,31 +181,8 @@ const char *__stdio_error_str(int errnum) {
             return "Function not implemented";
         default:
             /* Buat pesan unknown */
-            sprintf(unknown_buf, "Unknown error %d", errnum);
+            snprintf(unknown_buf, sizeof(unknown_buf), "Unknown error %d", errnum);
             return unknown_buf;
     }
 }
 
-/* ============================================================
- * FILNO
- * ============================================================
- * Dapatkan file descriptor dari stream.
- *
- * Parameter:
- *   stream - Stream yang diperiksa
- *
- * Return: File descriptor, atau -1 jika error
- */
-int fileno(FILE *stream) {
-    if (stream == NULL) {
-        errno = EBADF;
-        return -1;
-    }
-
-    if (stream->fd < 0) {
-        errno = EBADF;
-        return -1;
-    }
-
-    return stream->fd;
-}

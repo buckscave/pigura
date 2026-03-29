@@ -165,9 +165,10 @@ extern int fgetc(FILE *stream);
 extern char *fgets(char *s, int n, FILE *stream);
 
 /*
- * gets - Baca string dari stdin (DEPRECATED, UNSAFE)
+ * gets - DIHAPUS sesuai Pigura C90
+ * Fungsi gets() tidak aman (tanpa batas ukuran buffer).
+ * Gunakan fgets() sebagai pengganti yang aman.
  */
-extern char *gets(char *s);
 
 /*
  * fputc - Tulis satu karakter
@@ -265,9 +266,10 @@ extern int printf(const char *format, ...);
 extern int fprintf(FILE *stream, const char *format, ...);
 
 /*
- * sprintf - Cetak formatted ke string
+ * sprintf - DIHAPUS sesuai Pigura C90
+ * Fungsi sprintf() tidak aman (tanpa batas ukuran buffer).
+ * Gunakan snprintf() sebagai pengganti yang aman.
  */
-extern int sprintf(char *str, const char *format, ...);
 
 /*
  * snprintf - Cetak formatted ke string dengan batas
@@ -285,9 +287,10 @@ extern int vprintf(const char *format, va_list ap);
 extern int vfprintf(FILE *stream, const char *format, va_list ap);
 
 /*
- * vsprintf - Cetak formatted ke string (va_list)
+ * vsprintf - DIHAPUS sesuai Pigura C90
+ * Fungsi vsprintf() tidak aman (tanpa batas ukuran buffer).
+ * Gunakan vsnprintf() sebagai pengganti yang aman.
  */
-extern int vsprintf(char *str, const char *format, va_list ap);
 
 /*
  * vsnprintf - Cetak formatted ke string dengan batas (va_list)

@@ -29,10 +29,10 @@ FILE *stdin = &_stdin;
 FILE *stdout = &_stdout;
 FILE *stderr = &_stderr;
 
-/* Pool FILE untuk alokasi */
-static FILE _file_pool[FOPEN_MAX];
-static int _file_pool_used[FOPEN_MAX];
-static int _file_pool_initialized = 0;
+/* Pool FILE untuk alokasi (visible ke flush.c untuk fflush NULL) */
+FILE _file_pool[FOPEN_MAX];
+int _file_pool_used[FOPEN_MAX];
+int _file_pool_initialized = 0;
 
 /* Buffer untuk stdin/stdout/stderr */
 static unsigned char _stdin_buf[BUFSIZ];
@@ -604,7 +604,7 @@ void __stdio_init(void) {
     _stdin.buf_pos = 0;
     _stdin.buf_len = 0;
     _stdin.buf_mode = _IOLBF;
-    strcpy(_stdin.mode, "r");
+    strncpy(_stdin.mode, "r", sizeof(_stdin.mode) - 1); _stdin.mode[sizeof(_stdin.mode) - 1] = '\0';
 
     /* Inisialisasi stdout */
     _stdout.fd = STDOUT_FILENO;
@@ -614,7 +614,7 @@ void __stdio_init(void) {
     _stdout.buf_pos = 0;
     _stdout.buf_len = 0;
     _stdout.buf_mode = _IOLBF;
-    strcpy(_stdout.mode, "w");
+    strncpy(_stdout.mode, "w", sizeof(_stdout.mode) - 1); _stdout.mode[sizeof(_stdout.mode) - 1] = '\0';
 
     /* Inisialisasi stderr */
     _stderr.fd = STDERR_FILENO;
@@ -624,7 +624,7 @@ void __stdio_init(void) {
     _stderr.buf_pos = 0;
     _stderr.buf_len = 0;
     _stderr.buf_mode = _IONBF;  /* stderr unbuffered */
-    strcpy(_stderr.mode, "w");
+    strncpy(_stderr.mode, "w", sizeof(_stderr.mode) - 1); _stderr.mode[sizeof(_stderr.mode) - 1] = '\0';
 
     /* Init pool */
     _init_file_pool();

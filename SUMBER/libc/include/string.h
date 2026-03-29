@@ -103,19 +103,14 @@ extern void *memchr(const void *s, int c, size_t n);
  */
 
 /*
- * strcpy - Salin string
- * Menyalin string dari src ke dest, termasuk null terminator.
+ * strcpy - DIHAPUS sesuai Pigura C90
+ * Fungsi strcpy() tidak aman (tanpa batas ukuran buffer).
+ * Gunakan strncpy() sebagai pengganti yang aman.
  *
- * Parameter:
- *   dest - Buffer tujuan
- *   src  - String sumber
- *
- * Return: Pointer ke dest
- *
- * Peringatan: Tidak aman jika buffer dest terlalu kecil.
- * Gunakan strncpy untuk keamanan.
+ * PIGURA C90 = C89 Core + POSIX Safe Functions
+ * Filosofi: Setiap tugas hanya memiliki SATU fungsi - versi aman.
+ * Dihapus: strcpy → Tersedia: strncpy (bounded)
  */
-extern char *strcpy(char *dest, const char *src);
 
 /*
  * strncpy - Salin string dengan batas
@@ -135,19 +130,14 @@ extern char *strcpy(char *dest, const char *src);
 extern char *strncpy(char *dest, const char *src, size_t n);
 
 /*
- * strcat - Gabungkan string
- * Menambahkan src ke akhir dest.
+ * strcat - DIHAPUS sesuai Pigura C90
+ * Fungsi strcat() tidak aman (tanpa batas ukuran buffer).
+ * Gunakan strncat() sebagai pengganti yang aman.
  *
- * Parameter:
- *   dest - String tujuan (harus null-terminated)
- *   src  - String yang ditambahkan
- *
- * Return: Pointer ke dest
- *
- * Peringatan: Tidak aman jika buffer dest terlalu kecil.
- * Gunakan strncat untuk keamanan.
+ * PIGURA C90 = C89 Core + POSIX Safe Functions
+ * Filosofi: Setiap tugas hanya memiliki SATU fungsi - versi aman.
+ * Dihapus: strcat → Tersedia: strncat (bounded)
  */
-extern char *strcat(char *dest, const char *src);
 
 /*
  * strncat - Gabungkan string dengan batas
@@ -313,17 +303,14 @@ extern size_t strspn(const char *s, const char *accept);
 extern size_t strcspn(const char *s, const char *reject);
 
 /*
- * strtok - Tokenize string (NON-REENTRANT)
+ * strtok - DIHAPUS sesuai Pigura C90
+ * Fungsi strtok() tidak aman (non-reentrant, menggunakan state statis).
+ * Gunakan strtok_r() sebagai pengganti yang aman (reentrant).
  *
- * Parameter:
- *   str    - String yang di-tokenize (NULL untuk lanjutan)
- *   delim  - Set delimiter
- *
- * Return: Pointer ke token berikutnya, atau NULL
- *
- * Peringatan: Tidak thread-safe. Gunakan strtok_r.
+ * PIGURA C90 = C89 Core + POSIX Safe Functions
+ * Filosofi: Setiap tugas hanya memiliki SATU fungsi - versi aman.
+ * Dihapus: strtok → Tersedia: strtok_r (reentrant)
  */
-extern char *strtok(char *str, const char *delim);
 
 /*
  * strtok_r - Tokenize string (REENTRANT, POSIX)
