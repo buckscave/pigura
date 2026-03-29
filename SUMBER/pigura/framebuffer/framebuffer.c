@@ -11,56 +11,38 @@
  */
 
 #include "../../inti/kernel.h"
+#include "framebuffer.h"
 
 /*
  * ===========================================================================
- * KONSTANTA
+ * DEFINISI STRUKTUR PERMUKAAN (lengkap)
  * ===========================================================================
- */
-
-#define PERMUKAAN_MAGIC        0x5045524D  /* "PERM" */
-#define PERMUKAAN_MAKS         256
-
-/* Format pixel */
-#define FORMAT_INVALID         0
-#define FORMAT_RGB332          1
-#define FORMAT_RGB565          2
-#define FORMAT_RGB888          3
-#define FORMAT_ARGB8888        4
-#define FORMAT_XRGB8888        5
-
-/* Flags */
-#define PERMUKAAN_FLAG_DOUBLE_BUFFER  0x01
-#define PERMUKAAN_FLAG_LINEAR         0x02
-#define PERMUKAAN_FLAG_GPU_ACCEL      0x04
-
-/*
- * ===========================================================================
- * STRUKTUR DATA
- * ===========================================================================
+ * Definisi penuh struct permukaan.
+ * Hanya dilihat oleh framebuffer.c.
+ * Pengguna luar hanya melihat forward declaration di framebuffer.h.
  */
 
 struct permukaan {
     tak_bertanda32_t magic;
-    
+
     /* Dimensi */
     tak_bertanda32_t lebar;
     tak_bertanda32_t tinggi;
     tak_bertanda32_t bpp;
     tak_bertanda32_t pitch;
     tak_bertanda32_t format;
-    
+
     /* Buffer */
     tak_bertanda32_t *piksel;
     tak_bertanda32_t *piksel_belakang;  /* Back buffer */
     ukuran_t ukuran;
-    
+
     /* Alamat fisik (untuk permukaan display) */
     tak_bertanda64_t alamat_fisik;
-    
+
     /* Flags */
     tak_bertanda32_t flags;
-    
+
     /* Status */
     bool_t kotor;
     bool_t aktif;
@@ -128,41 +110,42 @@ status_t permukaan_init(void)
     if (g_initialized) {
         return STATUS_SUDAH_ADA;
     }
-    
+
     kernel_memset(g_permukaan_list, 0, sizeof(g_permukaan_list));
     g_permukaan_count = 0;
     g_display = NULL;
     g_initialized = BENAR;
-    
+
     return STATUS_BERHASIL;
 }
 
-permukaan_t *permukaan_buat(tak_bertanda32_t lebar, tak_bertanda32_t tinggi,
+permukaan_t *permukaan_buat(tak_bertanda32_t lebar,
+                             tak_bertanda32_t tinggi,
                              tak_bertanda32_t bpp)
 {
     struct permukaan *p;
     tak_bertanda32_t i;
-    
+
     if (!g_initialized) {
         return NULL;
     }
-    
+
     /* Cari slot kosong */
     for (i = 0; i < PERMUKAAN_MAKS; i++) {
         if (g_permukaan_list[i].magic != PERMUKAAN_MAGIC) {
             break;
         }
     }
-    
+
     if (i >= PERMUKAAN_MAKS) {
         return NULL;  /* Penuh */
     }
-    
+
     p = &g_permukaan_list[i];
-    
+
     /* Inisialisasi */
     kernel_memset(p, 0, sizeof(struct permukaan));
-    
+
     p->magic = PERMUKAAN_MAGIC;
     p->lebar = lebar;
     p->tinggi = tinggi;
@@ -170,20 +153,20 @@ permukaan_t *permukaan_buat(tak_bertanda32_t lebar, tak_bertanda32_t tinggi,
     p->pitch = lebar * (bpp / 8);
     p->format = format_dari_bpp(bpp);
     p->ukuran = (ukuran_t)p->pitch * tinggi;
-    
+
     /* Alokasi buffer */
     p->piksel = (tak_bertanda32_t *)kmalloc(p->ukuran);
     if (p->piksel == NULL) {
         p->magic = 0;
         return NULL;
     }
-    
+
     kernel_memset(p->piksel, 0, p->ukuran);
     p->aktif = BENAR;
     p->kotor = SALAH;
-    
+
     g_permukaan_count++;
-    
+
     return (permukaan_t *)p;
 }
 
@@ -194,41 +177,41 @@ permukaan_t *permukaan_buat_display(tak_bertanda64_t alamat_fisik,
                                       tak_bertanda32_t pitch)
 {
     struct permukaan *p;
-    
+
     p = (struct permukaan *)permukaan_buat(lebar, tinggi, bpp);
     if (p == NULL) {
         return NULL;
     }
-    
-    /* Gunakan alamat fisik yang sudah ada (dari video driver) */
+
+    /* Gunakan alamat fisik dari video driver */
     p->alamat_fisik = alamat_fisik;
-    p->piksel = (tak_bertanda32_t *)alamat_fisik;  /* Akan di-map oleh paging */
+    p->piksel = (tak_bertanda32_t *)alamat_fisik;
     p->pitch = pitch;
     p->ukuran = (ukuran_t)pitch * tinggi;
-    
+
     g_display = p;
-    
+
     return (permukaan_t *)p;
 }
 
 void permukaan_hapus(permukaan_t *handle)
 {
     struct permukaan *p = (struct permukaan *)handle;
-    
+
     if (p == NULL || p->magic != PERMUKAAN_MAGIC) {
         return;
     }
-    
+
     /* Jangan hapus buffer display fisik */
     if (p->alamat_fisik == 0 && p->piksel != NULL) {
         kfree(p->piksel);
     }
-    
+
     /* Hapus back buffer jika ada */
     if (p->piksel_belakang != NULL) {
         kfree(p->piksel_belakang);
     }
-    
+
     kernel_memset(p, 0, sizeof(struct permukaan));
     g_permukaan_count--;
 }
@@ -236,10 +219,11 @@ void permukaan_hapus(permukaan_t *handle)
 void permukaan_hapus_semua(void)
 {
     tak_bertanda32_t i;
-    
+
     for (i = 0; i < PERMUKAAN_MAKS; i++) {
         if (g_permukaan_list[i].magic == PERMUKAAN_MAGIC) {
-            permukaan_hapus((permukaan_t *)&g_permukaan_list[i]);
+            permukaan_hapus(
+                (permukaan_t *)&g_permukaan_list[i]);
         }
     }
 }
@@ -250,17 +234,19 @@ void permukaan_tulis_piksel(permukaan_t *handle, tak_bertanda32_t x,
                              tak_bertanda32_t y, tak_bertanda32_t warna)
 {
     struct permukaan *p = (struct permukaan *)handle;
-    
-    if (p == NULL || p->magic != PERMUKAAN_MAGIC || p->piksel == NULL) {
+
+    if (p == NULL || p->magic != PERMUKAAN_MAGIC) {
         return;
     }
-    
+    if (p->piksel == NULL) {
+        return;
+    }
+
     if (x >= p->lebar || y >= p->tinggi) {
         return;
     }
-    
-    tak_bertanda32_t offset = y * (p->pitch / 4) + x;
-    p->piksel[offset] = warna;
+
+    p->piksel[y * (p->pitch / 4) + x] = warna;
     p->kotor = BENAR;
 }
 
@@ -269,28 +255,33 @@ tak_bertanda32_t permukaan_baca_piksel(permukaan_t *handle,
                                         tak_bertanda32_t y)
 {
     struct permukaan *p = (struct permukaan *)handle;
-    
-    if (p == NULL || p->magic != PERMUKAAN_MAGIC || p->piksel == NULL) {
+
+    if (p == NULL || p->magic != PERMUKAAN_MAGIC) {
         return 0;
     }
-    
+    if (p->piksel == NULL) {
+        return 0;
+    }
+
     if (x >= p->lebar || y >= p->tinggi) {
         return 0;
     }
-    
-    tak_bertanda32_t offset = y * (p->pitch / 4) + x;
-    return p->piksel[offset];
+
+    return p->piksel[y * (p->pitch / 4) + x];
 }
 
 void permukaan_isi(permukaan_t *handle, tak_bertanda32_t warna)
 {
     struct permukaan *p = (struct permukaan *)handle;
     tak_bertanda32_t total_piksel;
-    
-    if (p == NULL || p->magic != PERMUKAAN_MAGIC || p->piksel == NULL) {
+
+    if (p == NULL || p->magic != PERMUKAAN_MAGIC) {
         return;
     }
-    
+    if (p->piksel == NULL) {
+        return;
+    }
+
     total_piksel = p->lebar * p->tinggi;
     kernel_memset32(p->piksel, warna, total_piksel);
     p->kotor = BENAR;
@@ -298,23 +289,28 @@ void permukaan_isi(permukaan_t *handle, tak_bertanda32_t warna)
 
 void permukaan_isi_kotak(permukaan_t *handle, tak_bertanda32_t x,
                           tak_bertanda32_t y, tak_bertanda32_t lebar,
-                          tak_bertanda32_t tinggi, tak_bertanda32_t warna)
+                          tak_bertanda32_t tinggi,
+                          tak_bertanda32_t warna)
 {
     struct permukaan *p = (struct permukaan *)handle;
     tak_bertanda32_t i, j;
-    
+
     if (p == NULL || p->magic != PERMUKAAN_MAGIC) {
         return;
     }
-    
+
     /* Bounds check */
     if (x >= p->lebar || y >= p->tinggi) {
         return;
     }
-    
-    if (x + lebar > p->lebar) lebar = p->lebar - x;
-    if (y + tinggi > p->tinggi) tinggi = p->tinggi - y;
-    
+
+    if (x + lebar > p->lebar) {
+        lebar = p->lebar - x;
+    }
+    if (y + tinggi > p->tinggi) {
+        tinggi = p->tinggi - y;
+    }
+
     /* Isi per baris */
     for (j = y; j < y + tinggi; j++) {
         tak_bertanda32_t offset = j * (p->pitch / 4) + x;
@@ -322,7 +318,7 @@ void permukaan_isi_kotak(permukaan_t *handle, tak_bertanda32_t x,
             p->piksel[offset + i] = warna;
         }
     }
-    
+
     p->kotor = BENAR;
 }
 
@@ -331,31 +327,46 @@ void permukaan_isi_kotak(permukaan_t *handle, tak_bertanda32_t x,
 tak_bertanda32_t permukaan_lebar(permukaan_t *handle)
 {
     struct permukaan *p = (struct permukaan *)handle;
-    return (p != NULL && p->magic == PERMUKAAN_MAGIC) ? p->lebar : 0;
+    if (p != NULL && p->magic == PERMUKAAN_MAGIC) {
+        return p->lebar;
+    }
+    return 0;
 }
 
 tak_bertanda32_t permukaan_tinggi(permukaan_t *handle)
 {
     struct permukaan *p = (struct permukaan *)handle;
-    return (p != NULL && p->magic == PERMUKAAN_MAGIC) ? p->tinggi : 0;
+    if (p != NULL && p->magic == PERMUKAAN_MAGIC) {
+        return p->tinggi;
+    }
+    return 0;
 }
 
 tak_bertanda32_t permukaan_bpp(permukaan_t *handle)
 {
     struct permukaan *p = (struct permukaan *)handle;
-    return (p != NULL && p->magic == PERMUKAAN_MAGIC) ? p->bpp : 0;
+    if (p != NULL && p->magic == PERMUKAAN_MAGIC) {
+        return p->bpp;
+    }
+    return 0;
 }
 
 tak_bertanda32_t permukaan_pitch(permukaan_t *handle)
 {
     struct permukaan *p = (struct permukaan *)handle;
-    return (p != NULL && p->magic == PERMUKAAN_MAGIC) ? p->pitch : 0;
+    if (p != NULL && p->magic == PERMUKAAN_MAGIC) {
+        return p->pitch;
+    }
+    return 0;
 }
 
 void *permukaan_buffer(permukaan_t *handle)
 {
     struct permukaan *p = (struct permukaan *)handle;
-    return (p != NULL && p->magic == PERMUKAAN_MAGIC) ? (void *)p->piksel : NULL;
+    if (p != NULL && p->magic == PERMUKAAN_MAGIC) {
+        return (void *)p->piksel;
+    }
+    return NULL;
 }
 
 permukaan_t *permukaan_display(void)
@@ -368,23 +379,24 @@ permukaan_t *permukaan_display(void)
 status_t permukaan_aktifkan_double_buffer(permukaan_t *handle)
 {
     struct permukaan *p = (struct permukaan *)handle;
-    
+
     if (p == NULL || p->magic != PERMUKAAN_MAGIC) {
-        return STATUS_PARAM_KOSONG;
+        return STATUS_PARAM_NULL;
     }
-    
+
     if (p->piksel_belakang != NULL) {
         return STATUS_SUDAH_ADA;
     }
-    
-    p->piksel_belakang = (tak_bertanda32_t *)kmalloc(p->ukuran);
+
+    p->piksel_belakang =
+        (tak_bertanda32_t *)kmalloc(p->ukuran);
     if (p->piksel_belakang == NULL) {
-        return STATUS_MEMORI_KURANG;
+        return STATUS_MEMORI_TIDAK_CUKUP;
     }
-    
+
     kernel_memcpy(p->piksel_belakang, p->piksel, p->ukuran);
-    p->flags |= PERMUKAAN_FLAG_DOUBLE_BUFFER;
-    
+    p->flags |= PERMUKAAN_FLAG_DOUBLE_BUF;
+
     return STATUS_BERHASIL;
 }
 
@@ -392,25 +404,26 @@ void permukaan_flip(permukaan_t *handle)
 {
     struct permukaan *p = (struct permukaan *)handle;
     tak_bertanda32_t *temp;
-    
+
     if (p == NULL || p->magic != PERMUKAAN_MAGIC) {
         return;
     }
-    
+
     if (p->piksel_belakang == NULL) {
         return;  /* Tidak ada double buffer */
     }
-    
+
     /* Swap buffers */
     temp = p->piksel;
     p->piksel = p->piksel_belakang;
     p->piksel_belakang = temp;
-    
+
     /* Copy ke display jika ini permukaan display */
     if (p == g_display && p->alamat_fisik != 0) {
-        kernel_memcpy((void *)p->alamat_fisik, p->piksel, p->ukuran);
+        kernel_memcpy(
+            (void *)p->alamat_fisik, p->piksel, p->ukuran);
     }
-    
+
     p->kotor = SALAH;
 }
 
