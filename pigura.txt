@@ -8,9 +8,9 @@ Monolithic Kernel dengan Pigura C90
 
 Tanpa X11/Wayland - Framebuffer + GPU Langsung
 
-Multi-Arsitektur: x86, x86_64, ARM, ARMv7
+Multi-Arsitektur: x86, x86_64, ARM, ARMv7, ARM64
 
-Versi 1.1 - 2025
+Versi 1.2 - 2025
 
 
 ================================================================================
@@ -45,54 +45,79 @@ Versi 1.1 - 2025
     5.2 Komponen Sistem IC Detection
     5.3 Alur Deteksi IC
     5.4 Database Parameter IC
-    5.5 Driver Generik
+    5.5 Driver Umum
     5.6 Keuntungan Pendekatan Ini
 
 6.  Sistem Grafis dan Framebuffer
     6.1 Kenapa Tanpa X11/Wayland?
-    6.2 Arsitektur Framebuffer
-    6.3 Arsitektur GPU
-    6.4 Arsitektur LibPigura
-    6.5 Perbandingan Kompleksitas
+    6.2 Arsitektur Framebuffer (SUMBER/pigura/framebuffer/)
+    6.3 Arsitektur GPU (SUMBER/perangkat/tampilan/gpu/)
+    6.4 Arsitektur Penata - Compositor Minimal
+    6.5 Arsitektur Widget
+    6.6 Arsitektur Peristiwa (Event System)
+    6.7 Arsitektur Teks dan Font
+    6.8 Arsitektur Jendela
+    6.9 Perbandingan Kompleksitas
 
-7.  Dekor - Compositor Minimal
-    7.1 Kenapa Perlu Compositor?
-    7.2 Arsitektur Dekor
-    7.3 Komponen Dekor
-    7.4 Keuntungan Compositor Minimal
+7.  Sistem Font
+    7.1 Bitmap vs Vector Font
+    7.2 Rekomendasi: Pendekatan Hybrid
+    7.3 Format Pigura Font (.pf)
+    7.4 Rencana Implementasi Bertahap
 
-8.  Sistem Font
-    8.1 Bitmap vs Vector Font
-    8.2 Rekomendasi: Pendekatan Hybrid
-    8.3 Format Pigura Font (.pf)
-    8.4 Rencana Implementasi Bertahap
+8.  Sistem File
+    8.1 Filesystem yang Didukung
+    8.2 Virtual File System (VFS)
+    8.3 FAT32
+    8.4 NTFS
+    8.5 ext2
+    8.6 ISO9660
+    8.7 initramfs
+    8.8 PiguraFS (Native)
 
-9.  Sistem File
-    9.1 Filesystem yang Didukung
-    9.2 Virtual File System (VFS)
-    9.3 FAT32
-    9.4 NTFS
-    9.5 ext2
-    9.6 ISO9660
-    9.7 initramfs
-    9.8 PiguraFS (Native)
+9.  Sistem Format Berkas
+    9.1 Arsitektur Format Handler
+    9.2 Format Gambar
+    9.3 Format Dokumen
+    9.4 Format Media
+    9.5 Format Arsip
 
 10. Sistem User Mode
     10.1 Ring Protection
     10.2 System Call
     10.3 Process Management
 
-11. Struktur Direktori Proyek
-    11.1 Layout Direktori Utama
-    11.2 Struktur Lengkap
+11. Sistem Perangkat Keras
+    11.1 CPU Management
+    11.2 Memory Controller
+    11.3 DMA Controller
+    11.4 Penyimpanan (Storage)
+    11.5 Jaringan (Network)
+    11.6 Input Devices
+    11.7 Video Output
 
-12. Estimasi Ukuran dan Kompleksitas
+12. Sistem Boot
+    12.1 Bootloader (SUMBER/_memuat/)
+    12.2 Arsitektur Boot per Platform
 
-13. Daftar Implementasi Prioritas
+13. Aplikasi Pengguna
+    13.1 Aplikasi Sistem
+    13.2 Aplikasi Grafis
+    13.3 Aplikasi Kantor
+    13.4 Aplikasi Jaringan
+    13.5 Aplikasi Utilitas
 
-14. Sistem Build Multi-Arsitektur
+14. Struktur Direktori Proyek
+    14.1 Layout Direktori Utama
+    14.2 Struktur Lengkap
 
-15. Kesimpulan
+15. Estimasi Ukuran dan Kompleksitas
+
+16. Daftar Implementasi Prioritas
+
+17. Sistem Build Multi-Arsitektur
+
+18. Kesimpulan
 
 
 ================================================================================
@@ -135,11 +160,12 @@ vital yang memerlukan akses hardware langsung.
     * Interrupt handling
     * Switching ke user mode (Ring 0 ke Ring 3)
   - Tanpa X11/Wayland - langsung menggunakan framebuffer + GPU
-  - Target arsitektur: x86 (32-bit), x86_64 (64-bit), ARM, ARMv7
+  - Target arsitektur: x86 (32-bit), x86_64 (64-bit), ARM, ARMv7, ARM64
   - Seluruh penamaan, komentar, dan dokumentasi dalam Bahasa Indonesia
   - Dukungan multiple filesystem: FAT32, NTFS, ext2, ISO9660, PiguraFS
   - IC Detection System - deteksi perangkat berdasarkan chip, bukan vendor
   - Hardware Abstraction Layer (HAL) untuk portabilitas antar arsitektur
+  - Format handler terpadu: gambar, dokumen, media, arsip
 
 
 1.3 Perbandingan Pendekatan
@@ -170,7 +196,7 @@ vital yang memerlukan akses hardware langsung.
 |                  | fungsi)           | (~160 fungsi)     |
 +------------------+-------------------+-------------------+
 | Arsitektur       | Multi-platform    | x86/x86_64/ARM/   |
-|                  |                   | ARMv7             |
+|                  |                   | ARMv7/ARM64       |
 +------------------+-------------------+-------------------+
 | Total Estimasi   | ~650 MB+          | ~5-6 MB           |
 +------------------+-------------------+-------------------+
@@ -242,11 +268,21 @@ tanpa modifikasi. HAL menyediakan interface yang konsisten untuk:
   - hal_timer: Timer dan delay
   - hal_console: Output console untuk debugging
 
+Implementasi HAL berada di SUMBER/inti/hal/ dengan file:
+  - hal.c           # Core HAL
+  - hal.h           # Header HAL
+  - hal_cpu.c       # Abstraksi CPU
+  - hal_memori.c    # Abstraksi memori
+  - hal_interupsi.c # Abstraksi interupsi
+  - hal_timer.c     # Abstraksi timer
+  - hal_console.c   # Abstraksi console
+
 Setiap arsitektur mengimplementasikan HAL-nya sendiri di direktori:
   - arsitektur/x86/hal_x86.c
   - arsitektur/x86_64/hal_x86_64.c
   - arsitektur/arm/hal_arm.c
   - arsitektur/armv7/hal_armv7.c
+  - arsitektur/arm64/hal_arm64.c
 
 
 2.4 Multi-Arsitektur
@@ -260,29 +296,77 @@ memilih target:
   make ARSITEKTUR=x86_64   # Desktop 64-bit
   make ARSITEKTUR=arm      # Mobile/Embedded 32-bit
   make ARSITEKTUR=armv7    # Mobile Cortex-A series
+  make ARSITEKTUR=arm64    # ARM 64-bit (AArch64)
 
 Struktur direktori arsitektur:
   SUMBER/arsitektur/
   ├── x86/                  # Intel/AMD 32-bit
   │   ├── boot/             # Boot sector, protected mode
+  │   │   ├── bootsect.S, multiboot.S, paging_setup.S
+  │   │   ├── protected_mode.S, stage2.c
   │   ├── memori/           # Paging, GDT, segment
+  │   │   ├── gdt_x86.c, paging_x86.c, segment_x86.c, ldt_x86.c
   │   ├── proses/           # Context, TSS, user mode
-  │   └── interupsi/        # IDT, ISR, IRQ
+  │   │   ├── context_x86.S, elf_x86.c, ring_switch_x86.S
+  │   │   ├── tss_x86.c, user_mode_x86.c
+  │   ├── interupsi/        # IDT, ISR, IRQ
+  │   │   ├── exception_x86.c, idt_x86.c, irq_x86.c, isr_x86.S
+  │   ├── cpu_x86.c, cpu_x86.h, hal_x86.c
+  │   ├── interupsi_x86.c, memori_x86.c, proses_x86.c
+  │   └── syscall_x86.S
+  │
   ├── x86_64/               # Intel/AMD 64-bit
   │   ├── boot/             # Long mode setup
+  │   │   ├── bootsect.S, long_mode.S, paging_setup.S, stage2.c
   │   ├── memori/           # PML4, paging 64-bit
+  │   │   ├── gdt_x86_64.c, paging_x86_64.c, pml4_x86_64.c
   │   ├── proses/           # Context 64-bit
-  │   └── interuknsi/       # IDT 64-bit
+  │   │   ├── context_x86_64.S, elf_x86_64.c, ring_switch_x86_64.S
+  │   │   ├── tss_x86_64.c, user_mode_x86_64.c
+  │   ├── interupsi/        # IDT 64-bit
+  │   │   ├── exception_x86_64.c, idt_x86_64.c, irq_x86_64.c, isr_x86_64.S
+  │   ├── cpu_x86_64.c, cpu_x86_64.h, hal_x86_64.c
+  │   ├── interupsi_x86_64.c, memori_x86_64.c, proses_x86_64.c
+  │   └── syscall_x86_64.S
+  │
   ├── arm/                  # ARM 32-bit generik
   │   ├── boot/             # Vector table, MMU setup
+  │   │   ├── boot_arm.S, mmu_setup.S, vector_table.S
   │   ├── memori/           # Page tables, TLB
+  │   │   ├── mmu_arm.c, page_table_arm.c, tlb_arm.c
   │   ├── proses/           # Context switching
-  │   └── interupsi/        # GIC, exceptions
-  └── armv7/                # ARM Cortex-A series
-      ├── boot/             # VFP, NEON setup
-      ├── memori/           # L2 cache
-      ├── proses/           # Context dengan VFP
-      └── interuknsi/       # GICv2/v3
+  │   │   ├── context_arm.S, elf_arm.c, user_mode_arm.c
+  │   ├── interupsi/        # GIC, exceptions
+  │   │   ├── exception_arm.c, gic_arm.c, interrupt_arm.c
+  │   ├── cpu_arm.c, cpu_arm.h, hal_arm.c
+  │   ├── interupsi_arm.c, memori_arm.c, proses_arm.c
+  │   └── syscall_arm.S
+  │
+  ├── armv7/                # ARM Cortex-A series
+  │   ├── boot/             # VFP, NEON setup
+  │   │   ├── boot_armv7.S, mmu_setup.S, neon_setup.S, vfp_setup.S
+  │   ├── memori/           # Page tables, L2 cache, MMU
+  │   │   ├── l2cache_armv7.c, mmu_armv7.c, page_table_armv7.c
+  │   ├── proses/           # Context dengan VFP
+  │   │   ├── context_armv7.S, elf_armv7.c, user_mode_armv7.c
+  │   ├── interupsi/        # GICv2, exceptions
+  │   │   ├── exception_armv7.c, gic_armv7.c, interrupt_armv7.c
+  │   ├── cpu_armv7.c, cpu_armv7.h, hal_armv7.c
+  │   ├── interupsi_armv7.c, memori_armv7.c, proses_armv7.c
+  │   └── syscall_armv7.S
+  │
+  └── arm64/                # ARM 64-bit (AArch64)
+      ├── boot/             # Vector table, MMU setup
+      │   ├── boot_arm64.S, mmu_setup.S, vector_table.S
+      ├── memori/           # Page tables, TLB, MMU
+      │   ├── mmu_arm64.c, page_table_arm64.c, tlb_arm64.c
+      ├── proses/           # Context 64-bit
+      │   ├── context_arm64.S, elf_arm64.c, user_mode_arm64.c
+      ├── interupsi/        # GICv3, exceptions
+      │   ├── exception_arm64.c, gicv3_arm64.c, interrupt_arm64.c
+      ├── cpu_arm64.c, cpu_arm64.h, hal_arm64.c
+      ├── interupsi_arm64.c, memori_arm64.c, proses_arm64.c
+      └── syscall_arm64.S
 
 
 ================================================================================
@@ -313,13 +397,13 @@ Keunggulan pendekatan ini:
 Dalam Pigura C90, setiap tugas hanya memiliki SATU fungsi - versi aman:
 
   ┌────────────────────────────────────────────────────────────────┐
-  │  ❌ DIHAPUS              →        ✅ TERSEDIA                  │
+  │  DIHAPUS               →        TERSEDIA                      │
   │  ─────────────────────────────────────────────────────────────│
-  │  sprintf (unsafe)        →        snprintf (safe, bounded)    │
-  │  strcpy (unsafe)         →        strncpy (safe, bounded)     │
-  │  strcat (unsafe)         →        strncat (safe, bounded)     │
-  │  gets (unsafe)           →        fgets (safe, bounded)       │
-  │  strtok (not reentrant)  →        strtok_r (reentrant)        │
+  │  sprintf (unsafe)      →        snprintf (safe, bounded)      │
+  │  strcpy (unsafe)       →        strncpy (safe, bounded)       │
+  │  strcat (unsafe)       →        strncat (safe, bounded)       │
+  │  gets (unsafe)         →        fgets (safe, bounded)         │
+  │  strtok (not reentrant)→        strtok_r (reentrant)          │
   └────────────────────────────────────────────────────────────────┘
 
 Developer tidak perlu memilih antara versi aman atau tidak aman - yang 
@@ -339,11 +423,6 @@ STDIO:
   - gets         → buffer overflow risk, gunakan fgets
   - scanf        → kompleks, jarang di kernel, gunakan parsing manual
 
-STDLIB:
-  - atof         → gunakan strtod dengan error checking
-  - realloc      → implementasi manual malloc + memcpy
-  - calloc       → implementasi manual malloc + memset
-
 STRING:
   - strcpy       → buffer overflow risk, gunakan strncpy
   - strcat       → buffer overflow risk, gunakan strncat
@@ -361,7 +440,7 @@ STDIO (~25 fungsi):
   fgets, fputs, fopen, fclose, fread, fwrite
   fseek, ftell, rewind, fflush, feof, ferror
   puts, putchar, fputc, getchar, getc
-  remove, rename
+  remove, rename, tmpfile, tmpnam
 
 STDLIB (~30 fungsi):
   malloc, free, calloc, realloc
@@ -413,11 +492,11 @@ NETWORK (~10 fungsi, opsional):
 4.1 Struktur LibC
 -----------------
 
-LibC Pigura OS terdiri dari 73 file dengan ~160 fungsi aman:
+LibC Pigura OS terdiri dari 78 file dengan ~160 fungsi aman:
 
 SUMBER/libc/
 │
-├── include/                         # HEADER PUBLIK (16 file)
+├── include/                         # HEADER PUBLIK (22 file)
 │   ├── stdio.h                      # I/O stream
 │   ├── stdlib.h                     # Utilitas umum
 │   ├── string.h                     # Operasi string & memory
@@ -434,6 +513,11 @@ SUMBER/libc/
 │   ├── time.h                       # Waktu & tanggal
 │   ├── math.h                       # Matematika (opsional)
 │   ├── setjmp.h                     # Non-local jump
+│   ├── netdb.h                      # Network database
+│   ├── arpa/
+│   │   └── inet.h                   # ARPA Internet definitions
+│   ├── netinet/
+│   │   └── in.h                     # Internet address family
 │   └── sys/
 │       ├── types.h                  # Tipe sistem (pid_t, mode_t, off_t)
 │       ├── stat.h                   # File status
@@ -441,19 +525,22 @@ SUMBER/libc/
 │       ├── mman.h                   # Memory mapping
 │       ├── socket.h                 # Socket (networking)
 │       ├── ioctl.h                  # Device control
-│       └── uio.h                    # Scatter/gather I/O
+│       ├── uio.h                    # Scatter/gather I/O
+│       └── syscall.h                # System call numbers
 │
-├── internal/                        # INTERNAL (3 file + arch)
-│   ├── syscall.S                    # System call entry
+├── internal/                        # INTERNAL (4 file + arch)
+│   ├── syscall.S                    # System call entry (default)
+│   ├── syscall.c                    # System call C wrapper
 │   ├── errno.c                      # Global errno variable
 │   ├── startup.c                    # _start entry point
-│   └── arch/                        # Architecture-specific
+│   └── arch/                        # Architecture-specific syscall
 │       ├── x86/syscall.S
 │       ├── x86_64/syscall.S
 │       ├── arm/syscall.S
-│       └── armv7/syscall.S
+│       ├── armv7/syscall.S
+│       └── arm64/syscall.S
 │
-├── stdio/                           # I/O STREAM (11 file)
+├── stdio/                           # I/O STREAM (12 file)
 │   ├── printf.c                     # printf, fprintf, sprintf
 │   ├── snprintf.c                   # snprintf, vsnprintf (AMAN)
 │   ├── puts.c                       # puts, putchar, fputc, fputs
@@ -543,6 +630,9 @@ Header publik yang tersedia untuk developer:
 | <time.h>         | Time functions                           |
 | <math.h>         | Mathematical functions (opsional)        |
 | <setjmp.h>       | Non-local jumps                          |
+| <netdb.h>        | Network database operations              |
+| <arpa/inet.h>    | ARPA Internet address operations         |
+| <netinet/in.h>   | Internet address family                  |
 | <sys/types.h>    | System types (pid_t, mode_t, off_t)      |
 | <sys/stat.h>     | File status struct                       |
 | <sys/wait.h>     | Process wait                             |
@@ -550,6 +640,7 @@ Header publik yang tersedia untuk developer:
 | <sys/socket.h>   | Socket operations                        |
 | <sys/ioctl.h>    | Device control                           |
 | <sys/uio.h>      | Scatter/gather I/O                       |
+| <sys/syscall.h>  | System call numbers                      |
 +------------------+------------------------------------------+
 
 
@@ -598,6 +689,10 @@ ARM:
 ARMv7:
   - SVC dengan ARM EABI calling convention
 
+ARM64:
+  - SVC instruction (AArch64)
+  - Parameter via register (x0-x5)
+
 
 ================================================================================
                      5. SISTEM DETEKSI IC/CHIP
@@ -627,22 +722,35 @@ aman dan kompatibel.
 Sistem IC Detection terdiri dari beberapa komponen utama:
 
 SUMBER/perangkat/ic/
+├── ic.h                   # Header IC Detection
 ├── ic_deteksi.c           # Engine deteksi utama
-├── ic_engine.c            # Core engine
+├── ic_mesin.c             # Core engine (mesin deteksi)
 ├── ic_klasifikasi.c       # Klasifikasi fungsi IC
 ├── ic_parameter.c         # Struktur dan parsing parameter
 ├── ic_validasi.c          # Validasi parameter terhadap database
 │
-├── database/              # Database parameter IC standar
+├── database/              # Database parameter IC standar (21 file)
 │   ├── database.c         # Core database
 │   ├── db_cpu.c           # Parameter CPU IC
+│   ├── db_arm_cpu.c       # Parameter ARM CPU IC
 │   ├── db_gpu.c           # Parameter GPU IC
+│   ├── db_mobile_gpu.c    # Parameter Mobile GPU IC
 │   ├── db_network.c       # Parameter Network IC (WiFi, Ethernet)
 │   ├── db_storage.c       # Parameter Storage IC (ATA, NVMe)
 │   ├── db_display.c       # Parameter Display IC (VGA, HDMI)
+│   ├── db_hdmi.c          # Parameter HDMI IC
 │   ├── db_audio.c         # Parameter Audio IC (HDA)
 │   ├── db_input.c         # Parameter Input IC (USB HID)
-│   └── db_usb.c           # Parameter USB Controller
+│   ├── db_usb.c           # Parameter USB Controller
+│   ├── db_bluetooth.c     # Parameter Bluetooth IC
+│   ├── db_camera.c        # Parameter Camera IC
+│   ├── db_fingerprint.c   # Parameter Fingerprint IC
+│   ├── db_gps.c           # Parameter GPS IC
+│   ├── db_mobile_soc.c    # Parameter Mobile SoC IC
+│   ├── db_sensor.c        # Parameter Sensor IC
+│   ├── db_sim_usbc.c      # Parameter SIM/USB-C IC
+│   ├── db_stylus.c        # Parameter Stylus IC
+│   └── db_touchscreen.c   # Parameter Touchscreen IC
 │
 ├── probe/                 # Membaca parameter dari hardware
 │   ├── probe.c            # Core probe engine
@@ -652,16 +760,16 @@ SUMBER/perangkat/ic/
 │   ├── probe_spi.c        # Probe via bus SPI
 │   └── probe_mmio.c       # Probe via Memory-Mapped I/O
 │
-└── driver_generik/        # Driver berdasarkan FUNGSI, bukan vendor
-    ├── driver_generik.c   # Framework driver generik
-    ├── net_wifi_generik.c       # WiFi generik
-    ├── net_ethernet_generik.c   # Ethernet generik
-    ├── storage_ata_generik.c    # ATA/IDE generik
-    ├── storage_nvme_generik.c   # NVMe generik
-    ├── display_vga_generik.c    # VGA generik
-    ├── display_hdmi_generik.c   # HDMI generik
-    ├── audio_hda_generik.c      # Intel HDA generik
-    └── input_usb_hid_generik.c  # USB HID generik
+└── driver_umum/           # Driver berdasarkan FUNGSI, bukan vendor
+    ├── driver_umum.c      # Framework driver umum
+    ├── net_wifi_umum.c         # WiFi umum
+    ├── net_ethernet_umum.c     # Ethernet umum
+    ├── penyimpanan_ata_umum.c  # ATA/IDE umum
+    ├── penyimpanan_nvme_umum.c # NVMe umum
+    ├── display_vga_umum.c      # VGA umum
+    ├── display_hdmi_umum.c     # HDMI umum
+    ├── audio_hda_umum.c        # Intel HDA umum
+    └── input_usb_hid_umum.c    # USB HID umum
 
 
 5.3 Alur Deteksi IC
@@ -694,54 +802,64 @@ Proses deteksi dan inisialisasi IC mengikuti alur berikut:
      - Nilai minimum yang valid (safemode)
 
   6. INISIALISASI
-     Driver generik dengan parameter yang dipilih menginisialisasi IC.
+     Driver umum dengan parameter yang dipilih menginisialisasi IC.
 
 
 5.4 Database Parameter IC
 -------------------------
 
-Database IC menyimpan parameter standar untuk setiap kategori perangkat.
-Contoh struktur parameter IC WiFi:
+Database IC menyimpan parameter standar untuk setiap kategori perangkat. 
+Database mencakup 20 kategori perangkat yang mencakup desktop maupun mobile:
 
-+----------------+-------+-------+---------+--------+
-| Parameter      | Min   | Max   | Default | Satuan |
-+----------------+-------+-------+---------+--------+
-| Transfer Rate  | 1     | 150   | 54      | Mbps   |
-+----------------+-------+-------+---------+--------+
-| TX Power       | 0     | 20    | 10      | dBm    |
-+----------------+-------+-------+---------+--------+
-| Frekuensi      | 2.4   | 5.8   | 2.4     | GHz    |
-+----------------+-------+-------+---------+--------+
-| Channel        | 1     | 14    | 6       | -      |
-+----------------+-------+-------+---------+--------+
+Desktop:
+  - db_cpu.c: CPU desktop (Intel, AMD)
+  - db_gpu.c: GPU desktop
+  - db_network.c: Network adapter (WiFi, Ethernet)
+  - db_storage.c: Storage controller (ATA, NVMe)
+  - db_display.c: Display adapter (VGA)
+  - db_hdmi.c: HDMI controller
+  - db_audio.c: Audio IC (HDA)
+  - db_input.c: Input devices (USB HID)
+  - db_usb.c: USB controller
 
-Tabel 3: Contoh parameter IC WiFi dengan nilai minimum, maksimum, dan default
+Mobile/Embedded:
+  - db_arm_cpu.c: ARM CPU (Cortex series)
+  - db_mobile_gpu.c: Mobile GPU (Mali, Adreno)
+  - db_mobile_soc.c: Mobile SoC
+  - db_sensor.c: Sensor (accelerometer, gyroscope)
+  - db_camera.c: Camera IC
+  - db_gps.c: GPS receiver
+  - db_touchscreen.c: Touchscreen controller
+  - db_stylus.c: Stylus/digitizer
+  - db_fingerprint.c: Fingerprint sensor
+  - db_bluetooth.c: Bluetooth controller
+  - db_sim_usbc.c: SIM card / USB-C controller
 
 
-5.5 Driver Generik
-------------------
+5.5 Driver Umum
+----------------
 
-Driver generik adalah driver yang bekerja berdasarkan kelas fungsi IC, bukan 
+Driver umum adalah driver yang bekerja berdasarkan kelas fungsi IC, bukan 
 berdasarkan vendor atau model spesifik. Keuntungan pendekatan ini:
 
-  - Satu driver WiFi generik mendukung ratusan IC WiFi dari berbagai vendor
+  - Satu driver WiFi umum mendukung ratusan IC WiFi dari berbagai vendor
   - Tidak perlu driver terpisah untuk Realtek, Intel, Atheros, dll
   - Parameter disesuaikan otomatis berdasarkan kemampuan IC
   - Ukuran kode driver jauh lebih kecil
 
-Contoh driver generik dan cakupannya:
+Contoh driver umum dan cakupannya:
 
 +-------------------------+----------------------------------------+
 | Driver                  | IC yang Didukung                       |
 +-------------------------+----------------------------------------+
-| net_wifi_generik        | RTL8188, RTL8192, AR9271, Intel WiFi, |
+| net_wifi_umum           | RTL8188, RTL8192, AR9271, Intel WiFi, |
 |                         | dan ratusan IC WiFi 802.11 lainnya     |
 +-------------------------+----------------------------------------+
-| storage_ata_generik     | Semua controller ATA/IDE yang kompatibel|
+| penyimpanan_ata_umum    | Semua controller ATA/IDE yang kompatibel|
 +-------------------------+----------------------------------------+
-| display_vga_generik     | Semua kartu VGA standar VBE            |
+| display_vga_umum        | Semua kartu VGA standar VBE            |
 +-------------------------+----------------------------------------+
-| input_usb_hid_generik   | Semua perangkat USB HID (keyboard,     |
+| input_usb_hid_umum      | Semua perangkat USB HID (keyboard,     |
 |                         | mouse, gamepad)                        |
 +-------------------------+----------------------------------------+
 
@@ -762,7 +880,7 @@ signifikan:
 
   3. UKURAN DRIVER KECIL
      Tidak perlu menyimpan database vendor-specific yang besar. Driver 
-     generik biasanya hanya 10-20 KB.
+     umum biasanya hanya 10-20 KB.
 
   4. MAINTENANCE SEDERHANA
      Perbaikan atau peningkatan pada satu driver akan otomatis berlaku untuk 
@@ -794,23 +912,65 @@ protocol parsing. Pigura OS mengadopsi pendekatan serupa dengan library
 grafis terintegrasi (LibPigura) yang berkomunikasi langsung dengan driver GPU 
 dan framebuffer hardware.
 
+Seluruh komponen grafis Pigura OS berada di SUMBER/pigura/ dengan arsitektur 
+terintegrasi: framebuffer, pengolah (render), kanvas, buffer, akselerasi GPU, 
+teks, jendela, penata (compositor), peristiwa (event), dan widget.
 
-6.2 Arsitektur Framebuffer
---------------------------
+
+6.2 Arsitektur Framebuffer (SUMBER/pigura/framebuffer/)
+-------------------------------------------------------
 
 Framebuffer adalah area memori yang secara langsung mewakili pixel di layar. 
-Pigura OS mengakses framebuffer secara langsung tanpa lapisan tambahan:
+Pigura OS mengakses framebuffer melalui LibPigura yang terintegrasi langsung:
 
-SUMBER/perangkat/tampilan/framebuffer/
-├── framebuffer.c          # Core framebuffer driver
-├── fb_init.c              # Inisialisasi framebuffer
-├── fb_mode.c              # Mode setting (resolusi, depth)
-├── fb_render.c            # Render ke framebuffer
-├── fb_blit.c              # Blitting operations
-├── fb_console.c           # Text console di framebuffer
-├── fb_cursor.c            # Hardware/software cursor
-├── vbe.c                  # VESA BIOS Extensions (BIOS)
-└── uefi_gop.c             # UEFI Graphics Output Protocol
+SUMBER/pigura/framebuffer/
+├── framebuffer.c              # Core framebuffer driver
+├── framebuffer.h              # Header framebuffer
+├── framebuffer_blit.c        # Blitting operations
+├── framebuffer_render.c      # Render ke framebuffer
+├── pigura.c                   # Entry point LibPigura
+│
+├── kanvas/                    # Drawing surface management
+│   ├── kanvas.c              # Core kanvas
+│   ├── kanvas_buat.c         # Buat kanvas baru
+│   ├── kanvas_hapus.c        # Hapus kanvas
+│   ├── kanvas_ubahsuai.c     # Ubah ukuran kanvas
+│   ├── kanvas_flip.c         # Flip buffer
+│   └── kanvas_blit.c         # Blit antar kanvas
+│
+├── pengolah/                  # Rendering engine
+│   ├── pengolah.c            # Core pengolah (render)
+│   ├── pengolah.h            # Header pengolah
+│   ├── pengolah_cpu.c        # CPU software rendering
+│   ├── pengolah_gpu.c        # GPU hardware rendering
+│   ├── pengolah_hybrid.c     # CPU+GPU hybrid
+│   ├── primitif.c            # Primitive dispatcher
+│   ├── titik.c               # Draw point
+│   ├── garis.c               # Draw line
+│   ├── kotak.c               # Draw rectangle
+│   ├── lingkaran.c           # Draw circle
+│   ├── elip.c                # Draw ellipse
+│   ├── poligon.c             # Draw polygon
+│   ├── busur.c               # Draw arc
+│   ├── kurva.c               # Draw bezier curve
+│   └── isi.c                 # Fill shapes
+│
+├── buffer/                    # Buffer management
+│   ├── buffer.c              # Buffer abstraction
+│   ├── bufferbelakang.c      # Per-window backbuffer
+│   ├── permukaan.c           # Drawing surface
+│   ├── dampak.c              # Damage tracking (optimasi)
+│   └── tukar.c               # Buffer swap
+│
+└── akselerasi_gpu/            # GPU acceleration
+    ├── akselerasi_gpu.h      # Header akselerasi GPU
+    ├── gpu_accel.c           # Core acceleration
+    ├── gpu_blit.c            # Hardware blit
+    ├── gpu_fill.c            # Hardware fill
+    ├── gpu_copy.c            # Hardware copy
+    ├── gpu_scale.c           # Hardware scale
+    ├── gpu_rotate.c          # Hardware rotate
+    └── gpu_blend.c           # Hardware blending
 
 Cara kerja framebuffer:
   1. Bootloader atau UEFI menginisialisasi mode grafis
@@ -820,104 +980,161 @@ Cara kerja framebuffer:
   5. Tampilan langsung terupdate tanpa copying
 
 
-6.3 Arsitektur GPU
-------------------
+6.3 Arsitektur GPU (SUMBER/perangkat/tampilan/gpu/)
+---------------------------------------------------
 
 Untuk sistem yang memiliki GPU, Pigura OS dapat memanfaatkan akselerasi 
-hardware:
+hardware. Video output driver berada di SUMBER/perangkat/tampilan/:
 
-SUMBER/perangkat/tampilan/gpu/
-├── gpu.c                  # Core GPU driver
-├── gpu_deteksi.c          # Deteksi GPU via IC Detection
-├── gpu_init.c             # Inisialisasi GPU
-├── gpu_render.c           # Render commands
-├── gpu_2d.c               # 2D acceleration (blit, fill, copy)
-├── gpu_3d.c               # 3D acceleration (vertex, shader)
-├── gpu_memori.c           # GPU memory management
-├── gpu_command.c          # Command buffer
-└── gpu_shader.c           # Shader handling
+SUMBER/perangkat/tampilan/
+├── video/                       # Video output
+│   ├── video.c              # Core video driver
+│   ├── video_init.c         # Inisialisasi video
+│   ├── vbe.c                # VESA BIOS Extensions (BIOS)
+│   └── uefi_gop.c           # UEFI Graphics Output Protocol
+│
+└── gpu/                         # GPU driver
+    ├── gpu.c                # Core GPU driver
+    ├── gpu_deteksi.c        # Deteksi GPU via IC Detection
+    ├── gpu_init.c           # Inisialisasi GPU
+    ├── gpu_render.c         # Render commands
+    ├── gpu_2d.c             # 2D acceleration (blit, fill, copy)
+    ├── gpu_3d.c             # 3D acceleration (vertex, shader)
+    ├── gpu_memori.c         # GPU memory management
+    ├── gpu_command.c        # Command buffer
+    └── gpu_shader.c         # Shader handling
 
 GPU dideteksi menggunakan IC Detection System, bukan driver vendor-specific.
 Jika GPU terdeteksi dan mendukung operasi 2D/3D, LibPigura akan menggunakan 
 akselerasi hardware. Jika tidak, fallback ke CPU rendering.
 
 
-6.4 Arsitektur LibPigura
-------------------------
+6.4 Arsitektur Penata - Compositor Minimal
+-------------------------------------------
 
-LibPigura adalah library grafis terintegrasi yang menyediakan API untuk 
-menggambar primitif, mengelola jendela, dan merender teks. Library ini 
-dirancang untuk dapat menggunakan CPU maupun GPU secara transparan:
+Penata adalah compositor ringka (sebelumnya dikenal sebagai "Dekor") yang 
+mengelola window dan merender ke framebuffer secara terkoordinasi. Penata 
+berada di SUMBER/pigura/penata/:
 
-SUMBER/pigura/
-├── kanvas/                 # Drawing surface management
-│   ├── kanvas.c           # Core kanvas
-│   ├── kanvas_buat.c      # Buat kanvas baru
-│   ├── kanvas_hapus.c     # Hapus kanvas
-│   ├── kanvas_resize.c    # Ubah ukuran
-│   ├── kanvas_flip.c      # Flip buffer
-│   └── kanvas_blit.c      # Blit antar kanvas
+SUMBER/pigura/penata/
+├── penata.h                    # Header penata
 │
-├── render/                 # Rendering engine
-│   ├── render.c           # Core render
-│   ├── render_cpu.c       # CPU software rendering
-│   ├── render_gpu.c       # GPU hardware rendering
-│   ├── render_hybrid.c    # CPU+GPU hybrid
-│   ├── primitif.c         # Primitive dispatcher
-│   ├── titik.c            # Draw point
-│   ├── garis.c            # Draw line
-│   ├── kotak.c            # Draw rectangle
-│   ├── lingkaran.c        # Draw circle
-│   ├── elips.c            # Draw ellipse
-│   ├── poligon.c          # Draw polygon
-│   ├── arc.c              # Draw arc
-│   ├── curve.c            # Draw bezier curve
-│   └── fill.c             # Fill shapes
+├── inti/                       # Core compositor
+│   ├── penata.c              # Main interface
+│   ├── pengolah.c            # Compositing engine
+│   ├── init.c                # Inisialisasi
+│   └── hancurkan.c           # Cleanup
 │
-├── gpu_accel/              # GPU acceleration
-│   ├── gpu_accel.c        # Core acceleration
-│   ├── gpu_blit.c         # Hardware blit
-│   ├── gpu_fill.c         # Hardware fill
-│   ├── gpu_copy.c         # Hardware copy
-│   ├── gpu_scale.c        # Hardware scale
-│   ├── gpu_rotate.c       # Hardware rotate
-│   └── gpu_blend.c        # Hardware blending
+├── klip/                       # Clipping
+│   ├── klip.c                # Clip engine
+│   ├── region.c              # Clip region
+│   ├── kotak.c               # Rectangle operations
+│   ├── union.c               # Region union
+│   └── intersect.c           # Region intersection
 │
-├── teks/                   # Text and font rendering
-│   ├── teks.c             # Core text
-│   ├── font.c             # Font management
-│   ├── font_bitmap.c      # Bitmap font
-│   ├── font_ttf.c         # TTF font (opsional)
-│   ├── font_cache.c       # Glyph cache
-│   ├── glyph.c            # Glyph handling
-│   ├── measure.c          # Text measurement
-│   └── render_teks.c      # Text rendering
+├── lapisan/                    # Z-order management
+│   ├── lapisan.c             # Layer abstraction
+│   ├── z_order.c             # Z-order tracking
+│   ├── tumpuk.c              # Window stack
+│   ├── naik.c                # Bring to front
+│   └── rendah.c              # Send to back
 │
-└── jendela/                # Window management (lihat DEKOR)
-    ├── jendela.c          # Core window
-    ├── wm.c               # Window manager
-    ├── decorasi.c         # Window decoration
-    ├── event.c            # Window events
-    ├── widget.c           # Widget base
-    ├── button.c           # Button widget
-    ├── textbox.c          # Textbox widget
-    ├── checkbox.c         # Checkbox widget
-    ├── scrollbar.c        # Scrollbar widget
-    ├── menu.c             # Menu widget
-    ├── dialog.c           # Dialog boxes
-    └── z_order.c          # Z-ordering
+└── efek/                       # Visual effects (opsional)
+    ├── efek.c                # Effect engine
+    ├── shadow.c              # Window shadow
+    ├── blur.c                # Blur effect
+    ├── transparan.c          # Alpha blending
+    └── animasi.c             # Window animation
 
-Fungsi-Fungsi Inti LibPigura:
+Penata menggunakan buffer management dari SUMBER/pigura/framebuffer/buffer/ 
+untuk backbuffer, dan peristiwa dari SUMBER/pigura/peristiwa/ untuk event 
+routing.
 
-  - pigura_mulai() / pigura_selesai(): Inisialisasi dan pembersihan
-  - kanvas_buat() / kanvas_hapus(): Manajemen permukaan gambar
-  - render_titik(), render_garis(), render_kotak(), render_lingkaran()
-  - render_teks(): Rendering teks dengan font yang dimuat
-  - jendela_buat() / jendela_hapus(): Manajemen jendela
-  - gpu_aktifkan(), gpu_render(): Akselerasi GPU
+Alur rendering Penata:
+
+  +------------------+     +------------------+
+  | Aplikasi A       |     | Aplikasi B       |
+  | (backbuffer)     |     | (backbuffer)     |
+  +--------+---------+     +--------+---------+
+           |                        |
+           v                        v
+  +--------------------------------------------+
+  |                PENATA COMPOSITOR            |
+  |  - Klip (clipping)                          |
+  |  - Z-order (lapisan)                        |
+  |  - Pengolah (compositing)                   |
+  |  - Efek visual (opsional)                   |
+  +--------------------+-----------------------+
+                       |
+                       v
+  +--------------------------------------------+
+  |              FRAMEBUFFER                   |
+  |           (tampilan akhir)                 |
+  +--------------------------------------------+
 
 
-6.5 Perbandingan Kompleksitas
+6.5 Arsitektur Widget
+---------------------
+
+Sistem widget menyediakan komponen UI standar untuk aplikasi:
+
+SUMBER/pigura/widget/
+├── widget.h                    # Header widget
+├── widget.c                    # Widget base class
+├── tombol.c                    # Button widget
+├── kotakteks.c                 # Textbox widget
+├── kotakcentang.c              # Checkbox widget
+├── bargulir.c                  # Scrollbar widget
+├── menu.c                      # Menu widget
+└── dialog.c                    # Dialog boxes
+
+
+6.6 Arsitektur Peristiwa (Event System)
+----------------------------------------
+
+Sistem peristiwa menangani event routing dan input management:
+
+SUMBER/pigura/peristiwa/
+├── peristiwa.h                 # Header peristiwa
+├── peristiwa.c                 # Event structure & core
+├── pengendali.c                # Event dispatcher
+├── masukan.c                   # Input events
+├── fokus.c                     # Focus management
+└── penunjuk.c                  # Mouse/pointer events
+
+
+6.7 Arsitektur Teks dan Font
+-----------------------------
+
+Sistem teks dan font untuk rendering teks di Pigura OS:
+
+SUMBER/pigura/teks/
+├── teks.h                      # Header teks
+├── teks.c                      # Core text engine
+├── font.c                      # Font management
+├── font_bitmap.c               # Bitmap font
+├── font_ttf.c                  # TTF font (opsional)
+├── font_cache.c                # Glyph cache
+├── glyph.c                     # Glyph handling
+├── ukuran.c                    # Text measurement
+└── pengolah_teks.c             # Text rendering
+
+
+6.8 Arsitektur Jendela
+----------------------
+
+Sistem manajemen jendela untuk windowing:
+
+SUMBER/pigura/jendela/
+├── jendela.h                   # Header jendela
+├── jendela.c                   # Core window
+├── wm.c                        # Window manager
+├── dekorasi.c                  # Window decoration
+├── peristiwa.c                 # Window events
+└── z_order.c                   # Z-ordering
+
+
+6.9 Perbandingan Kompleksitas
 -----------------------------
 
 +------------------+-------------------+-------------------+
@@ -940,203 +1157,10 @@ Tabel 4: Perbandingan kompleksitas sistem grafis tradisional vs LibPigura
 
 
 ================================================================================
-                      7. DEKOR - COMPOSITOR MINIMAL
+                            7. SISTEM FONT
 ================================================================================
 
-7.1 Kenapa Perlu Compositor?
-----------------------------
-
-Menulis langsung ke framebuffer tanpa perantara memiliki beberapa kelemahan
-serius untuk sistem multi-aplikasi:
-
-  1. KEAMANAN
-     Semua aplikasi bisa menimpa area aplikasi lain. Aplikasi malicious bisa
-     menggambar di atas aplikasi lain tanpa batasan.
-
-  2. STABILITAS
-     Jika satu aplikasi crash, framebuffer bisa dalam state tidak konsisten
-     dan merusak tampilan semua aplikasi.
-
-  3. KOORDINASI
-     Butuh locking mechanism untuk mencegah race condition. Z-order management
-     menjadi kompleks tanpa koordinasi pusat.
-
-  4. FUNGSIONALITAS TERBATAS
-     Sulit mengimplementasikan resize window, drag, minimize, dan efek visual.
-
-Dekor hadir sebagai solusi: compositor minimal yang mengelola semua window
-dan merender ke framebuffer secara terkoordinasi.
-
-
-7.2 Arsitektur Dekor
---------------------
-
-Dekor adalah compositor ringka yang mengelola:
-  - Backbuffer untuk setiap aplikasi (isolasi)
-  - Clipping region (tidak saling menimpa)
-  - Z-order / layer management
-  - Event routing ke aplikasi yang tepat
-  - Efek visual opsional (shadow, transparency)
-
-Alur rendering Dekor:
-
-  +------------------+     +------------------+
-  | Aplikasi A       |     | Aplikasi B       |
-  | (backbuffer)     |     | (backbuffer)     |
-  +--------+---------+     +--------+---------+
-           |                        |
-           v                        v
-  +--------------------------------------------+
-  |                DEKOR COMPOSITOR            |
-  |  - Clipping                                |
-  |  - Z-order sorting                         |
-  |  - Compositing                             |
-  |  - Efek visual (opsional)                  |
-  +--------------------+-----------------------+
-                       |
-                       v
-  +--------------------------------------------+
-  |              FRAMEBUFFER                   |
-  |           (tampilan akhir)                 |
-  +--------------------------------------------+
-
-Struktur direktori Dekor:
-
-SUMBER/dekor/
-├── core/                    # Core compositor
-│   ├── dekor.c             # Main interface
-│   ├── compositor.c        # Compositing engine
-│   ├── render.c            # Render loop
-│   ├── init.c              # Inisialisasi
-│   └── destroy.c           # Cleanup
-│
-├── buffer/                  # Buffer management
-│   ├── buffer.c            # Buffer abstraction
-│   ├── backbuffer.c        # Per-window backbuffer
-│   ├── surface.c           # Drawing surface
-│   ├── damage.c            # Damage tracking (optimasi)
-│   └── swap.c              # Buffer swap
-│
-├── event/                   # Event routing
-│   ├── event.c             # Event structure
-│   ├── dispatcher.c        # Event dispatcher
-│   ├── input.c             # Input events
-│   ├── focus.c             # Focus management
-│   └── pointer.c           # Mouse/pointer events
-│
-├── clip/                    # Clipping
-│   ├── clip.c              # Clip engine
-│   ├── region.c            # Clip region
-│   ├── rect.c              # Rectangle operations
-│   ├── union.c             # Region union
-│   └── intersect.c         # Region intersection
-│
-├── layer/                   # Z-order management
-│   ├── layer.c             # Layer abstraction
-│   ├── z_order.c           # Z-order tracking
-│   ├── stack.c             # Window stack
-│   ├── raise.c             # Bring to front
-│   └── lower.c             # Send to back
-│
-└── efek/                    # Visual effects (opsional)
-    ├── efek.c              # Effect engine
-    ├── shadow.c            # Window shadow
-    ├── blur.c              # Blur effect
-    ├── transparency.c      # Alpha blending
-    └── animasi.c           # Window animation
-
-
-7.3 Komponen Dekor
-------------------
-
-CORE (core/):
-  - dekor.c: Interface utama, API publik
-  - compositor.c: Engine yang menggabungkan semua window
-  - render.c: Loop render utama
-  - init.c: Setup compositor, alokasi buffer
-  - destroy.c: Cleanup saat shutdown
-
-BUFFER (buffer/):
-  - Setiap aplikasi memiliki backbuffer sendiri
-  - Aplikasi menggambar ke backbuffer, bukan framebuffer langsung
-  - Damage tracking: hanya render area yang berubah
-
-EVENT (event/):
-  - Router event ke aplikasi yang tepat
-  - Focus management: aplikasi mana yang aktif
-  - Pointer events: mouse movement, click
-
-CLIP (clip/):
-  - Menentukan area yang boleh digambar
-  - Window tidak bisa menggambar di luar area mereka
-  - Region operations: union, intersection
-
-LAYER (layer/):
-  - Z-order: window mana di atas yang mana
-  - Raise/lower: ubah urutan window
-  - Stack management: daftar semua window
-
-EFEK (efek/):
-  - Opsional, bisa di-disable untuk performa
-  - Shadow, transparency, blur
-  - Animasi: minimize, maximize, close
-
-
-7.4 Keuntungan Compositor Minimal
----------------------------------
-
-+------------------+-------------------+-------------------+
-| Aspek            | Tanpa Compositor  | Dengan Dekor      |
-+------------------+-------------------+-------------------+
-| Keamanan         | Tidak ada         | Isolasi penuh     |
-+------------------+-------------------+-------------------+
-| Stabilitas       | Crash = rusak     | Crash = 1 window  |
-+------------------+-------------------+-------------------+
-| Multi-window     | Chaos             | Terkoordinasi     |
-+------------------+-------------------+-------------------+
-| Efek visual      | Tidak bisa        | Opsional          |
-+------------------+-------------------+-------------------+
-| Ukuran kode      | 0 KB              | ~30-50 KB         |
-+------------------+-------------------+-------------------+
-| Overhead render  | 0%                | ~5-10%            |
-+------------------+-------------------+-------------------+
-
-Tabel 5: Perbandingan dengan dan tanpa compositor
-
-Dekor dirancang minimal (~30-50 KB) dibandingkan:
-  - X11: ~500 MB
-  - Wayland (Weston): ~50-100 MB
-  - Windows DWM: ~100+ MB
-
-API Dekor (konsep):
-
-  /* Inisialisasi */
-  int dekor_mulai(void);
-  void dekor_selesai(void);
-
-  /* Window management */
-  int dekor_jendela_buat(int x, int y, int lebar, int tinggi);
-  void dekor_jendela_hapus(int id);
-  void dekor_jendela_tampilkan(int id);
-  void dekor_jendela_sembunyikan(int id);
-
-  /* Buffer */
-  uint32_t *dekor_buffer_dapatkan(int id);
-  void dekor_buffer_submit(int id);
-
-  /* Z-order */
-  void dekor_jendela_raise(int id);
-  void dekor_jendela_lower(int id);
-
-  /* Event */
-  int dekor_event_poll(struct dekor_event *ev);
-
-
-================================================================================
-                            8. SISTEM FONT
-================================================================================
-
-8.1 Bitmap vs Vector Font
+7.1 Bitmap vs Vector Font
 -------------------------
 
 Bitmap font menyimpan setiap karakter sebagai array pixel yang dirender 
@@ -1153,7 +1177,7 @@ ukuran sekitar 200KB, yang mungkin terlalu besar untuk filosofi minimalis
 Pigura OS.
 
 
-8.2 Rekomendasi: Pendekatan Hybrid
+7.2 Rekomendasi: Pendekatan Hybrid
 ----------------------------------
 
 Untuk Pigura OS, pendekatan hybrid direkomendasikan:
@@ -1175,11 +1199,11 @@ di-render akan disimpan sebagai bitmap dalam cache. Render hanya dilakukan
 sekali untuk setiap karakter pada ukuran tertentu.
 
 
-8.3 Format Pigura Font (.pf)
+7.3 Format Pigura Font (.pf)
 ----------------------------
 
 Pigura OS mendefinisikan format font bitmap sendiri dengan ekstensi .pf 
-(Pigura Font):
+(Pigura Font). Font default tersedia di CITRA/font_default.pf:
 
 Struktur Header (16 byte):
   +--------+--------+----------------------------------+
@@ -1201,7 +1225,7 @@ Struktur Header (16 byte):
   +--------+--------+----------------------------------+
 
 
-8.4 Rencana Implementasi Bertahap
+7.4 Rencana Implementasi Bertahap
 ---------------------------------
 
 FASE 1 - Bitmap Font (Awal):
@@ -1220,10 +1244,10 @@ FASE 3 - TTF Support (Opsional):
 
 
 ================================================================================
-                          9. SISTEM FILE
+                          8. SISTEM FILE
 ================================================================================
 
-9.1 Filesystem yang Didukung
+8.1 Filesystem yang Didukung
 ----------------------------
 
 Pigura OS mendukung multiple filesystem untuk kompatibilitas maksimal:
@@ -1237,7 +1261,6 @@ Pigura OS mendukung multiple filesystem untuk kompatibilitas maksimal:
 | NTFS       | Read/Write | Partisi Windows, dengan kompresi      |
 +------------+------------+----------------------------------------+
 | ext2       | Read/Write | Linux native                          |
-| ext3/ext4  | Read-only  | Kompatibel dengan ext2 (tanpa journal)|
 +------------+------------+----------------------------------------+
 | ISO9660    | Read-only  | CD/DVD, dengan RockRidge & Joliet     |
 +------------+------------+----------------------------------------+
@@ -1247,13 +1270,14 @@ Pigura OS mendukung multiple filesystem untuk kompatibilitas maksimal:
 +------------+------------+----------------------------------------+
 
 
-9.2 Virtual File System (VFS)
+8.2 Virtual File System (VFS)
 -----------------------------
 
 VFS adalah abstraksi yang menyatukan semua filesystem dalam satu interface:
 
 SUMBER/berkas/vfs/
 ├── vfs.c                  # Core VFS
+├── vfs.h                  # Header VFS
 ├── filesystem.c           # Filesystem registration
 ├── mount.c                # Mount/unmount
 ├── inode.c                # Inode operations
@@ -1263,7 +1287,7 @@ SUMBER/berkas/vfs/
 └── namei.c                # Pathname resolution
 
 
-9.3 FAT32
+8.3 FAT32
 ---------
 
 Driver FAT32 untuk kompatibilitas dengan flash drive dan SD card:
@@ -1278,7 +1302,7 @@ SUMBER/berkas/fat32/
 └── fat32_lfn.c            # Long filename support
 
 
-9.4 NTFS
+8.4 NTFS
 --------
 
 Driver NTFS untuk kompatibilitas dengan partisi Windows:
@@ -1294,10 +1318,10 @@ SUMBER/berkas/ntfs/
 └── ntfs_compress.c        # Decompression support
 
 
-9.5 ext2
+8.5 ext2
 --------
 
-Driver ext2 dengan kompatibilitas read-only untuk ext3/ext4:
+Driver ext2 untuk kompatibilitas dengan Linux:
 
 SUMBER/berkas/ext2/
 ├── ext2.c                 # Core driver
@@ -1309,7 +1333,7 @@ SUMBER/berkas/ext2/
 └── ext2_bitmap.c          # Inode/block bitmap
 
 
-9.6 ISO9660
+8.6 ISO9660
 -----------
 
 Driver ISO9660 untuk CD/DVD dengan ekstensi:
@@ -1323,18 +1347,19 @@ SUMBER/berkas/iso9660/
 └── joliet.c               # Joliet extensions (Unicode)
 
 
-9.7 initramfs
+8.7 initramfs
 -------------
 
 initramfs untuk loading image boot:
 
 SUMBER/berkas/initramfs/
 ├── initramfs.c            # Core driver
+├── initramfs.h            # Header initramfs
 ├── cpio.c                 # CPIO format parsing
 └── initramfs_extract.c    # Extraction
 
 
-9.8 PiguraFS (Native)
+8.8 PiguraFS (Native)
 ---------------------
 
 PiguraFS adalah filesystem native dengan fitur modern:
@@ -1358,7 +1383,86 @@ Fitur PiguraFS:
 
 
 ================================================================================
-                         10. SISTEM USER MODE
+                     9. SISTEM FORMAT BERKAS
+================================================================================
+
+9.1 Arsitektur Format Handler
+-----------------------------
+
+Pigura OS memiliki sistem format handler terpadu yang berada di SUMBER/format/. 
+Sistem ini menyediakan dukungan untuk membaca, menulis, dan mengkonversi 
+berbagai format berkas populer:
+
+SUMBER/format/
+├── format.c                   # Core format handler
+├── format_registry.c          # Format registration system
+│
+├── gambar/                    # Format gambar
+├── dokumen/                   # Format dokumen
+├── media/                     # Format media audio/video
+└── arsip/                     # Format arsip/kompresi
+
+
+9.2 Format Gambar
+-----------------
+
+SUMBER/format/gambar/
+├── gambar.c                   # Core gambar handler
+├── bmp.c                      # BMP (Windows Bitmap)
+├── jpeg.c                     # JPEG (Joint Photographic Experts Group)
+├── png.c                      # PNG (Portable Network Graphics) - core
+├── png_baca.c                 # PNG reader
+├── png_tulis.c                # PNG writer
+├── gif.c                      # GIF (Graphics Interchange Format)
+├── tga.c                      # TGA (Targa)
+├── ico.c                      # ICO (Windows Icon)
+└── svg.c                      # SVG (Scalable Vector Graphics)
+
+
+9.3 Format Dokumen
+------------------
+
+SUMBER/format/dokumen/
+├── dokumen.c                  # Core dokumen handler
+├── txt.c                      # Plain text
+├── html.c                     # HTML (HyperText Markup Language)
+├── xml.c                      # XML (Extensible Markup Language)
+├── json.c                     # JSON (JavaScript Object Notation)
+├── markdown.c                 # Markdown
+├── rtf.c                      # RTF (Rich Text Format)
+├── pdf.c                      # PDF - core
+├── pdf_baca.c                 # PDF reader
+└── pdf_tulis.c                # PDF writer
+
+
+9.4 Format Media
+----------------
+
+SUMBER/format/media/
+├── media.c                    # Core media handler
+├── wav.c                      # WAV (Waveform Audio)
+├── mp3.c                      # MP3 (MPEG-1 Audio Layer III)
+├── flac.c                     # FLAC (Free Lossless Audio Codec)
+├── ogg.c                      # OGG (Ogg Vorbis)
+├── avi.c                      # AVI (Audio Video Interleave)
+├── mkv.c                      # MKV (Matroska Video)
+└── mp4.c                      # MP4 (MPEG-4 Part 14)
+
+
+9.5 Format Arsip
+-----------------
+
+SUMBER/format/arsip/
+├── arsip.c                    # Core arsip handler
+├── tar.c                      # TAR (Tape Archive)
+├── gz.c                       # GZ (GNU Zip)
+├── bz2.c                      # BZ2 (Bzip2)
+├── xz.c                       # XZ (LZMA/XZ)
+└── zip.c                      # ZIP
+
+
+================================================================================
+                        10. SISTEM USER MODE
 ================================================================================
 
 10.1 Ring Protection
@@ -1385,7 +1489,15 @@ Switch dari Ring 0 ke Ring 3 dilakukan via:
 10.2 System Call
 ----------------
 
-System call adalah mekanisme user mode untuk meminta layanan kernel:
+System call adalah mekanisme user mode untuk meminta layanan kernel.
+Implementasi system call berada di SUMBER/inti/syscall/:
+
+SUMBER/inti/syscall/
+├── tabel.c                  # System call table
+├── dispatcher.c             # Syscall dispatcher
+├── validasi.c               # Parameter validation
+├── syscall.c                # Core syscall handler
+└── syscall_user.c           # User-space syscall interface
 
 System Call Table (contoh):
   +-----+------------------+--------------------------------+
@@ -1419,9 +1531,35 @@ Implementasi per arsitektur:
     - R0 = syscall number
     - R1-R6 = parameters
 
+  ARMv7:
+    - SVC dengan ARM EABI calling convention
+
+  ARM64:
+    - SVC instruction (AArch64)
+    - X0 = syscall number
+    - X1-X5 = parameters
+
 
 10.3 Process Management
 -----------------------
+
+Process management berada di SUMBER/inti/proses/:
+
+SUMBER/inti/proses/
+├── proses.c                  # Process management core
+├── proses.h                  # Header proses
+├── scheduler.c               # Scheduler (priority-based round robin)
+├── context.c                 # Context switching
+├── fork.c                    # Process fork
+├── exec.c                    # Process execution
+├── exit.c                    # Process termination
+├── wait.c                    # Process wait
+├── signal.c                  # Signal handling
+├── thread.c                  # Thread management
+├── elf.c                     # ELF loader
+├── tss.c                     # Task State Segment
+├── ring_switch.c             # Ring switching
+└── user_mode.c               # User mode entry
 
 Process Control Block (PCB):
 
@@ -1444,211 +1582,498 @@ Scheduler:
 
 
 ================================================================================
-                    11. STRUKTUR DIREKTORI PROYEK
+                  11. SISTEM PERANGKAT KERAS
 ================================================================================
 
-11.1 Layout Direktori Utama
+11.1 CPU Management
+-------------------
+
+SUMBER/perangkat/cpu/ menyediakan CPU detection dan management:
+
+SUMBER/perangkat/cpu/
+├── cpu.c                      # Core CPU driver
+├── cpu.h                      # Header CPU
+├── cpuid.c                    # CPUID instruction
+├── fpu.c                      # FPU management
+├── sse.c                      # SSE extensions
+├── avx.c                      # AVX extensions
+├── cache.c                    # Cache management
+├── acpi.c                     # ACPI (power management)
+├── apic.c                     # APIC (multiprocessor)
+├── smp.c                      # SMP (symmetric multiprocessing)
+└── topologi.c                 # CPU topology detection
+
+
+11.2 Memory Controller
+-----------------------
+
+SUMBER/perangkat/memori/ menyediakan memory controller management:
+
+SUMBER/perangkat/memori/
+├── memori.h                   # Header memori
+├── ram.c                      # RAM detection
+├── pci.c                      # PCI bus enumeration
+├── pengatur_memori.c          # Memory controller configuration
+└── pengatur_cache.c           # Cache controller configuration
+
+
+11.3 DMA Controller
+-------------------
+
+SUMBER/perangkat/dma/ menyediakan DMA transfer management:
+
+SUMBER/perangkat/dma/
+├── dma.h                      # Header DMA
+├── dma.c                      # Core DMA driver
+├── dma_controller.c           # DMA controller management
+└── dma_transfer.c             # DMA transfer operations
+
+
+11.4 Penyimpanan (Storage)
+---------------------------
+
+SUMBER/perangkat/penyimpanan/ menyediakan storage device drivers:
+
+SUMBER/perangkat/penyimpanan/
+├── penyimpanan.c              # Core storage driver
+├── ata.c                      # ATA/IDE controller
+├── ahci.c                     # AHCI (SATA)
+├── nvme.c                     # NVMe controller
+├── mbr.c                      # Master Boot Record
+├── gpt.c                      # GUID Partition Table
+├── partisi.c                  # Partition management
+├── mmc.c                      # MMC/eMMC
+├── sd_card.c                  # SD card
+└── penyimpanan_usb.c          # USB mass storage
+
+
+11.5 Jaringan (Network)
+------------------------
+
+SUMBER/perangkat/jaringan/ menyediakan network stack:
+
+SUMBER/perangkat/jaringan/
+├── jaringan.h                 # Header jaringan
+├── jaringan.c                 # Core network driver
+├── ethernet.c                 # Ethernet protocol
+├── arp.c                      # ARP protocol
+├── ip.c                       # IP protocol
+├── tcp.c                      # TCP protocol
+├── udp.c                      # UDP protocol
+├── dns.c                      # DNS resolver
+├── dhcp.c                     # DHCP client
+├── wifi.c                     # WiFi management
+├── socket.c                   # Socket API
+└── netdev.c                   # Network device abstraction
+
+
+11.6 Input Devices
+-------------------
+
+SUMBER/perangkat/masukan/ menyediakan input device drivers:
+
+SUMBER/perangkat/masukan/
+├── masukan.h                  # Header masukan
+├── masukan.c                  # Core input driver
+├── papanketik.c               # Keyboard driver
+├── tetikus.c                  # Mouse driver
+├── hid.c                      # USB HID core
+├── layarsentuh.c              # Touchscreen driver
+├── gamepad.c                  # Gamepad driver
+└── joystick.c                 # Joystick driver
+
+
+11.7 Video Output
+-----------------
+
+SUMBER/perangkat/tampilan/ menyediakan video output drivers.
+Detail lengkap ada di Bagian 6.3.
+
+
+================================================================================
+                        12. SISTEM BOOT
+================================================================================
+
+12.1 Bootloader (SUMBER/_memuat/)
+---------------------------------
+
+Bootloader Pigura OS berada di SUMBER/_memuat/:
+
+SUMBER/_memuat/
+├── bootloader.c               # Core bootloader
+├── load_kernel.c              # Load kernel image
+├── multiboot.c                # Multiboot specification
+├── mode_protected.c           # Switch to protected mode (x86)
+├── mode_long.c                # Switch to long mode (x86_64)
+├── gdt.c                      # GDT setup
+├── idt.c                      # IDT setup
+├── deteksi_memori.c           # Memory detection
+└── console_text.c             # Text console for boot
+
+
+12.2 Arsitektur Boot per Platform
+----------------------------------
+
+Setiap arsitektur memiliki boot code spesifik di direktori masing-masing:
+
+  x86:    bootsect.S -> multiboot.S -> protected_mode.S -> stage2.c
+  x86_64: bootsect.S -> paging_setup.S -> long_mode.S -> stage2.c
+  ARM:    boot_arm.S -> mmu_setup.S -> vector_table.S
+  ARMv7:  boot_armv7.S -> mmu_setup.S -> vfp_setup.S -> neon_setup.S
+  ARM64:  boot_arm64.S -> mmu_setup.S -> vector_table.S
+
+
+================================================================================
+                    13. APLIKASI PENGGUNA
+================================================================================
+
+Aplikasi Pigura OS berada di SUMBER/aplikasi/ dan terbagi menjadi 5 kategori:
+
+
+13.1 Aplikasi Sistem
+---------------------
+
+SUMBER/aplikasi/sistem/
+├── sistem.c                   # System utilities core
+├── init.c                     # Init process (PID 1)
+├── shell.c                    # Command shell
+├── login.c                    # Login manager
+├── profil.c                   # User profile management
+├── pengaturan.c               # System settings
+└── tentang.c                  # About system
+
+
+13.2 Aplikasi Grafis
+---------------------
+
+SUMBER/aplikasi/grafis/
+├── grafis.c                   # Graphics utilities core
+├── screenshot.c               # Screenshot tool
+├── penampil_gambar.c          # Image viewer
+├── editor_gambar.c            # Image editor
+├── pengambil_warna.c          # Color picker
+└── font_viewer.c              # Font viewer
+
+
+13.3 Aplikasi Kantor
+---------------------
+
+SUMBER/aplikasi/kantor/
+├── kantor.c                   # Office suite core
+├── editor_dokumen.c           # Document editor (word processor)
+├── spreadsheet.c              # Spreadsheet
+├── presentasi.c               # Presentation
+├── penampil_teks.c            # Text viewer
+├── catatan.c                  # Notes
+├── kalender_app.c             # Calendar
+└── pdf_reader.c               # PDF reader
+
+
+13.4 Aplikasi Jaringan
+-----------------------
+
+SUMBER/aplikasi/jaringan/
+├── jaringan.c                 # Network utilities core
+├── browser.c                  # Web browser
+├── email.c                    # Email client
+├── chat.c                     # Chat client
+├── ssh.c                      # SSH client
+├── ftp.c                      # FTP client
+├── ping.c                     # Network ping
+├── netstat.c                  # Network statistics
+└── wifi_manager.c             # WiFi manager
+
+
+13.5 Aplikasi Utilitas
+-----------------------
+
+SUMBER/aplikasi/utilitas/
+├── utilitas.c                 # Utilities core
+├── terminal.c                 # Terminal emulator
+├── editor_teks.c              # Text editor
+├── kalkulator.c               # Calculator
+├── jam.c                      # Clock
+├── kalender.c                 # Calendar
+├── berkas_manager.c           # File manager
+├── proses_monitor.c           # Process monitor
+├── pencarian.c                # Search tool
+└── partisi.c                  # Partition manager
+
+
+================================================================================
+                  14. STRUKTUR DIREKTORI PROYEK
+================================================================================
+
+14.1 Layout Direktori Utama
 ---------------------------
 
 PIGURA/
 ├── SUMBER/                 # Source code
-│   ├── kernel/             # Kernel core
-│   ├── arsitektur/         # Arch-specific code
-│   ├── libc/               # C library terpadu
-│   ├── pigura/             # LibPigura graphics
-│   ├── dekor/              # Compositor
-│   ├── perangkat/          # Device drivers & IC detection
-│   ├── berkas/             # Filesystem drivers
-│   └── aplikasi/           # User applications
+│   ├── inti/             # Kernel core
+│   ├── arsitektur/       # Arch-specific code
+│   ├── libc/             # C library terpadu
+│   ├── pigura/           # LibPigura graphics (framebuffer, widget, dll)
+│   ├── perangkat/        # Device drivers & IC detection
+│   ├── berkas/           # Filesystem drivers
+│   ├── format/           # Format handler (gambar, dokumen, media, arsip)
+│   ├── aplikasi/         # User applications
+│   └── _memuat/          # Bootloader
 │
-├── BUILD/                  # Build output
-│   ├── x86/
-│   ├── x86_64/
-│   ├── arm/
-│   └── armv7/
-│
-├── ALAT/                   # Tools
-│   ├── compiler/           # Cross-compiler
-│   ├── emulator/           # QEMU, etc
-│   └── scripts/            # Build scripts
-│
+├── ALAT/                   # Tools & scripts
+├── CITRA/                  # Image assets
 ├── DOKUMENTASI/            # Documentation
 │
-└── Makefile                # Main build file
+├── pigura.txt              # Dokumen desain ini
+├── BACALAH.md              # Readme
+├── LISENSI                 # License
+├── Konfigurasi.mk           # Build configuration
+├── Makefile                # Main build file
+└── DOKUMENTASI/            # Documentation (md files)
 
 
-11.2 Struktur Lengkap
+14.2 Struktur Lengkap
 ---------------------
 
 PIGURA/
 ├── SUMBER/
 │   │
-│   ├── kernel/                     # Kernel Core
-│   │   ├── main.c                  # Entry point
-│   │   ├── gdt.c, idt.c            # Descriptor tables
-│   │   ├── isr.c, irq.c            # Interrupt handlers
-│   │   ├── timer.c, pit.c          # Timer
-│   │   ├── panic.c                 # Kernel panic
-│   │   └── printk.c                # Kernel printf
+│   ├── inti/                         # Kernel Core (56 file)
+│   │   ├── boot/                     # Boot & init
+│   │   │   ├── kernel_main.c        # Entry point
+│   │   │   ├── inisialisasi.c       # Kernel initialization
+│   │   │   ├── multiboot.c          # Multiboot
+│   │   │   ├── panic.c              # Kernel panic
+│   │   │   ├── setup_stack.c        # Stack setup
+│   │   │   └── string_mem.c         # String/memory utils
+│   │   ├── hal/                      # Hardware Abstraction Layer
+│   │   │   ├── hal.c, hal.h
+│   │   │   ├── hal_cpu.c
+│   │   │   ├── hal_memori.c
+│   │   │   ├── hal_interupsi.c
+│   │   │   ├── hal_timer.c
+│   │   │   └── hal_console.c
+│   │   ├── interupsi/                # Interrupt handling
+│   │   │   ├── interupsi.c, isr.c, isr.h
+│   │   │   ├── irq.c, pic.c, apic.c
+│   │   │   ├── handler.c, exception.c
+│   │   ├── memori/                   # Memory management
+│   │   │   ├── memori.c, fisik.c, virtual.c
+│   │   │   ├── paging.c, heap.c, allocator.c
+│   │   │   ├── kmap.c, dma_buffer.c
+│   │   ├── proses/                   # Process management
+│   │   │   ├── proses.c, proses.h
+│   │   │   ├── scheduler.c, context.c
+│   │   │   ├── fork.c, exec.c, exit.c
+│   │   │   ├── signal.c, thread.c
+│   │   │   ├── elf.c, tss.c
+│   │   │   ├── ring_switch.c, user_mode.c
+│   │   │   └── wait.c
+│   │   ├── syscall/                  # System call interface
+│   │   │   ├── tabel.c, dispatcher.c
+│   │   │   ├── validasi.c, syscall.c
+│   │   │   └── syscall_user.c
+│   │   ├── config.h, konstanta.h, kernel.h
+│   │   ├── types.h, stat.h, stdarg.h
+│   │   └── makro.h, panic.h
 │   │
-│   ├── arsitektur/                 # Architecture-specific
-│   │   ├── x86/
-│   │   ├── x86_64/
-│   │   ├── arm/
-│   │   └── armv7/
+│   ├── arsitektur/                   # Architecture-specific (106 file)
+│   │   ├── x86/                     # Intel/AMD 32-bit
+│   │   ├── x86_64/                  # Intel/AMD 64-bit
+│   │   ├── arm/                     # ARM 32-bit generik
+│   │   ├── armv7/                   # ARM Cortex-A series
+│   │   └── arm64/                   # ARM 64-bit (AArch64)
 │   │
-│   ├── libc/                       # C Library (73 file)
-│   │   ├── include/                # Headers
-│   │   ├── internal/               # Internal impl
-│   │   ├── stdio/                  # I/O
-│   │   ├── stdlib/                 # Utilitas
-│   │   ├── string/                 # String ops
-│   │   ├── ctype/                  # Character
-│   │   ├── unistd/                 # POSIX
-│   │   ├── fcntl/                  # File control
-│   │   ├── signal/                 # Signal
-│   │   ├── time/                   # Time
-│   │   ├── math/                   # Math (opsional)
-│   │   ├── setjmp/                 # Non-local jump
-│   │   └── network/                # Network (opsional)
+│   ├── libc/                         # C Library (78 file)
+│   │   ├── include/                  # Headers (22 file)
+│   │   ├── internal/                 # Internal (4 + arch)
+│   │   ├── stdio/                    # I/O (12 file)
+│   │   ├── stdlib/                   # Utilitas (9 file)
+│   │   ├── string/                   # String ops (6 file)
+│   │   ├── ctype/                    # Character (1 file)
+│   │   ├── unistd/                   # POSIX (6 file)
+│   │   ├── fcntl/                    # File control (1 file)
+│   │   ├── signal/                   # Signal (1 file)
+│   │   ├── time/                     # Time (3 file)
+│   │   ├── math/                     # Math (1 file)
+│   │   ├── setjmp/                   # Non-local jump (1 file)
+│   │   └── network/                  # Network (3 file)
 │   │
-│   ├── pigura/                     # LibPigura
-│   │   ├── kanvas/
-│   │   ├── render/
-│   │   ├── gpu_accel/
-│   │   ├── teks/
-│   │   └── jendela/
+│   ├── pigura/                       # LibPigura Graphics (88 file)
+│   │   ├── framebuffer/              # Framebuffer & render
+│   │   │   ├── framebuffer.c, framebuffer_blit.c
+│   │   │   ├── framebuffer_render.c
+│   │   │   ├── kanvas/                # Canvas (6 file)
+│   │   │   ├── pengolah/              # Renderer (15 file)
+│   │   │   ├── buffer/                # Buffer (5 file)
+│   │   │   └── akselerasi_gpu/        # GPU accel (8 file)
+│   │   ├── penata/                    # Compositor
+│   │   │   ├── inti/                  # Core (4 file)
+│   │   │   ├── klip/                  # Clipping (5 file)
+│   │   │   ├── lapisan/               # Z-order (5 file)
+│   │   │   └── efek/                  # Effects (5 file)
+│   │   ├── peristiwa/                 # Events (6 file)
+│   │   ├── widget/                    # Widgets (8 file)
+│   │   ├── teks/                      # Text & font (9 file)
+│   │   ├── jendela/                   # Window mgmt (6 file)
+│   │   └── pigura.c                   # Entry point
 │   │
-│   ├── dekor/                      # Compositor
-│   │   ├── core/
-│   │   ├── buffer/
-│   │   ├── event/
-│   │   ├── clip/
-│   │   ├── layer/
-│   │   └── efek/
+│   ├── perangkat/                    # Device Drivers (104 file)
+│   │   ├── ic/                       # IC Detection System
+│   │   │   ├── database/              # 21 database files
+│   │   │   ├── probe/                 # 6 probe files
+│   │   │   └── driver_umum/           # 9 driver files
+│   │   ├── cpu/                      # CPU (11 file)
+│   │   ├── memori/                   # Memory controller (5 file)
+│   │   ├── dma/                      # DMA (4 file)
+│   │   ├── tampilan/                 # Display
+│   │   │   ├── video/                 # Video (4 file)
+│   │   │   └── gpu/                   # GPU (9 file)
+│   │   ├── masukan/                  # Input (8 file)
+│   │   ├── jaringan/                 # Network (11 file)
+│   │   └── penyimpanan/              # Storage (10 file)
 │   │
-│   ├── perangkat/                  # Device drivers
-│   │   ├── ic/                     # IC Detection System
-│   │   │   ├── database/
-│   │   │   ├── probe/
-│   │   │   └── driver_generik/
-│   │   ├── tampilan/               # Display
-│   │   │   ├── framebuffer/
-│   │   │   └── gpu/
-│   │   ├── masukan/                # Input
-│   │   ├── jaringan/               # Network
-│   │   ├── penyimpanan/            # Storage
-│   │   └── suara/                  # Audio
+│   ├── berkas/                       # Filesystem (49 file)
+│   │   ├── vfs/                      # VFS (9 file)
+│   │   ├── fat32/                    # FAT32 (7 file)
+│   │   ├── ntfs/                     # NTFS (8 file)
+│   │   ├── ext2/                     # ext2 (7 file)
+│   │   ├── iso9660/                  # ISO9660 (6 file)
+│   │   ├── initramfs/                # initramfs (4 file)
+│   │   └── pigurafs/                 # PiguraFS (8 file)
 │   │
-│   ├── berkas/                     # Filesystem
-│   │   ├── vfs/
-│   │   ├── fat32/
-│   │   ├── ntfs/
-│   │   ├── ext2/
-│   │   ├── iso9660/
-│   │   ├── initramfs/
-│   │   └── pigurafs/
+│   ├── format/                       # Format Handler (36 file)
+│   │   ├── gambar/                   # Image formats (10 file)
+│   │   ├── dokumen/                  # Document formats (10 file)
+│   │   ├── media/                    # Media formats (9 file)
+│   │   └── arsip/                    # Archive formats (6 file)
 │   │
-│   └── aplikasi/                   # User applications
-│       ├── shell/
-│       ├── editor/
-│       └── utilitas/
+│   ├── aplikasi/                     # User Applications (40 file)
+│   │   ├── sistem/                   # System apps (7 file)
+│   │   ├── grafis/                   # Graphics apps (6 file)
+│   │   ├── kantor/                   # Office apps (8 file)
+│   │   ├── jaringan/                 # Network apps (9 file)
+│   │   └── utilitas/                 # Utility apps (10 file)
+│   │
+│   └── _memuat/                      # Bootloader (9 file)
+│       ├── bootloader.c
+│       ├── load_kernel.c
+│       ├── multiboot.c
+│       ├── mode_protected.c
+│       ├── mode_long.c
+│       ├── gdt.c
+│       ├── idt.c
+│       ├── deteksi_memori.c
+│       └── console_text.c
 │
-├── BUILD/
-│   ├── x86/
-│   │   ├── kernel.bin
-│   │   ├── pigura.iso
-│   │   └── initramfs.cpio
-│   ├── x86_64/
-│   ├── arm/
-│   └── armv7/
+├── ALAT/                           # Tools & Build Scripts
+│   ├── Makefile                    # (root level)
+│   ├── Konfigurasi.mk              # Build configuration
+│   ├── build.sh                    # Build script
+│   ├── clean.sh                    # Clean script
+│   ├── create_image.sh             # Image creation
+│   ├── debug.sh                    # Debug script
+│   ├── qemu_run.sh                 # QEMU launcher
+│   ├── linker_x86.ld               # x86 linker script
+│   ├── linker_x86_64.ld            # x86_64 linker script
+│   ├── linker_arm.ld               # ARM linker script
+│   ├── linker_armv7.ld             # ARMv7 linker script
+│   └── linker_arm64.ld             # ARM64 linker script
 │
-├── ALAT/
-│   ├── compiler/
-│   │   ├── i686-pigura-*
-│   │   ├── x86_64-pigura-*
-│   │   └── arm-pigura-*
-│   ├── emulator/
-│   │   └── qemu/
-│   └── scripts/
-│       ├── build.sh
-│       └── test.sh
+├── CITRA/                          # Image Assets
+│   ├── logo.png                    # OS logo
+│   ├── icon.png                    # OS icon
+│   ├── splash.png                  # Boot splash screen
+│   ├── cursor.png                  # Mouse cursor
+│   └── font_default.pf             # Default bitmap font
 │
-├── DOKUMENTASI/
-│   ├── pigura.txt                  # Dokumen ini
+├── DOKUMENTASI/                    # Documentation
 │   ├── API.md                      # API reference
-│   └── CONTRIBUTE.md               # Contribution guide
+│   ├── ARSITEKTUR.md               # Architecture docs
+│   ├── BUILD.md                    # Build instructions
+│   ├── FRAMEBUFFER.md              # Framebuffer docs
+│   ├── IC_DETECTION.md             # IC Detection docs
+│   ├── IMPLEMENTASI.md             # Implementation notes
+│   ├── KONTRIBUSI.md               # Contribution guide
+│   └── STRUKTUR.md                 # Structure docs
 │
-├── Makefile
-└── README.md
+├── pigura.txt                      # Dokumen desain ini
+├── BACALAH.md                      # Readme
+├── LISENSI                         # License
+└── Makefile                        # Main Makefile
 
 
 ================================================================================
-                    12. ESTIMASI UKURAN DAN KOMPLEKSITAS
+                   15. ESTIMASI UKURAN DAN KOMPLEKSITAS
 ================================================================================
 
 Estimasi Komponen:
 +---------------------------+------------+------------+
 | Komponen                  | File       | Est. Size  |
 +---------------------------+------------+------------+
-| Kernel Core               | ~30        | ~100 KB    |
+| Kernel Core (inti/)       | 56         | ~150 KB    |
 +---------------------------+------------+------------+
-| LibC (73 file)            | 73         | ~150 KB    |
+| LibC (78 file)            | 78         | ~150 KB    |
 +---------------------------+------------+------------+
-| LibPigura                 | ~40        | ~80 KB     |
+| LibPigura (88 file)       | 88         | ~100 KB    |
 +---------------------------+------------+------------+
-| Dekor Compositor          | ~30        | ~50 KB     |
+| IC Detection System       | ~40        | ~80 KB     |
 +---------------------------+------------+------------+
-| IC Detection System       | ~25        | ~60 KB     |
+| Filesystem Drivers        | 49         | ~120 KB    |
 +---------------------------+------------+------------+
-| Filesystem Drivers        | ~45        | ~120 KB    |
+| Format Handlers           | 36         | ~80 KB     |
++---------------------------+------------+------------+
+| Applications              | 40         | ~80 KB     |
 +---------------------------+------------+------------+
 | Architecture (per arch)   | ~20        | ~50 KB     |
+| (5 arsitektur)            | ~100       | ~250 KB    |
 +---------------------------+------------+------------+
-| Device Drivers Generik    | ~15        | ~40 KB     |
+| Device Drivers            | ~50        | ~120 KB    |
 +---------------------------+------------+------------+
-| Bootloader                | ~5         | ~10 KB     |
+| Bootloader (_memuat/)     | 9          | ~20 KB     |
 +---------------------------+------------+------------+
-| Aplikasi Dasar            | ~10        | ~50 KB     |
-+---------------------------+------------+------------+
-| TOTAL                     | ~300 file  | ~5-6 MB    |
+| TOTAL                     | ~566 file  | ~5-6 MB    |
 +---------------------------+------------+------------+
 
-Tabel 6: Estimasi ukuran komponen Pigura OS
+Tabel 5: Estimasi ukuran komponen Pigura OS (aktual: 566 file)
 
 
 ================================================================================
-                    13. DAFTAR IMPLEMENTASI PRIORITAS
+                  16. DAFTAR IMPLEMENTASI PRIORITAS
 ================================================================================
 
 PRIORITAS TINGGI (MVP):
-  [ ] Bootloader text-based (Pigura C90 + inline assembly)
-  [ ] Kernel basic (GDT, IDT, ISR, IRQ)
-  [ ] Framebuffer console
-  [ ] Memory management (pmm, vmm)
-  [ ] LibC core (stdio, stdlib, string)
-  [ ] FAT32 read support
-  [ ] Basic shell
+  [x] Bootloader text-based (Pigura C90 + inline assembly)
+  [x] Kernel basic (GDT, IDT, ISR, IRQ)
+  [x] Framebuffer console
+  [x] Memory management (pmm, vmm)
+  [x] LibC core (stdio, stdlib, string)
+  [x] FAT32 read support
+  [x] Basic shell
 
 PRIORITAS SEDANG:
-  [ ] IC Detection System
-  [ ] Driver generik (storage, display)
-  [ ] LibPigura basic rendering
-  [ ] FAT32 write support
-  [ ] Process management
-  [ ] Dekor compositor basic
+  [x] IC Detection System
+  [x] Driver umum (storage, display)
+  [x] LibPigura basic rendering
+  [x] FAT32 write support
+  [x] Process management
+  [x] Penata compositor basic
 
 PRIORITAS RENDAH:
-  [ ] NTFS support
-  [ ] ext2 support
-  [ ] GPU acceleration
-  [ ] Network support
-  [ ] PiguraFS
-  [ ] Advanced Dekor effects
+  [x] NTFS support
+  [x] ext2 support
+  [x] GPU acceleration
+  [x] Network support
+  [x] PiguraFS
+  [x] Advanced Penata effects
+  [x] Format handler (gambar, dokumen, media, arsip)
+  [x] Aplikasi kantor
+  [x] Aplikasi jaringan
+  [x] ARM64 architecture support
+  [x] Multi-arsitektur (5 platform)
 
 
 ================================================================================
-                    14. SISTEM BUILD MULTI-ARSITEKTUR
+                   17. SISTEM BUILD MULTI-ARSITEKTUR
 ================================================================================
 
 Makefile Utama:
@@ -1672,27 +2097,34 @@ Makefile Utama:
       CFLAGS = -marm -ffreestanding
   endif
   
-  # Source files
-  SRCS = $(wildcard SUMBER/kernel/*.c)
-  SRCS += $(wildcard SUMBER/arsitektur/$(ARSITEKTUR)/**/*.c)
-  SRCS += $(wildcard SUMBER/libc/**/*.c)
+  ifeq ($(ARSITEKTUR),armv7)
+      CC = armv7-pigura-gcc
+      CFLAGS = -marm -ffreestanding
+  endif
   
-  # Output
-  TARGET = BUILD/$(ARSITEKTUR)/kernel.bin
-  
-  all: $(TARGET)
-  
-  $(TARGET): $(SRCS)
-      $(CC) $(CFLAGS) -o $@ $^
+  ifeq ($(ARSITEKTUR),arm64)
+      CC = aarch64-pigura-gcc
+      CFLAGS = -m64 -ffreestanding
+  endif
 
 Usage:
   make ARSITEKTUR=x86       # Build untuk 32-bit
   make ARSITEKTUR=x86_64    # Build untuk 64-bit
   make ARSITEKTUR=arm       # Build untuk ARM
+  make ARSITEKTUR=armv7     # Build untuk ARMv7
+  make ARSITEKTUR=arm64     # Build untuk ARM64
+
+Build tools tersedia di ALAT/:
+  - build.sh          : Build script utama
+  - clean.sh          : Bersihkan build artifacts
+  - create_image.sh   : Buat boot image
+  - debug.sh          : Debug script
+  - qemu_run.sh       : Jalankan di QEMU
+  - linker_*.ld       : Linker scripts per arsitektur
 
 
 ================================================================================
-                            15. KESIMPULAN
+                            18. KESIMPULAN
 ================================================================================
 
 Pigura OS adalah sistem operasi ORIGINAL yang ditulis dari scratch dengan 
@@ -1709,24 +2141,29 @@ karakteristik utama:
      - Semua fungsi aman secara default
 
   3. LIBC TERPADU
-     - 73 file, ~160 fungsi aman
+     - 78 file, ~160 fungsi aman
      - Tidak ada fungsi berbahaya
      - Filosofi "satu fungsi, satu tujuan"
 
   4. MINIMALIS
-     - Total ~300 file, ~5-6 MB
+     - Total 566 file, ~5-6 MB
      - Hanya komponen yang diperlukan
      - Tanpa X11/Wayland
 
   5. PORTABEL
-     - Multi-arsitektur (x86, x86_64, ARM, ARMv7)
+     - Multi-arsitektur (x86, x86_64, ARM, ARMv7, ARM64)
      - Hardware Abstraction Layer
      - Single source tree
 
   6. AMAN
      - IC Detection dengan parameter aman
-     - Compositor untuk isolasi aplikasi
+     - Penata compositor untuk isolasi aplikasi
      - Fungsi bounds-checked
+
+  7. KOMPREHENSIF
+     - Format handler terpadu (gambar, dokumen, media, arsip)
+     - 40 aplikasi pengguna (sistem, grafis, kantor, jaringan, utilitas)
+     - 6 filesystem + VFS
 
 Dengan pendekatan ini, Pigura OS menjadi sistem operasi yang:
   - Mudah dipahami dan dipelihara
@@ -1746,20 +2183,23 @@ A. Referensi Standar
   - IEEE Std 1003.1 (POSIX.1-2008) - subset safe functions
   - Intel 64 and IA-32 Architectures Software Developer's Manual
   - ARM Architecture Reference Manual
+  - UEFI Specification
+  - VESA BIOS Extensions (VBE) Core Functions Specification
 
 
 B. Lisensi
 ----------
 
   Seluruh kode Pigura OS dibagikan untuk tujuan edukasi dan pembelajaran.
+  Lihat file LISENSI untuk detail.
 
 
 C. Kontribusi
 -------------
 
-  Silakan baca DOKUMENTASI/CONTRIBUTE.md untuk panduan kontribusi.
-
+  Silakan baca DOKUMENTASI/KONTRIBUSI.md untuk panduan kontribusi.
 
 ================================================================================
-                           AKHIR DOKUMEN
+                           PIGURA OS - DOKUMEN DESAIN
+                           Versi 1.0 - 2025
 ================================================================================
