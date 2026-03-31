@@ -50,7 +50,7 @@ ifeq ($(ARCH),x86)
     OBJDUMP         := objdump
     CFLAGS          := -m32 -march=i686
     ASFLAGS         := --32
-    LDFLAGS         := -m elf_i386
+    LDFLAGS         := -Wl,-melf_i386
     QEMU            := qemu-system-i386
     LINKER_SCRIPT   := $(DIREKTORI_ALAT)/linker_x86.ld
 else ifeq ($(ARCH),x86_64)
@@ -61,7 +61,7 @@ else ifeq ($(ARCH),x86_64)
     OBJDUMP         := objdump
     CFLAGS          := -m64 -march=x86-64
     ASFLAGS         := --64
-    LDFLAGS         := -m elf_x86_64
+    LDFLAGS         := -Wl,-melf_x86_64
     QEMU            := qemu-system-x86_64
     LINKER_SCRIPT   := $(DIREKTORI_ALAT)/linker_x86_64.ld
 else ifeq ($(ARCH),arm)
@@ -127,9 +127,13 @@ KERNEL_MAP          := $(DIREKTORI_OUTPUT)/pigura_$(ARCH).map
 # SOURCE FILES
 # ========================================
 
-# Cari semua file sumber
-SUMBER_C            := $(shell find $(DIREKTORI_SUMBER) -name '*.c' 2>/dev/null)
-SUMBER_ASM          := $(shell find $(DIREKTORI_SUMBER) -name '*.S' -o -name '*.s' 2>/dev/null)
+# Cari semua file sumber (exclude arsitektur lain)
+_OTHER_ARCH := $(filter-out $(ARCH),x86 x86_64 arm armv7 arm64)
+_SKIP_C     := $(foreach a,$(_OTHER_ARCH),-not -path '*/arsitektur/$(a)/*')
+SKIP_LIBC   := $(foreach a,$(_OTHER_ARCH),-not -path '*/libc/internal/arch/$(a)/*')
+SKIP_ASM    := $(foreach a,$(_OTHER_ARCH),-not -path '*/arsitektur/$(a)/*')
+SUMBER_C   := $(shell find $(DIREKTORI_SUMBER) $(_SKIP_C) $(SKIP_LIBC) -name '*.c' 2>/dev/null)
+SUMBER_ASM := $(shell find $(DIREKTORI_SUMBER) $(SKIP_ASM) $(SKIP_LIBC) \( -name '*.S' -o -name '*.s' \) 2>/dev/null)
 
 # Object files
 OBJEK_C             := $(patsubst $(DIREKTORI_SUMBER)/%.c,$(DIREKTORI_BUILD)/$(ARCH)/%.o,$(SUMBER_C))
@@ -169,8 +173,8 @@ direktori:
 $(KERNEL_ELF): $(OBJEK)
 	@echo "[INFO] Linking kernel..."
 	@$(CC) $(LDFLAGS) -T $(LINKER_SCRIPT) -nostdlib \
-	 -o $@ $(OBJEK) -lgcc \
-	 -Map=$(KERNEL_MAP)
+	-o $@ $(OBJEK) -lgcc \
+	-Wl,-Map=$(KERNEL_MAP)
 	@echo "[SUKSES] Kernel: $@"
 	@$(OBJDUMP) -h $@ > $(DIREKTORI_OUTPUT)/sections_$(ARCH).txt
 	@$(OBJDUMP) -t $@ > $(DIREKTORI_OUTPUT)/symbols_$(ARCH).txt
@@ -221,9 +225,9 @@ debug: kernel
 docs:
 	@echo "[INFO] Building documentation..."
 	@if [ -d "$(DIREKTORI_DOK)" ]; then \
-	 echo "[INFO] Documentation available in $(DIREKTORI_DOK)"; \
+	echo "[INFO] Documentation available in $(DIREKTORI_DOK)"; \
 	else \
-	 echo "[WARNING] No documentation found"; \
+	echo "[WARNING] No documentation found"; \
 	fi
 
 # ========================================
@@ -274,16 +278,16 @@ info:
 check-deps:
 	@echo "[INFO] Checking dependencies..."
 	@if ! command -v $(CC) >/dev/null 2>&1; then \
-	 echo "[ERROR] Compiler $(CC) tidak ditemukan"; \
-	 exit 1; \
+	echo "[ERROR] Compiler $(CC) tidak ditemukan"; \
+	exit 1; \
 	fi
 	@if ! command -v $(AS) >/dev/null 2>&1; then \
-	 echo "[ERROR] Assembler $(AS) tidak ditemukan"; \
-	 exit 1; \
+	echo "[ERROR] Assembler $(AS) tidak ditemukan"; \
+	exit 1; \
 	fi
 	@if [ ! -f $(LINKER_SCRIPT) ]; then \
-	 echo "[ERROR] Linker script tidak ditemukan: $(LINKER_SCRIPT)"; \
-	 exit 1; \
+	echo "[ERROR] Linker script tidak ditemukan: $(LINKER_SCRIPT)"; \
+	exit 1; \
 	fi
 	@echo "[SUKSES] Dependencies OK"
 
