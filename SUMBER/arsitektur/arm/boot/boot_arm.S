@@ -1,9 +1,9 @@
 # =============================================================================
-# PIGURA OS - BOOT CODE ARM64 (AArch64)
+# PIGURA OS - BOOT CODE ARM (32-BIT)
 # =============================================================================
 #
-# Berkas ini berisi kode boot untuk arsitektur ARM64 (AArch64).
-# Dirancang untuk boot dari UEFI atau bare metal pada board ARM64.
+# Berkas ini berisi kode boot untuk arsitektur ARM 32-bit.
+# Dirancang untuk boot dari bootloader atau bare metal pada board ARM.
 #
 # Fungsi utama:
 #   1. Setup stack dan environment
@@ -11,7 +11,7 @@
 #   3. Setup MMU dan page tables
 #   4. Lompat ke kernel C entry
 #
-# Arsitektur: ARM64 (AArch64)
+# Arsitektur: ARM (ARMv4/v5/v6 - 32-bit)
 # Versi: 1.0
 # =============================================================================
 
@@ -20,19 +20,18 @@
 # =============================================================================
 
 # Alamat memory
-.set ALAMAT_KERNEL,        0x40080000    # Kernel load address
-.set ALAMAT_STACK,         0x40000000    # Stack bottom
-.set UKURAN_STACK,         0x10000       # 64 KB stack
+.set ALAMAT_KERNEL,        0x00010000    # Kernel load address
+.set ALAMAT_STACK,         0x00008000    # Stack bottom
+.set UKURAN_STACK,         0x8000        # 32 KB stack
 
-# UART PL011 (untuk Raspberry Pi 3/4 dan board ARM umum)
-.set UART0_BASE,           0x09060000    # UART0 base (QEMU virt)
+# UART PL011 (QEMU virt machine)
+.set UART0_BASE,           0x09000000    # UART0 base (QEMU virt)
 .set UART0_DR,             0x00          # Data Register
 .set UART0_FR,             0x18          # Flag Register
 .set UART0_IBRD,           0x24          # Integer Baud Rate
 .set UART0_FBRD,           0x28          # Fractional Baud Rate
 .set UART0_LCRH,           0x2C          # Line Control
 .set UART0_CR,             0x30          # Control Register
-.set UART0_IMSC,           0x38          # Interrupt Mask
 
 # UART flags
 .set UART_FR_TXFF,         0x20          # Transmit FIFO full
@@ -47,26 +46,17 @@
 .set UART_LCRH_FEN,        0x10          # FIFO enable
 .set UART_LCRH_WLEN_8,     0x60          # 8-bit word
 
-# MMU
-.set MMU_MAIR0,            0xBB          # Normal memory, Device memory
-.set MMU_TCR_T0SZ,         16            # VA size (48-bit)
-.set MMU_TCR_IRGN0,        0x04          # Inner write-back cacheable
-.set MMU_TCR_ORGN0,        0x04          # Outer write-back cacheable
-.set MMU_TCR_SH0,          0x03          # Inner shareable
-.set MMU_TCR_TG0,          0x00          # 4 KB granule
+# CPSR mode bits
+.set CPSR_MODE_SVC,        0x13
+.set CPSR_MODE_IRQ,        0x12
+.set CPSR_MODE_FIQ,        0x11
+.set CPSR_MODE_ABT,        0x17
+.set CPSR_MODE_UND,        0x1B
+.set CPSR_MODE_SYS,        0x1F
 
-# Page table flags
-.set PT_VALID,             0x01          # Valid entry
-.set PT_TABLE,             0x02          # Table descriptor
-.set PT_PAGE,              0x01          # Page descriptor
-.set PT_USER,              0x04          # User accessible
-.set PT_RDONLY,            0x02          # Read-only
-.set PT_AF,                0x10          # Access flag
-.set PT_NG,                0x800         # Not global
-.set PT_SH_INNER,          0x200         # Inner shareable
-.set PT_AP_RW,             0x00          # Read/Write
-.set PT_MA_NORMAL,         0x00          # Normal memory
-.set PT_MA_DEVICE,         0x01          # Device memory
+# CPSR flags
+.set CPSR_IRQ_DIS,         (1 << 7)
+.set CPSR_FIQ_DIS,         (1 << 6)
 
 # =============================================================================
 # ENTRY POINT
@@ -78,32 +68,26 @@
 
 _start:
     # -------------------------------------------------------------------------
-    # Disable interrupts
+    # Disable interrupts dan switch ke SVC mode
     # -------------------------------------------------------------------------
-    msr     DAIFSet, #0xF                  # Disable all exceptions
-
-    # -------------------------------------------------------------------------
-    # Check processor ID and set up for primary CPU only
-    # -------------------------------------------------------------------------
-    mrs     x0, MPIDR_EL1                  # Get processor ID
-    and     x0, x0, #3                     # Extract CPU number
-    cbnz    x0, ._cpu_halt                 # Halt secondary CPUs
+    cpsid   if                          # Disable IRQ dan FIQ
+    cps     #CPSR_MODE_SVC              # Switch ke Supervisor mode
 
     # -------------------------------------------------------------------------
     # Setup stack
     # -------------------------------------------------------------------------
-    ldr     x0, =_stack_top
-    mov     sp, x0
+    ldr     sp, =_stack_top
 
     # -------------------------------------------------------------------------
     # Zero BSS section
     # -------------------------------------------------------------------------
-    ldr     x0, =_bss_start
-    ldr     x1, =_bss_end
+    ldr     r0, =_bss_start
+    ldr     r1, =_bss_end
+    mov     r2, #0
 ._bss_loop:
-    cmp     x0, x1
-    b.ge    ._bss_done
-    str     xzr, [x0], #8
+    cmp     r0, r1
+    bge     ._bss_done
+    str     r2, [r0], #4
     b       ._bss_loop
 ._bss_done:
 
@@ -115,11 +99,11 @@ _start:
     # -------------------------------------------------------------------------
     # Print boot banner
     # -------------------------------------------------------------------------
-    ldr     x0, =_pesan_banner
+    ldr     r0, =_pesan_banner
     bl      _uart_puts
 
     # -------------------------------------------------------------------------
-    # Setup page tables (identity mapping + kernel mapping)
+    # Setup page tables (identity mapping)
     # -------------------------------------------------------------------------
     bl      _mmu_setup
 
@@ -131,12 +115,13 @@ _start:
     # -------------------------------------------------------------------------
     # Jump to C kernel entry
     # -------------------------------------------------------------------------
-    ldr     x0, =_kernel_entry
-    br      x0
+    ldr     r0, =_kernel_entry
+    bx      r0
 
-._cpu_halt:
-    wfi
-    b       ._cpu_halt
+    # -------------------------------------------------------------------------
+    # Should not reach here
+    # -------------------------------------------------------------------------
+    b       .
 
 # =============================================================================
 # UART FUNCTIONS
@@ -151,108 +136,82 @@ _start:
 # -----------------------------------------------------------------------------
 _uart_init:
     # Load UART base address
-    ldr     x0, =UART0_BASE
+    ldr     r0, =UART0_BASE
 
     # Disable UART
-    str     wzr, [x0, #UART0_CR]
+    mov     r1, #0
+    str     r1, [r0, #UART0_CR]
 
     # Wait for TX FIFO to empty
 ._uart_wait_tx:
-    ldr     w1, [x0, #UART0_FR]
-    tst     w1, #UART_FR_TXFF
-    b.ne    ._uart_wait_tx
+    ldr     r1, [r0, #UART0_FR]
+    tst     r1, #UART_FR_TXFF
+    bne     ._uart_wait_tx
 
     # Set baud rate (115200 @ 24MHz clock)
     # IBRD = 24MHz / (16 * 115200) = 13
-    mov     w1, #13
-    str     w1, [x0, #UART0_IBRD]
+    mov     r1, #13
+    str     r1, [r0, #UART0_IBRD]
 
     # FBRD = 0 (fractional part)
-    str     wzr, [x0, #UART0_FBRD]
+    mov     r1, #0
+    str     r1, [r0, #UART0_FBRD]
 
     # Set line control: 8-bit, FIFO enabled
-    mov     w1, #(UART_LCRH_WLEN_8 | UART_LCRH_FEN)
-    str     w1, [x0, #UART0_LCRH]
+    mov     r1, #(UART_LCRH_WLEN_8 | UART_LCRH_FEN)
+    str     r1, [r0, #UART0_LCRH]
 
     # Enable UART, TX, RX
-    mov     w1, #(UART_CR_UARTEN | UART_CR_TXE | UART_CR_RXE)
-    str     w1, [x0, #UART0_CR]
+    mov     r1, #(UART_CR_UARTEN | UART_CR_TXE | UART_CR_RXE)
+    str     r1, [r0, #UART0_CR]
 
-    ret
+    mov     pc, lr
 
 # -----------------------------------------------------------------------------
 # _uart_putc
 # ----------
 # Output single character to UART.
-# Parameters: x0 = character
+# Parameters: r0 = character
 # -----------------------------------------------------------------------------
 _uart_putc:
     # Save character
-    mov     w2, w0
+    mov     r2, r0
 
     # Load UART base
-    ldr     x1, =UART0_BASE
+    ldr     r1, =UART0_BASE
 
     # Wait for TX FIFO not full
 ._uart_putc_wait:
-    ldr     w3, [x1, #UART0_FR]
-    tst     w3, #UART_FR_TXFF
-    b.ne    ._uart_putc_wait
+    ldr     r3, [r1, #UART0_FR]
+    tst     r3, #UART_FR_TXFF
+    bne     ._uart_putc_wait
 
     # Write character
-    str     w2, [x1, #UART0_DR]
+    str     r2, [r1, #UART0_DR]
 
-    ret
+    mov     pc, lr
 
 # -----------------------------------------------------------------------------
 # _uart_puts
 # ----------
 # Output null-terminated string to UART.
-# Parameters: x0 = pointer to string
+# Parameters: r0 = pointer to string
 # -----------------------------------------------------------------------------
 _uart_puts:
-    mov     x2, x0                         # String pointer
+    # Save lr
+    mov     r3, lr
+    mov     r2, r0                         # String pointer
 
 ._uart_puts_loop:
-    ldrb    w0, [x2], #1                   # Load byte and increment
-    cbz     w0, ._uart_puts_done           # Check for null terminator
+    ldrb    r0, [r2], #1                   # Load byte and increment
+    cmp     r0, #0                         # Check for null terminator
+    beq     ._uart_puts_done
 
     bl      _uart_putc
     b       ._uart_puts_loop
 
 ._uart_puts_done:
-    ret
-
-# -----------------------------------------------------------------------------
-# _uart_puthex
-# ------------
-# Output 64-bit value in hexadecimal format.
-# Parameters: x0 = value to print
-# -----------------------------------------------------------------------------
-_uart_puthex:
-    mov     x3, x0                         # Save value
-    mov     x4, #16                        # Digit count
-
-._uart_puthex_loop:
-    sub     x4, x4, #1                     # Decrement counter
-
-    # Extract nibble
-    lsr     x0, x3, x4
-    and     x0, x0, #0xF
-
-    # Convert to ASCII
-    cmp     x0, #10
-    b.lt    ._uart_puthex_digit
-    add     x0, x0, #('A' - '0' - 10)
-
-._uart_puthex_digit:
-    add     x0, x0, #'0'
-
-    bl      _uart_putc
-
-    cbnz    x4, ._uart_puthex_loop
-
-    ret
+    mov     pc, r3
 
 # =============================================================================
 # MMU FUNCTIONS
@@ -261,67 +220,49 @@ _uart_puthex:
 # -----------------------------------------------------------------------------
 # _mmu_setup
 # ----------
-# Setup page tables for identity mapping and kernel mapping.
+# Setup page tables for identity mapping.
 # -----------------------------------------------------------------------------
 _mmu_setup:
     # Save return address
-    mov     x8, x30
+    mov     r8, lr
 
     # Get page table base
-    ldr     x0, =_pgd
+    ldr     r0, =_page_table
 
-    # Clear page tables (3 levels x 4KB)
-    mov     x1, x0
-    mov     x2, #0
-    mov     x3, #(4096 * 3)
+    # Clear page table (16KB = 4096 entries)
+    mov     r1, r0
+    mov     r2, #0
+    mov     r3, #4096
 ._mmu_clear:
-    str     x2, [x1], #8
-    subs    x3, x3, #8
-    b.ne    ._mmu_clear
+    str     r2, [r1], #4
+    subs    r3, r3, #1
+    bne     ._mmu_clear
 
-    # Create identity mapping (first 1 GB)
-    # PGD[0] -> PUD
-    ldr     x1, =_pud
-    orr     x0, x1, #PT_VALID | PT_TABLE
-    ldr     x1, =_pgd
-    str     x0, [x1]
+    # Create identity mapping (first 1 GB with 1MB sections)
+    # Section descriptor: AP=11 (RW), Domain=0, CB=11, Type=10 (section)
+    mov     r1, r0                         # Page table pointer
+    mov     r2, #0                         # Physical address
+    mov     r3, #0xC12                     # Section flags: C=1, B=1, AP=11, type=10
+    orr     r3, r3, #0x400                 # Domain 0 client
+    mov     r4, #1024                      # 1024 sections = 1GB
 
-    # PUD[0] -> PMD (identity mapping)
-    ldr     x0, =_pmd
-    orr     x0, x0, #PT_VALID | PT_TABLE
-    ldr     x1, =_pud
-    str     x0, [x1]
-
-    # PMD entries (2 MB blocks, first 1 GB)
-    ldr     x0, =_pmd
-    mov     x1, #(PT_VALID | PT_AF | PT_SH_INNER | PT_AP_RW | (0 << 2))
-    mov     x2, #0                         # Physical address
-    mov     x3, #512                       # 512 entries (1 GB)
-
-._mmu_pmd_loop:
-    orr     x4, x1, x2
-    str     x4, [x0], #8
-    add     x2, x2, #(2 << 20)             # Next 2 MB
-    subs    x3, x3, #1
-    b.ne    ._mmu_pmd_loop
-
-    # Setup MAIR (Memory Attribute Indirection Register)
-    mov     x0, #MMU_MAIR0
-    msr     MAIR_EL1, x0
-
-    # Setup TCR (Translation Control Register)
-    mov     x0, #((MMU_TCR_T0SZ << 0) | (MMU_TCR_IRGN0 << 8) | \
-                  (MMU_TCR_ORGN0 << 10) | (MMU_TCR_SH0 << 12) | \
-                  (MMU_TCR_TG0 << 14))
-    msr     TCR_EL1, x0
+._mmu_section_loop:
+    orr     r5, r2, r3                     # Combine address and flags
+    str     r5, [r1], #4
+    add     r2, r2, #0x100000              # Next 1MB
+    subs    r4, r4, #1
+    bne     ._mmu_section_loop
 
     # Set TTBR0 (Translation Table Base Register)
-    ldr     x0, =_pgd
-    msr     TTBR0_EL1, x0
+    ldr     r0, =_page_table
+    mcr     p15, 0, r0, c2, c0, 0
+
+    # Set Domain Access Control (client mode for domain 0)
+    mov     r0, #0x01                      # Domain 0 = client
+    mcr     p15, 0, r0, c3, c0, 0
 
     # Return
-    mov     x30, x8
-    ret
+    mov     pc, r8
 
 # -----------------------------------------------------------------------------
 # _mmu_enable
@@ -329,65 +270,28 @@ _mmu_setup:
 # Enable MMU and caches.
 # -----------------------------------------------------------------------------
 _mmu_enable:
-    # Invalidate all TLB entries
-    tlbi    vmalle1is
-    dsb     sy
-    isb
+    # Invalidate TLB
+    mov     r0, #0
+    mcr     p15, 0, r0, c8, c7, 0          # Invalidate entire TLB
 
-    # Enable caches and MMU in SCTLR
-    mrs     x0, SCTLR_EL1
-    orr     x0, x0, #(1 << 0)              # MMU enable
-    orr     x0, x0, #(1 << 2)              # D-cache enable
-    orr     x0, x0, #(1 << 12)             # I-cache enable
-    msr     SCTLR_EL1, x0
-    isb
+    # Data synchronization barrier
+    mcr     p15, 0, r0, c7, c10, 4
 
-    ret
+    # Read Control Register
+    mrc     p15, 0, r0, c1, c0, 0
 
-# =============================================================================
-# EXCEPTION VECTORS
-# =============================================================================
+    # Enable MMU, D-cache, I-cache
+    orr     r0, r0, #0x0001                # M bit - MMU enable
+    orr     r0, r0, #0x0004                # C bit - Data cache enable
+    orr     r0, r0, #0x1000                # I bit - Instruction cache enable
 
-.section .text
-.align 11                          # Must be aligned to 2KB
+    # Write Control Register
+    mcr     p15, 0, r0, c1, c0, 0
 
-.global _exception_vectors
-_exception_vectors:
-    # Current EL with SP0
-    b       ._exc_current_sp0
-    b       ._exc_current_sp0
-    b       ._exc_current_sp0
-    b       ._exc_current_sp0
+    # Instruction synchronization barrier
+    mcr     p15, 0, r0, c7, c5, 4
 
-    # Current EL with SPx
-    b       ._exc_current_spx
-    b       ._exc_current_spx
-    b       ._exc_current_spx
-    b       ._exc_current_spx
-
-    # Lower EL using AArch64
-    b       ._exc_lower_aarch64
-    b       ._exc_lower_aarch64
-    b       ._exc_lower_aarch64
-    b       ._exc_lower_aarch64
-
-    # Lower EL using AArch32
-    b       ._exc_lower_aarch32
-    b       ._exc_lower_aarch32
-    b       ._exc_lower_aarch32
-    b       ._exc_lower_aarch32
-
-._exc_current_sp0:
-    b       .
-
-._exc_current_spx:
-    b       .
-
-._exc_lower_aarch64:
-    b       .
-
-._exc_lower_aarch32:
-    b       .
+    mov     pc, lr
 
 # =============================================================================
 # DATA
@@ -396,7 +300,7 @@ _exception_vectors:
 .section .rodata
 
 _pesan_banner:
-    .asciz "\r\nPIGURA OS v1.0 - ARM64 Boot\r\n"
+    .asciz "\r\nPIGURA OS v1.0 - ARM32 Boot\r\n"
     .asciz "Initializing kernel...\r\n"
 
 # =============================================================================
@@ -410,15 +314,9 @@ _stack_bottom:
     .skip UKURAN_STACK
 _stack_top:
 
-.align 12
-_pgd:
-    .skip 4096                      # Page Global Directory (L0)
-_pud:
-    .skip 4096                      # Page Upper Directory (L1)
-_pmd:
-    .skip 4096                      # Page Middle Directory (L2)
-_pmd_high:
-    .skip 4096                      # PMD for higher half
+.align 14                         # 16KB aligned for page table
+_page_table:
+    .skip 16384                    # 4096 entries x 4 bytes
 
 _bss_start:
     .skip 1
