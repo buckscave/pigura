@@ -1044,13 +1044,11 @@ void elf_print_stats(void)
  * Print informasi berkas ELF.
  *
  * Parameter:
- *   path - Path ke berkas ELF
+ *   buffer - Pointer ke buffer berisi data ELF
  */
-void elf_print_info(const char *path)
+void elf_print_info(void *buffer)
 {
-    berkas_t *berkas;
-    tak_bertanda8_t header[64];
-    ukuran_t bytes_read;
+    const tak_bertanda8_t *data = (const tak_bertanda8_t *)buffer;
     tak_bertanda32_t elf_class;
     tak_bertanda32_t machine;
     const char *type_str;
@@ -1058,33 +1056,19 @@ void elf_print_info(const char *path)
     const char *machine_str;
     tak_bertanda32_t i;
     
-    if (path == NULL) {
+    if (data == NULL) {
         return;
     }
     
-    berkas = berkas_buka(path, BERKAS_BACA);
-    if (berkas == NULL) {
-        kernel_printf("[ELF] Tidak dapat membuka: %s\n", path);
-        return;
-    }
-    
-    bytes_read = berkas_baca(berkas, header, sizeof(header));
-    berkas_tutup(berkas);
-    
-    if (bytes_read < sizeof(elf32_header_t)) {
-        kernel_printf("[ELF] Gagal membaca header\n");
-        return;
-    }
-    
-    /* Validasi magic */
-    if (!elf_validasi_header(header, &elf_class, &machine)) {
+    /* Validasi magic dari buffer */
+    if (!elf_validasi_header(data, &elf_class, &machine)) {
         kernel_printf("[ELF] Bukan berkas ELF\n");
         return;
     }
     
     /* Type string */
     if (elf_class == ELF_CLASS_32) {
-        const elf32_header_t *h = (const elf32_header_t *)header;
+        const elf32_header_t *h = (const elf32_header_t *)data;
         switch (h->e_type) {
             case ELF_TYPE_EXEC:
                 type_str = "Executable";
@@ -1100,7 +1084,7 @@ void elf_print_info(const char *path)
                 break;
         }
     } else {
-        const elf64_header_t *h = (const elf64_header_t *)header;
+        const elf64_header_t *h = (const elf64_header_t *)data;
         switch (h->e_type) {
             case ELF_TYPE_EXEC:
                 type_str = "Executable";
@@ -1139,14 +1123,14 @@ void elf_print_info(const char *path)
             break;
     }
     
-    kernel_printf("\n[ELF] Informasi Berkas: %s\n", path);
+    kernel_printf("\n[ELF] Informasi Berkas ELF\n");
     kernel_printf("========================================\n");
     kernel_printf("  Class:     %s\n", class_str);
     kernel_printf("  Type:      %s\n", type_str);
     kernel_printf("  Machine:   %s\n", machine_str);
     
     if (elf_class == ELF_CLASS_32) {
-        const elf32_header_t *h = (const elf32_header_t *)header;
+        const elf32_header_t *h = (const elf32_header_t *)data;
         kernel_printf("  Entry:     0x%08lX\n", h->e_entry);
         kernel_printf("  PHDR:      %u entries at offset %lu\n",
                       h->e_phnum, (tak_bertanda64_t)h->e_phoff);
@@ -1156,7 +1140,7 @@ void elf_print_info(const char *path)
         
         for (i = 0; i < h->e_phnum; i++) {
             const elf32_phdr_t *phdr = (const elf32_phdr_t *)
-                                      (header + h->e_phoff + i * h->e_phentsize);
+                                      (data + h->e_phoff + i * h->e_phentsize);
             
             if (phdr->p_type == PT_LOAD) {
                 kernel_printf("    LOAD: vaddr=0x%08lX "
@@ -1170,7 +1154,7 @@ void elf_print_info(const char *path)
             }
         }
     } else {
-        const elf64_header_t *h = (const elf64_header_t *)header;
+        const elf64_header_t *h = (const elf64_header_t *)data;
         kernel_printf("  Entry:     0x%016llX\n", h->e_entry);
         kernel_printf("  PHDR:      %u entries at offset %llu\n",
                       h->e_phnum, h->e_phoff);

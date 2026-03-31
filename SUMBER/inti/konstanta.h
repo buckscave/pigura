@@ -798,13 +798,27 @@
 #define PCI_CONFIG_INTERRUPT 0x3C
 
 /* PCI class codes */
+#ifndef PCI_CLASS_STORAGE
 #define PCI_CLASS_STORAGE 0x01
+#endif
+#ifndef PCI_CLASS_NETWORK
 #define PCI_CLASS_NETWORK 0x02
+#endif
+#ifndef PCI_CLASS_DISPLAY
 #define PCI_CLASS_DISPLAY 0x03
+#endif
+#ifndef PCI_CLASS_MULTIMEDIA
 #define PCI_CLASS_MULTIMEDIA 0x04
+#endif
+#ifndef PCI_CLASS_MEMORY
 #define PCI_CLASS_MEMORY 0x05
+#endif
+#ifndef PCI_CLASS_BRIDGE
 #define PCI_CLASS_BRIDGE 0x06
+#endif
+#ifndef PCI_CLASS_SERIAL
 #define PCI_CLASS_SERIAL 0x0C
+#endif
 
 /* PCI vendor */
 #define PCI_VENDOR_INTEL 0x8086

@@ -1335,7 +1335,7 @@ void elf_dapat_statistik(tak_bertanda64_t *files,
 
 /* Print */
 void elf_print_stats(void);
-void elf_print_info(const char *path);
+void elf_print_info(void *buffer);
 
 /*
  * ===========================================================================
