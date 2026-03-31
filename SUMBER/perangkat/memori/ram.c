@@ -189,7 +189,7 @@ static bool_t ram_test_region(alamat_fisik_t mulai, ukuran_t ukuran)
     /* Test setiap word */
     for (i = 0; i < count; i++) {
         ptr = (volatile tak_bertanda32_t *)
-              (mulai + (i * 4));
+              (uintptr_t)(mulai + (i * 4));
 
         /* Simpan nilai asli */
         nilai_asli = *ptr;

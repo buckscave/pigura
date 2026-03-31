@@ -15,6 +15,34 @@
 
 /*
  * ===========================================================================
+ * FORWARD DECLARATIONS - VBE
+ * ===========================================================================
+ */
+
+extern status_t vbe_init(void);
+extern tak_bertanda32_t vbe_find_mode(tak_bertanda32_t width,
+                                       tak_bertanda32_t height,
+                                       tak_bertanda32_t bpp);
+extern status_t vbe_set_mode(tak_bertanda16_t mode);
+extern tak_bertanda64_t vbe_get_framebuffer_address(void);
+extern void vbe_shutdown(void);
+
+/*
+ * ===========================================================================
+ * FORWARD DECLARATIONS - UEFI GOP
+ * ===========================================================================
+ */
+
+extern status_t uefi_gop_init(void *gop_handle);
+extern status_t uefi_gop_get_info(void *gop, tak_bertanda32_t *width,
+                                   tak_bertanda32_t *height,
+                                   tak_bertanda32_t *bpp,
+                                   tak_bertanda64_t *fb_addr,
+                                   ukuran_t *fb_size);
+extern void uefi_gop_shutdown(void);
+
+/*
+ * ===========================================================================
  * VARIABEL LOKAL
  * ===========================================================================
  */
@@ -50,19 +78,19 @@ status_t video_init_from_multiboot(void *mb_info)
      * Multiboot menyediakan info framebuffer dari bootloader (GRUB, dll).
      */
     if (mb_info == NULL) {
-        return STATUS_PARAM_KOSONG;
+        return STATUS_PARAM_NULL;
     }
-    
+
     if (g_video_initialized) {
         return STATUS_SUDAH_ADA;
     }
-    
+
     /* Parse multiboot info untuk mendapatkan framebuffer info */
     /* Placeholder - implementasi penuh memerlukan parsing struktur multiboot */
-    
+
     g_video_source = VIDEO_SOURCE_VBE;
     g_video_initialized = BENAR;
-    
+
     return STATUS_BERHASIL;
 }
 
@@ -73,29 +101,29 @@ status_t video_init_from_uefi(void *gop_handle)
      * UEFI menyediakan GOP interface yang sudah dikonfigurasi.
      */
     if (gop_handle == NULL) {
-        return STATUS_PARAM_KOSONG;
+        return STATUS_PARAM_NULL;
     }
-    
+
     if (g_video_initialized) {
         return STATUS_SUDAH_ADA;
     }
-    
+
     status_t status = uefi_gop_init(gop_handle);
     if (status != STATUS_BERHASIL) {
         return status;
     }
-    
+
     /* Dapatkan info dari GOP */
     status = uefi_gop_get_info(gop_handle, &g_fb_width, &g_fb_height,
                                 &g_fb_bpp, &g_fb_physical_addr, &g_fb_size);
     if (status != STATUS_BERHASIL) {
         return status;
     }
-    
+
     g_fb_pitch = g_fb_width * (g_fb_bpp / 8);
     g_video_source = VIDEO_SOURCE_UEFI_GOP;
     g_video_initialized = BENAR;
-    
+
     return STATUS_BERHASIL;
 }
 
@@ -109,34 +137,34 @@ status_t video_init_vesa(tak_bertanda32_t width, tak_bertanda32_t height,
     if (g_video_initialized) {
         return STATUS_SUDAH_ADA;
     }
-    
+
     status_t status = vbe_init();
     if (status != STATUS_BERHASIL) {
         return status;
     }
-    
+
     /* Cari mode yang sesuai */
     tak_bertanda32_t mode = vbe_find_mode(width, height, bpp);
     if (mode == 0) {
         return STATUS_TIDAK_DITEMUKAN;
     }
-    
+
     /* Set mode */
     status = vbe_set_mode((tak_bertanda16_t)mode);
     if (status != STATUS_BERHASIL) {
         return status;
     }
-    
+
     g_fb_width = width;
     g_fb_height = height;
     g_fb_bpp = bpp;
     g_fb_pitch = width * (bpp / 8);
     g_fb_physical_addr = vbe_get_framebuffer_address();
     g_fb_size = g_fb_pitch * height;
-    
+
     g_video_source = VIDEO_SOURCE_VBE;
     g_video_initialized = BENAR;
-    
+
     return STATUS_BERHASIL;
 }
 
@@ -149,10 +177,10 @@ status_t video_init_legacy(tak_bertanda32_t width, tak_bertanda32_t height)
     if (g_video_initialized) {
         return STATUS_SUDAH_ADA;
     }
-    
+
     (void)width;
     (void)height;
-    
+
     /* VGA mode 0x13 = 320x200x256 */
     g_fb_width = 320;
     g_fb_height = 200;
@@ -160,10 +188,10 @@ status_t video_init_legacy(tak_bertanda32_t width, tak_bertanda32_t height)
     g_fb_pitch = 320;
     g_fb_physical_addr = 0xA0000;  /* VGA framebuffer */
     g_fb_size = 64000;
-    
+
     g_video_source = VIDEO_SOURCE_LEGACY_VGA;
     g_video_initialized = BENAR;
-    
+
     return STATUS_BERHASIL;
 }
 
@@ -172,9 +200,9 @@ status_t video_get_info(tak_bertanda64_t *fb_addr, ukuran_t *fb_size,
                          tak_bertanda32_t *bpp, tak_bertanda32_t *pitch)
 {
     if (!g_video_initialized) {
-        return STATUS_BELUM_SIAP;
+        return STATUS_BELUM_IMPLEMENTASI;
     }
-    
+
     if (fb_addr != NULL) {
         *fb_addr = g_fb_physical_addr;
     }
@@ -193,7 +221,7 @@ status_t video_get_info(tak_bertanda64_t *fb_addr, ukuran_t *fb_size,
     if (pitch != NULL) {
         *pitch = g_fb_pitch;
     }
-    
+
     return STATUS_BERHASIL;
 }
 
@@ -219,7 +247,7 @@ void video_shutdown(void)
     default:
         break;
     }
-    
+
     g_video_source = VIDEO_SOURCE_NONE;
     g_video_initialized = SALAH;
     g_fb_physical_addr = 0;

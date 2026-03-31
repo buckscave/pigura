@@ -10,6 +10,12 @@
 #include "../cpu/cpu.h"
 #include "../../inti/kernel.h"
 
+/* Forward declarations */
+extern status_t ata_init(void);
+extern status_t ahci_init(void);
+extern status_t nvme_init(void);
+extern status_t sd_card_init(void);
+
 /*
  * ===========================================================================
  * KONSTANTA PENYIMPANAN
@@ -317,7 +323,6 @@ status_t storage_tulis(tak_bertanda32_t dev_id, tak_bertanda64_t lba,
 void penyimpanan_cetak_info(void)
 {
     storage_dev_t *dev;
-    char buffer[32];
     ukuran_t i;
     
     if (!g_penyimpanan_diinisialisasi) {

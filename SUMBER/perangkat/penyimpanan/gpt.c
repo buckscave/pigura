@@ -17,6 +17,10 @@
 #include "../cpu/cpu.h"
 #include "../../inti/kernel.h"
 
+/* Forward declaration */
+extern status_t storage_baca(tak_bertanda32_t dev_id, tak_bertanda64_t lba,
+                          void *buffer, ukuran_t count);
+
 /*
  * ===========================================================================
  * KONSTANTA GPT
@@ -37,7 +41,7 @@
 #define GPT_MAX_PART_COUNT    256
 
 /* GUID tipe partisi umum */
-static const tak_bertanda8_t GPT_TYPE_UNUSED[16] = {
+static const tak_bertanda8_t GPT_TYPE_UNUSED[16] __attribute__((unused)) = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
@@ -126,7 +130,7 @@ typedef struct {
 
 /* Konteks GPT */
 typedef struct {
-    tak_bertanda32_t magic;
+    tak_bertanda64_t magic;
     bool_t diinisialisasi;
     gpt_header_t header;
     gpt_part_entry_t entry[GPT_MAX_PART_COUNT];
@@ -294,10 +298,14 @@ static void gpt_parse_entry(gpt_entry_t *raw, gpt_part_entry_t *entry,
     entry->magic = GPT_ENTRY_MAGIC;
     entry->index = index;
 
-    /* Cek apakah entry kosong */
-    if (gpt_guid_kosong(&raw->type_guid)) {
-        entry->valid = SALAH;
-        return;
+    /* Cek apakah entry kosong - salin dari struct packed */
+    {
+        gpt_guid_t tmp;
+        kernel_memcpy(&tmp, &raw->type_guid, sizeof(tmp));
+        if (gpt_guid_kosong(&tmp)) {
+            entry->valid = SALAH;
+            return;
+        }
     }
 
     entry->valid = BENAR;
@@ -308,8 +316,12 @@ static void gpt_parse_entry(gpt_entry_t *raw, gpt_part_entry_t *entry,
     entry->jumlah_sektor = raw->ending_lba - raw->starting_lba + 1;
     entry->atribut = raw->attributes;
 
-    gpt_nama_ke_ascii(raw->partition_name, entry->nama,
-                      sizeof(entry->nama));
+    /* Salin nama dari struct packed */
+    {
+        tak_bertanda16_t tmp_nama[36];
+        kernel_memcpy(tmp_nama, raw->partition_name, sizeof(tmp_nama));
+        gpt_nama_ke_ascii(tmp_nama, entry->nama, sizeof(entry->nama));
+    }
 }
 
 /*

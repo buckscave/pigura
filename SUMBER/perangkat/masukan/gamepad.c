@@ -530,13 +530,8 @@ status_t gamepad_rumble(tak_bertanda32_t id, tak_bertanda16_t weak,
         return STATUS_TIDAK_DUKUNG;
     }
     
-    /* Batasi nilai */
-    if (weak > GAMEPAD_RUMBLE_MAX) {
-        weak = GAMEPAD_RUMBLE_MAX;
-    }
-    if (strong > GAMEPAD_RUMBLE_MAX) {
-        strong = GAMEPAD_RUMBLE_MAX;
-    }
+    /* Batasi nilai - weak/strong sudah dalam rentang uint16_t */
+    (void)0; /* rumble values already bounded by type */
     
     /* Set rumble */
     gdev->rumble.weak = weak;
@@ -695,9 +690,8 @@ status_t gamepad_set_trigger_threshold(tak_bertanda32_t id,
         return STATUS_TIDAK_DITEMUKAN;
     }
     
-    if (threshold > GAMEPAD_TRIGGER_MAX) {
-        threshold = GAMEPAD_TRIGGER_MAX;
-    }
+    /* threshold sudah dalam rentang uint8_t */
+    (void)0; /* trigger threshold already bounded by type */
     
     gdev->left_trigger.threshold = threshold;
     gdev->right_trigger.threshold = threshold;

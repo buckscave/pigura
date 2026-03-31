@@ -132,11 +132,11 @@ status_t vbe_init(void)
 status_t vbe_get_info(void *info)
 {
     if (!g_vbe_initialized) {
-        return STATUS_BELUM_SIAP;
+        return STATUS_BELUM_IMPLEMENTASI;
     }
     
     if (info == NULL) {
-        return STATUS_PARAM_KOSONG;
+        return STATUS_PARAM_NULL;
     }
     
     kernel_memcpy(info, &g_vbe_info, sizeof(vbe_info_t));
@@ -145,12 +145,13 @@ status_t vbe_get_info(void *info)
 
 status_t vbe_get_mode_info(tak_bertanda16_t mode, void *info)
 {
+    (void)mode;
     if (!g_vbe_initialized) {
-        return STATUS_BELUM_SIAP;
+        return STATUS_BELUM_IMPLEMENTASI;
     }
     
     if (info == NULL) {
-        return STATUS_PARAM_KOSONG;
+        return STATUS_PARAM_NULL;
     }
     
     return vbe_call_bios(0x01, info);
@@ -159,7 +160,7 @@ status_t vbe_get_mode_info(tak_bertanda16_t mode, void *info)
 status_t vbe_set_mode(tak_bertanda16_t mode)
 {
     if (!g_vbe_initialized) {
-        return STATUS_BELUM_SIAP;
+        return STATUS_BELUM_IMPLEMENTASI;
     }
     
     /* Set mode dengan LFB (Linear Frame Buffer) */

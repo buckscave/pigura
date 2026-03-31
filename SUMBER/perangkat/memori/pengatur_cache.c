@@ -198,6 +198,7 @@ static void cache_detect_x86(cache_controller_t *ctrl)
  */
 static void cache_flush_x86(tak_bertanda32_t level)
 {
+    (void)level;
     /* Wbinvd flush semua cache */
     __asm__ __volatile__ ("wbinvd" : : : "memory");
 }
@@ -210,6 +211,7 @@ static void cache_flush_x86(tak_bertanda32_t level)
  */
 static void cache_invalidate_x86(tak_bertanda32_t level)
 {
+    (void)level;
     /* Invd invalidate tanpa writeback */
     __asm__ __volatile__ ("invd" : : : "memory");
 }
@@ -222,6 +224,7 @@ static void cache_invalidate_x86(tak_bertanda32_t level)
  */
 static void cache_enable_x86(tak_bertanda32_t level)
 {
+    (void)level;
     tak_bertanda32_t cr0;
 
     /* Baca CR0 */
@@ -687,7 +690,6 @@ status_t cache_flush_range(void *addr, ukuran_t ukuran)
     tak_bertanda8_t *ptr;
     tak_bertanda8_t *akhir;
     ukuran_t line_size;
-    ukuran_t offset;
 
     if (!g_cache_initialized) {
         return STATUS_PARAM_INVALID;
@@ -700,7 +702,7 @@ status_t cache_flush_range(void *addr, ukuran_t ukuran)
     line_size = cache_line_size(1);
 
     /* Align ke cache line */
-    ptr = (tak_bertanda8_t *)((alamat_fisik_t)addr & ~(line_size - 1));
+    ptr = (tak_bertanda8_t *)((uintptr_t)addr & ~(line_size - 1));
     akhir = (tak_bertanda8_t *)addr + ukuran;
 
     /* Flush per cache line */
@@ -755,7 +757,7 @@ status_t cache_invalidate_range(void *addr, ukuran_t ukuran)
     line_size = cache_line_size(1);
 
     /* Align ke cache line */
-    ptr = (tak_bertanda8_t *)((alamat_fisik_t)addr & ~(line_size - 1));
+    ptr = (tak_bertanda8_t *)((uintptr_t)addr & ~(line_size - 1));
     akhir = (tak_bertanda8_t *)addr + ukuran;
 
     /* Invalidate per cache line */

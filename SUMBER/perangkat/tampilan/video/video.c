@@ -11,7 +11,15 @@
  * VBE (VESA BIOS Extensions) dan UEFI GOP.
  */
 
-#include "../cpu/cpu.h"
+#include "../../cpu/cpu.h"
+
+/* Forward declarations */
+extern status_t vbe_init(void);
+extern status_t vbe_set_mode(tak_bertanda16_t mode);
+extern tak_bertanda32_t vbe_find_mode(tak_bertanda32_t width,
+                                       tak_bertanda32_t height,
+                                       tak_bertanda32_t bpp);
+extern status_t uefi_gop_init(void);
 
 /*
  * ===========================================================================
@@ -49,8 +57,9 @@ status_t video_init(void)
 
 status_t video_get_info(void *info)
 {
+    (void)info;
     if (!g_video_initialized) {
-        return STATUS_TIDAK_SIAP;
+        return STATUS_BELUM_IMPLEMENTASI;
     }
 
     return STATUS_TIDAK_DUKUNG;
@@ -60,7 +69,7 @@ status_t video_set_mode(tak_bertanda32_t width, tak_bertanda32_t height,
                         tak_bertanda32_t bpp)
 {
     if (!g_video_initialized) {
-        return STATUS_TIDAK_SIAP;
+        return STATUS_BELUM_IMPLEMENTASI;
     }
 
     /* Coba VBE dulu */

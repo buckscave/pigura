@@ -7,7 +7,7 @@
  * Tanggal: 2025
  */
 
-#include "../cpu/cpu.h"
+#include "../../cpu/cpu.h"
 #include "../../../inti/kernel.h"
 
 /*
@@ -99,20 +99,24 @@ status_t gpu_detect(void)
 status_t gpu_set_mode(tak_bertanda32_t dev_id, tak_bertanda32_t width,
                        tak_bertanda32_t height, tak_bertanda32_t bpp)
 {
+    (void)dev_id; (void)width; (void)height; (void)bpp;
     return STATUS_TIDAK_DUKUNG;
 }
 
 void *gpu_alloc_memory(tak_bertanda32_t dev_id, ukuran_t size)
 {
+    (void)dev_id; (void)size;
     return NULL;
 }
 
 void gpu_free_memory(tak_bertanda32_t dev_id, void *ptr)
 {
+    (void)dev_id; (void)ptr;
 }
 
 status_t gpu_flush(tak_bertanda32_t dev_id)
 {
+    (void)dev_id;
     return STATUS_BERHASIL;
 }
 
@@ -120,6 +124,7 @@ status_t gpu_2d_fill_rect(tak_bertanda32_t dev_id, tak_bertanda32_t x,
                            tak_bertanda32_t y, tak_bertanda32_t w,
                            tak_bertanda32_t h, tak_bertanda32_t color)
 {
+    (void)dev_id; (void)x; (void)y; (void)w; (void)h; (void)color;
     return STATUS_TIDAK_DUKUNG;
 }
 
@@ -127,5 +132,7 @@ status_t gpu_2d_blit(tak_bertanda32_t dev_id, void *src,
                       tak_bertanda32_t dst_x, tak_bertanda32_t dst_y,
                       tak_bertanda32_t src_w, tak_bertanda32_t src_h)
 {
+    (void)dev_id; (void)src; (void)dst_x; (void)dst_y;
+    (void)src_w; (void)src_h;
     return STATUS_TIDAK_DUKUNG;
 }

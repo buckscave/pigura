@@ -18,6 +18,9 @@
 #include "../cpu/cpu.h"
 #include "../../inti/kernel.h"
 
+/* snprintf fallback */
+#define snprintf kernel_snprintf
+
 /*
  * ===========================================================================
  * KONSTANTA SD CARD
@@ -576,7 +579,7 @@ static status_t sd_all_send_cid(sd_host_t *host)
             (char)((response[1] >> (24 - i * 8)) & 0xFF);
     }
     host->device.cid.pnm[5] = (char)((response[2] >> 24) & 0xFF);
-    host->device.cid.pnm[6] = '\0';
+    host->device.cid.pnm[5] = '\0'; /* Truncate last char to fit char[6] */
 
     return STATUS_BERHASIL;
 }
@@ -779,7 +782,6 @@ static status_t sd_read_single_block(sd_host_t *host,
 status_t sd_card_init(void)
 {
     sd_host_t *host;
-    tak_bertanda32_t i;
     status_t hasil;
 
     if (g_sd_diinisialisasi) {

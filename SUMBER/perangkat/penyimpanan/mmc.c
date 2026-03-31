@@ -18,6 +18,8 @@
 #include "../cpu/cpu.h"
 #include "../../inti/kernel.h"
 
+#define snprintf kernel_snprintf
+
 /*
  * ===========================================================================
  * KONSTANTA MMC
@@ -447,6 +449,7 @@ static status_t mmc_go_idle(mmc_host_t *host)
  */
 static status_t mmc_send_op_cond(mmc_host_t *host, bool_t is_mmc)
 {
+    (void)is_mmc;
     tak_bertanda32_t arg;
     tak_bertanda32_t response;
     tak_bertanda32_t timeout;
@@ -668,7 +671,6 @@ static status_t mmc_read_single_block(mmc_host_t *host,
 status_t mmc_init(void)
 {
     mmc_host_t *host;
-    tak_bertanda32_t i;
     status_t hasil;
 
     if (g_mmc_diinisialisasi) {

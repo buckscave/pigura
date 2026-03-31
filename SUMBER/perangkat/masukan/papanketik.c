@@ -493,6 +493,7 @@ status_t papanketik_init(void)
  */
 status_t papanketik_event(tak_bertanda32_t scancode, tak_bertanda32_t status)
 {
+    (void)status;
     papanketik_device_t *pdev;
     tak_bertanda32_t keycode;
     tak_bertanda32_t key_status;

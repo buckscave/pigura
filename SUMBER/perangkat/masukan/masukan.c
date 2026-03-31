@@ -764,17 +764,11 @@ status_t tetikus_event(tak_bertanda32_t buttons, tanda32_t dx,
     g_masukan_konteks.mouse_y += dy;
     
     /* Clamp ke screen bounds */
-    if (g_masukan_konteks.mouse_x < 0) {
-        g_masukan_konteks.mouse_x = 0;
+    if (g_masukan_konteks.mouse_x > (tak_bertanda32_t)g_mouse_dev->abs_max_x) {
+        g_masukan_konteks.mouse_x = (tak_bertanda32_t)g_mouse_dev->abs_max_x;
     }
-    if (g_masukan_konteks.mouse_y < 0) {
-        g_masukan_konteks.mouse_y = 0;
-    }
-    if (g_masukan_konteks.mouse_x > g_mouse_dev->abs_max_x) {
-        g_masukan_konteks.mouse_x = g_mouse_dev->abs_max_x;
-    }
-    if (g_masukan_konteks.mouse_y > g_mouse_dev->abs_max_y) {
-        g_masukan_konteks.mouse_y = g_mouse_dev->abs_max_y;
+    if (g_masukan_konteks.mouse_y > (tak_bertanda32_t)g_mouse_dev->abs_max_y) {
+        g_masukan_konteks.mouse_y = (tak_bertanda32_t)g_mouse_dev->abs_max_y;
     }
     
     /* Buat event */
@@ -869,6 +863,7 @@ status_t layarsentuh_event(tak_bertanda32_t id, tak_bertanda32_t tipe,
 tak_bertanda32_t layarsentuh_get_touches(touch_event_t *touches,
                                           tak_bertanda32_t max_count)
 {
+    (void)touches; (void)max_count;
     /* TODO: Implementasi tracking touch points */
     return 0;
 }
@@ -884,6 +879,7 @@ status_t joystick_init(void) { return STATUS_BERHASIL; }
 status_t joystick_event(tak_bertanda32_t id, tanda32_t *axis,
                          tak_bertanda32_t buttons)
 {
+    (void)id; (void)axis; (void)buttons;
     return STATUS_BERHASIL;
 }
 
@@ -894,12 +890,15 @@ status_t gamepad_event(tak_bertanda32_t id, tak_bertanda32_t buttons,
                         tanda16_t right_x, tanda16_t right_y,
                         tak_bertanda32_t triggers)
 {
+    (void)id; (void)buttons; (void)left_x; (void)left_y;
+    (void)right_x; (void)right_y; (void)triggers;
     return STATUS_BERHASIL;
 }
 
 status_t gamepad_rumble(tak_bertanda32_t id, tak_bertanda16_t weak,
                          tak_bertanda16_t strong)
 {
+    (void)id; (void)weak; (void)strong;
     return STATUS_TIDAK_DUKUNG;
 }
 
@@ -914,12 +913,14 @@ status_t hid_init(void) { return STATUS_BERHASIL; }
 status_t hid_parse(inputdev_t *dev, const tak_bertanda8_t *descriptor,
                     ukuran_t len)
 {
+    (void)dev; (void)descriptor; (void)len;
     return STATUS_TIDAK_DUKUNG;
 }
 
 status_t hid_process_report(inputdev_t *dev, const tak_bertanda8_t *report,
                              ukuran_t len)
 {
+    (void)dev; (void)report; (void)len;
     return STATUS_BERHASIL;
 }
 

@@ -517,7 +517,6 @@ status_t ata_baca(tak_bertanda32_t dev_id, tak_bertanda64_t lba,
                   void *buffer, ukuran_t count)
 {
     ata_device_t *dev;
-    tak_bertanda8_t status;
     ukuran_t i;
 
     if (!g_ata_diinisialisasi) {
@@ -621,7 +620,6 @@ status_t ata_tulis(tak_bertanda32_t dev_id, tak_bertanda64_t lba,
                    const void *buffer, ukuran_t count)
 {
     ata_device_t *dev;
-    tak_bertanda8_t status;
     ukuran_t i;
 
     if (!g_ata_diinisialisasi) {

@@ -17,6 +17,12 @@
 #include "../cpu/cpu.h"
 #include "../../inti/kernel.h"
 
+/* Forward declarations */
+extern status_t storage_baca(tak_bertanda32_t dev_id, tak_bertanda64_t lba,
+                            void *buffer, ukuran_t count);
+extern status_t gpt_init(void);
+extern status_t mbr_init(void);
+
 /*
  * ===========================================================================
  * KONSTANTA PARTISI
@@ -162,7 +168,6 @@ static void partisi_buat_label(partisi_entry_t *entry,
                                 tak_bertanda32_t index)
 {
     char buffer[16];
-    ukuran_t i;
     ukuran_t len;
 
     if (entry == NULL) {

@@ -72,17 +72,20 @@ status_t penyimpanan_usb_init(void)
 
 status_t usb_mass_storage_detect(void *usb_device)
 {
+    (void)usb_device;
     return STATUS_TIDAK_DUKUNG;
 }
 
 status_t usb_mass_storage_read(void *device, tak_bertanda64_t lba,
                                 void *buffer, ukuran_t count)
 {
+    (void)device; (void)lba; (void)buffer; (void)count;
     return STATUS_TIDAK_DUKUNG;
 }
 
 status_t usb_mass_storage_write(void *device, tak_bertanda64_t lba,
                                  const void *buffer, ukuran_t count)
 {
+    (void)device; (void)lba; (void)buffer; (void)count;
     return STATUS_TIDAK_DUKUNG;
 }

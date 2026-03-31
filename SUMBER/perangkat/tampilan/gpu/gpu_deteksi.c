@@ -7,7 +7,7 @@
  * Tanggal: 2025
  */
 
-#include "../cpu/cpu.h"
+#include "../../cpu/cpu.h"
 
 /*
  * ===========================================================================
@@ -41,5 +41,6 @@ const char *gpu_deteksi_get_vendor_name(tak_bertanda32_t vendor_id)
 
 status_t gpu_deteksi_get_info(tak_bertanda32_t dev_id, void *info)
 {
+    (void)dev_id; (void)info;
     return STATUS_TIDAK_DUKUNG;
 }

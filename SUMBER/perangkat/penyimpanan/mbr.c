@@ -17,6 +17,12 @@
 #include "../cpu/cpu.h"
 #include "../../inti/kernel.h"
 
+/* Forward declarations */
+extern status_t storage_baca(tak_bertanda32_t dev_id, tak_bertanda64_t lba,
+                            void *buffer, ukuran_t count);
+extern status_t storage_tulis(tak_bertanda32_t dev_id, tak_bertanda64_t lba,
+                             const void *buffer, ukuran_t count);
+
 /*
  * ===========================================================================
  * KONSTANTA MBR

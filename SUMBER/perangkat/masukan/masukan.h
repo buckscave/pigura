@@ -183,6 +183,7 @@
 #define KEY_MOD_SUPER               0x08
 #define KEY_MOD_CAPSLOCK            0x10
 #define KEY_MOD_NUMLOCK             0x20
+#define KEY_MOD_SCROLLLOCK          0x40
 
 /* Mouse buttons */
 #define MOUSE_BUTTON_NONE           0

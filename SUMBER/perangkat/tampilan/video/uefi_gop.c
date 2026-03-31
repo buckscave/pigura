@@ -88,7 +88,7 @@ status_t uefi_gop_init(void *gop_handle)
     g_gop = (efi_gop_t *)gop_handle;
     
     if (g_gop == NULL || g_gop->mode == NULL) {
-        return STATUS_PARAM_KOSONG;
+        return STATUS_PARAM_NULL;
     }
     
     g_gop_initialized = BENAR;
@@ -106,7 +106,7 @@ status_t uefi_gop_get_info(void *gop, tak_bertanda32_t *width,
     } else if (g_gop != NULL) {
         gop_ptr = g_gop;
     } else {
-        return STATUS_BELUM_SIAP;
+        return STATUS_BELUM_IMPLEMENTASI;
     }
     
     if (gop_ptr->mode == NULL || gop_ptr->mode->info == NULL) {

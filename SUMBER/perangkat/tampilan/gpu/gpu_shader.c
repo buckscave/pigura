@@ -7,7 +7,7 @@
  * Tanggal: 2025
  */
 
-#include "../cpu/cpu.h"
+#include "../../cpu/cpu.h"
 
 /*
  * ===========================================================================
@@ -24,17 +24,20 @@ tak_bertanda32_t gpu_shader_create(tak_bertanda32_t dev_id,
                                     const char *vertex_src,
                                     const char *fragment_src)
 {
+    (void)dev_id; (void)vertex_src; (void)fragment_src;
     return 0;
 }
 
 status_t gpu_shader_destroy(tak_bertanda32_t dev_id,
                              tak_bertanda32_t shader_id)
 {
+    (void)dev_id; (void)shader_id;
     return STATUS_TIDAK_DUKUNG;
 }
 
 status_t gpu_shader_use(tak_bertanda32_t dev_id, tak_bertanda32_t shader_id)
 {
+    (void)dev_id; (void)shader_id;
     return STATUS_TIDAK_DUKUNG;
 }
 
@@ -43,5 +46,7 @@ status_t gpu_shader_set_uniform(tak_bertanda32_t dev_id,
                                  const char *name, void *value,
                                  tak_bertanda32_t type)
 {
+    (void)dev_id; (void)shader_id;
+    (void)name; (void)value; (void)type;
     return STATUS_TIDAK_DUKUNG;
 }

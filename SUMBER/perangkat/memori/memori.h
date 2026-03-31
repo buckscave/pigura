@@ -458,6 +458,11 @@ ukuran_t ram_ukuran(void);
 status_t ram_info(ram_controller_t *ctrl);
 
 /*
+ * ram_cetak_info - Cetak informasi RAM
+ */
+void ram_cetak_info(void);
+
+/*
  * ===========================================================================
  * FUNGSI CACHE CONTROLLER
  * ===========================================================================

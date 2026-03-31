@@ -298,7 +298,6 @@ static tak_bertanda32_t pci_scan_bus(tak_bertanda8_t bus)
 static void pci_read_bars(pci_device_t *dev)
 {
     tak_bertanda32_t i;
-    tak_bertanda32_t bar;
     tak_bertanda32_t bar_asli;
     tak_bertanda32_t ukuran;
 

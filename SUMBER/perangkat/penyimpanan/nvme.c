@@ -618,7 +618,6 @@ status_t nvme_init(void)
 
         /* Parse info controller */
         {
-            char *p;
             for (i = 0; i < 40 && i < sizeof(ctrl.mn); i++) {
                 g_nvme_konteks.namespace[0].model[i] = ctrl.mn[i];
             }
