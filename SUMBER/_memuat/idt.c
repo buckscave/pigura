@@ -14,7 +14,15 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include "types.h"
+
+/* Kompatibilitas C89: inline tidak tersedia */
+#ifndef inline
+#ifdef __GNUC__
+    #define inline __inline__
+#else
+    #define inline
+#endif
+#endif
 
 /* =============================================================================
  * KONSTANTA

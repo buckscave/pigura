@@ -14,7 +14,15 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include "types.h"
+
+/* Kompatibilitas C89: inline tidak tersedia */
+#ifndef inline
+#ifdef __GNUC__
+    #define inline __inline__
+#else
+    #define inline
+#endif
+#endif
 
 /* =============================================================================
  * KONSTANTA
@@ -214,16 +222,15 @@ static uint32_t _detect_bios_e801(void)
     uint8_t cf;
 
     total = 0;
+    cf = 0;
 
     /* Call BIOS interrupt */
     __asm__ __volatile__(
-        "int $0x15"
-        : "=a"(ax), "=b"(bx), "=c"(cx), "=d"(dx)
+        "int $0x15\n\t"
+        "setc %4"
+        : "=a"(ax), "=b"(bx), "=c"(cx), "=d"(dx), "=rm"(cf)
         : "a"(0xE801), "b"(0), "c"(0), "d"(0)
     );
-
-    /* Capture carry flag */
-    __asm__ __volatile__("setc %0" : "=qm"(cf));
 
     if (cf) {
         /* Call failed */
@@ -264,7 +271,6 @@ static int _detect_bios_e820(void)
     uint32_t cont;
     uint32_t signature;
     uint32_t bytes;
-    uint32_t edx_tmp;
     struct {
         uint64_t base;
         uint64_t length;
@@ -273,6 +279,7 @@ static int _detect_bios_e820(void)
     } entry;
     int count;
     uint8_t cf;
+    uint32_t sig_out;
 
     count = 0;
     cont = 0;
@@ -284,22 +291,22 @@ static int _detect_bios_e820(void)
     do {
         /* Prepare for BIOS call */
         bytes = sizeof(entry);
+        sig_out = signature;
 
         /* Call BIOS */
         __asm__ __volatile__(
-            "int $0x15"
-            : "=a"(signature), "=b"(cont), "=c"(bytes),
-              "=d"(edx_tmp)
+            "int $0x15\n\t"
+            "setc %4"
+            : "=a"(sig_out), "=b"(bytes), "=c"(cont),
+              "=d"(signature), "=rm"(cf)
             : "a"(0xE820), "b"(cont), "c"(sizeof(entry)),
-              "d"(signature), "D"(&entry)
+              "d"(signature),
+              "D"(&entry)
             : "memory"
         );
 
-        /* Capture carry flag */
-        __asm__ __volatile__("setc %0" : "=qm"(cf));
-
         /* Check for error */
-        if (cf || signature != 0x534D4150) {
+        if (cf || sig_out != 0x534D4150) {
             break;
         }
 
