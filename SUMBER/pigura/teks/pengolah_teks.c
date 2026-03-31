@@ -155,6 +155,7 @@ status_t pengolah_teks_baris(permukaan_t *permukaan,
     while (teks[pos] != '\0') {
         tak_bertanda32_t panjang_baris = 0;
         tak_bertanda32_t kata_awal = 0;
+        tak_bertanda32_t __attribute__((unused)) kata_akhir = 0;
         tak_bertanda32_t lebar_baris = 0;
         tak_bertanda32_t y_baris;
 

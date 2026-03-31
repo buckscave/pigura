@@ -94,15 +94,12 @@ static void gpu_isi_baris32(tak_bertanda32_t *baris,
  *   warna        - Nilai warna 32-bit
  */
 static void gpu_isi_baris32_kliped(tak_bertanda32_t *baris,
-                                   tak_bertanda32_t lebar_total,
+                                   tak_bertanda32_t __attribute__((unused)) lebar_total,
                                    tak_bertanda32_t x_awal,
                                    tak_bertanda32_t x_akhir,
                                    tak_bertanda32_t warna)
 {
     tak_bertanda32_t i;
-
-    (void)lebar_total;
-
     for (i = x_awal; i < x_akhir; i++) {
         baris[i] = warna;
     }
@@ -523,6 +520,7 @@ status_t gpu_isi_gradien_v(tak_bertanda32_t *dst_buffer,
     struct gpu_konteks ctx;
     status_t status;
     tak_bertanda32_t row;
+    tak_bertanda32_t __attribute__((unused)) col;
     tak_bertanda32_t warna_baris;
 
     status = gpu_konteks_siapkan(&ctx, NULL, 0, 0, 0,

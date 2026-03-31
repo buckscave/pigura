@@ -140,6 +140,7 @@ status_t ukuran_teks(font_t *font, const char *teks,
     tak_bertanda32_t lebar_baris = 0;
     tak_bertanda32_t lebar_maks_baris = 0;
     tak_bertanda32_t jumlah_karakter = 0;
+    tak_bertanda32_t __attribute__((unused)) kata_awal = 0;
     tak_bertanda32_t kata_pos;
     tak_bertanda32_t total = 0;
     font_metrik_t metrik;

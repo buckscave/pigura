@@ -476,6 +476,9 @@ void bar_gulir_proses_event(widget_t *w,
 
     case WEVENT_KLIK:
         {
+            tak_bertanda32_t __attribute__((unused)) track_len =
+                data->orientasi == 0
+                ? w->tinggi - 2 : w->lebar - 2;
             tak_bertanda32_t klik;
 
             if (data->orientasi == 0) {

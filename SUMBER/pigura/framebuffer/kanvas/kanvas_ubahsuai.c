@@ -921,6 +921,7 @@ status_t kanvas_cermin_vertikal(struct kanvas *kv,
 {
     tak_bertanda8_t bpp;
     tak_bertanda8_t *temp;
+    tak_bertanda32_t __attribute__((unused)) baris;
     ukuran_t uk_baris;
     tak_bertanda32_t atas, bawah;
 

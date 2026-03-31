@@ -254,13 +254,11 @@ static void cpu_lingkaran_plot_8(struct p_konteks *ktx,
 static void cpu_lingkaran_garis_horisontal(
     struct p_konteks *ktx,
     tanda32_t cx, tanda32_t cy,
-    tak_bertanda32_t x0, tak_bertanda32_t x1,
+    tak_bertanda32_t __attribute__((unused)) x0, tak_bertanda32_t x1,
     tak_bertanda32_t warna)
 {
     tanda32_t x_aktual, x_max;
     tak_bertanda32_t offset;
-
-    (void)x0;
 
     x_aktual = (tanda32_t)(cx - x1);
     x_max = (tanda32_t)(cx + x1);

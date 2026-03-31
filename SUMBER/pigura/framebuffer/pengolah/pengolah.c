@@ -543,12 +543,10 @@ bool_t p_klip_titik(const struct p_konteks *ktx,
         return BENAR;
     }
 
-    if ((tak_bertanda32_t)x <
-        (tak_bertanda32_t)ktx->konfig.klip.x) {
+    if ((tak_bertanda32_t)x < (tak_bertanda32_t)ktx->konfig.klip.x) {
         return SALAH;
     }
-    if ((tak_bertanda32_t)y <
-        (tak_bertanda32_t)ktx->konfig.klip.y) {
+    if ((tak_bertanda32_t)y < (tak_bertanda32_t)ktx->konfig.klip.y) {
         return SALAH;
     }
     if ((tak_bertanda32_t)x >=
