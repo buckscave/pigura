@@ -1009,8 +1009,8 @@ int kernel_printk(int level, const char *format, ...)
     va_list ap;
     char buffer[1024];
     int ret;
-    tak_bertanda8_t old_fg;
-    tak_bertanda8_t old_bg;
+    tak_bertanda8_t old_fg __attribute__((unused));
+    tak_bertanda8_t old_bg __attribute__((unused));
 
     if (level > CONFIG_LOG_LEVEL) {
         return 0;

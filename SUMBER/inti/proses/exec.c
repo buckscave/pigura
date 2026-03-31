@@ -377,20 +377,26 @@ static alamat_virtual_t setup_user_stack(proses_t *proses, exec_args_t *args,
     stack[i++] = args->argc;
     
     /* Push argv pointers */
-    for (tak_bertanda32_t j = 0; j < args->argc; j++) {
-        stack[i++] = (tak_bertanda32_t)(alamat_ptr_t)str_ptr;
-        kernel_strncpy(str_ptr, args->argv[j],
-                       kernel_strlen(args->argv[j]) + 1);
-        str_ptr += kernel_strlen(args->argv[j]) + 1;
+    {
+        tak_bertanda32_t j;
+        for (j = 0; j < args->argc; j++) {
+            stack[i++] = (tak_bertanda32_t)(alamat_ptr_t)str_ptr;
+            kernel_strncpy(str_ptr, args->argv[j],
+                           kernel_strlen(args->argv[j]) + 1);
+            str_ptr += kernel_strlen(args->argv[j]) + 1;
+        }
     }
     stack[i++] = 0;  /* NULL terminator untuk argv */
     
     /* Push envp pointers */
-    for (tak_bertanda32_t j = 0; j < args->envc; j++) {
-        stack[i++] = (tak_bertanda32_t)(alamat_ptr_t)str_ptr;
-        kernel_strncpy(str_ptr, args->envp[j],
-                       kernel_strlen(args->envp[j]) + 1);
-        str_ptr += kernel_strlen(args->envp[j]) + 1;
+    {
+        tak_bertanda32_t j;
+        for (j = 0; j < args->envc; j++) {
+            stack[i++] = (tak_bertanda32_t)(alamat_ptr_t)str_ptr;
+            kernel_strncpy(str_ptr, args->envp[j],
+                           kernel_strlen(args->envp[j]) + 1);
+            str_ptr += kernel_strlen(args->envp[j]) + 1;
+        }
     }
     stack[i++] = 0;  /* NULL terminator untuk envp */
     

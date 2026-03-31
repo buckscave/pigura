@@ -431,6 +431,7 @@ void hal_cpu_reset(bool_t hard)
         /* Keyboard controller reset */
         cpu_do_reset();
     }
+    __builtin_unreachable();
 }
 
 /*

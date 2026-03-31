@@ -416,7 +416,7 @@ alamat_fisik_t pmm_alloc_page(void)
     addr = (alamat_fisik_t)index * PAGE_SIZE;
 
     /* Clear halaman untuk keamanan */
-    kernel_memset((void *)addr, 0, PAGE_SIZE);
+    kernel_memset((void *)(uintptr_t)addr, 0, PAGE_SIZE);
 
     return addr;
 }
@@ -510,7 +510,7 @@ alamat_fisik_t pmm_alloc_pages(tak_bertanda32_t count)
     addr = (alamat_fisik_t)index * PAGE_SIZE;
 
     /* Clear semua halaman */
-    kernel_memset((void *)addr, 0, (ukuran_t)(count * PAGE_SIZE));
+    kernel_memset((void *)(uintptr_t)addr, 0, (ukuran_t)(count * PAGE_SIZE));
 
     return addr;
 }

@@ -373,7 +373,7 @@ void *kmap(alamat_fisik_t phys)
     }
 
     /* Return alamat dengan offset */
-    return (void *)(vaddr + (phys & 0xFFF));
+    return (void *)(uintptr_t)(vaddr + (phys & 0xFFF));
 }
 
 /*
@@ -463,7 +463,7 @@ void *kmap_permanent(alamat_fisik_t phys)
             pkmap_table[index].ref_count++;
             vaddr = pkmap_vaddr_from_index((tak_bertanda32_t)index);
             spinlock_buka(&kmap_lock);
-            return (void *)(vaddr + (phys & 0xFFF));
+            return (void *)(uintptr_t)(vaddr + (phys & 0xFFF));
         }
     }
 
@@ -497,7 +497,7 @@ void *kmap_permanent(alamat_fisik_t phys)
         return NULL;
     }
 
-    return (void *)(vaddr + (phys & 0xFFF));
+    return (void *)(uintptr_t)(vaddr + (phys & 0xFFF));
 }
 
 /*
@@ -596,7 +596,7 @@ void *kmap_atomic(alamat_fisik_t phys)
     vaddr = kmap_vaddr_from_index(index);
     do_kmap(page_phys, vaddr, KMAP_FLAG_WIRED);
 
-    return (void *)(vaddr + (phys & 0xFFF));
+    return (void *)(uintptr_t)(vaddr + (phys & 0xFFF));
 }
 
 /*

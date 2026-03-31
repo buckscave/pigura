@@ -258,7 +258,7 @@ static void reserve_kernel_memory(multiboot_info_t *bootinfo)
 
     /* Reserve boot info dan memory map */
     if (bootinfo != NULL) {
-        pmm_reserve((alamat_fisik_t)bootinfo, sizeof(multiboot_info_t));
+        pmm_reserve((alamat_fisik_t)(uintptr_t)bootinfo, sizeof(multiboot_info_t));
 
         if (bootinfo->flags & MULTIBOOT_FLAG_MMAP) {
             pmm_reserve(bootinfo->mmap_addr, bootinfo->mmap_length);
@@ -271,7 +271,7 @@ static void reserve_kernel_memory(multiboot_info_t *bootinfo)
     }
 
     /* Reserve PMM bitmap */
-    pmm_reserve((alamat_fisik_t)pmm_bitmap_storage,
+    pmm_reserve((alamat_fisik_t)(uintptr_t)pmm_bitmap_storage,
                 PMM_BITMAP_SIZE * sizeof(tak_bertanda32_t));
 
     mem_stats.kernel_mem = kernel_size;

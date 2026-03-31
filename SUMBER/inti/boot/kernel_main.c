@@ -202,6 +202,7 @@ void kernel_start(void)
     kernel_printf("[KERNEL] Sistem siap\n");
 
     kernel_idle();
+    __builtin_unreachable();
 }
 
 void kernel_shutdown(int reboot)

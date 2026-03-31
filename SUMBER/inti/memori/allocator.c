@@ -148,7 +148,7 @@ static slab_t *slab_create(kmem_cache_t *cache)
     tak_bertanda32_t offset;
 
     /* Alokasikan memori untuk slab */
-    mem = (void *)pmm_alloc_pages(SLAB_SIZE_PAGES);
+    mem = (void *)(uintptr_t)pmm_alloc_pages(SLAB_SIZE_PAGES);
     if (mem == NULL) {
         return NULL;
     }
@@ -216,7 +216,7 @@ static void slab_destroy(kmem_cache_t *cache, slab_t *slab)
     }
 
     /* Bebaskan memori slab */
-    pmm_free_pages((alamat_fisik_t)slab, SLAB_SIZE_PAGES);
+    pmm_free_pages((alamat_fisik_t)(uintptr_t)slab, SLAB_SIZE_PAGES);
 }
 
 /*

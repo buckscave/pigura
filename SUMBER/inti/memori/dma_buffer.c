@@ -235,7 +235,7 @@ static alamat_fisik_t allocate_dma_pages(tak_bertanda32_t count,
     phys = DMA_ZONE_START + ((tak_bertanda32_t)index * UKURAN_HALAMAN);
 
     /* Clear memori */
-    kernel_memset((void *)phys, 0, count * UKURAN_HALAMAN);
+    kernel_memset((void *)(uintptr_t)phys, 0, count * UKURAN_HALAMAN);
 
     return phys;
 }

@@ -11,6 +11,14 @@
  * Tanggal: 2025
  */
 
+/*
+ * Cegah proses.h dari mendefinisikan vma_t dan vm_descriptor_t
+ * karena berkas ini memiliki definisi lokal yang lebih lengkap
+ */
+#define _VMA_T_DEFINED
+#define _VM_DESCRIPTOR_T_DEFINED
+#define _VMA_TYPES_SUPPRESSED
+
 #include "../kernel.h"
 
 /*
@@ -26,14 +34,30 @@
 #define VIRT_USER_END           0xBFFFFFFFUL
 
 /* Virtual memory area flags */
+#ifndef VMA_FLAG_NONE
 #define VMA_FLAG_NONE           0x00
+#endif
+#ifndef VMA_FLAG_READ
 #define VMA_FLAG_READ           0x01
+#endif
+#ifndef VMA_FLAG_WRITE
 #define VMA_FLAG_WRITE          0x02
+#endif
+#ifndef VMA_FLAG_EXEC
 #define VMA_FLAG_EXEC           0x04
+#endif
+#ifndef VMA_FLAG_STACK
 #define VMA_FLAG_STACK          0x08
+#endif
+#ifndef VMA_FLAG_HEAP
 #define VMA_FLAG_HEAP           0x10
+#endif
+#ifndef VMA_FLAG_SHARED
 #define VMA_FLAG_SHARED         0x20
+#endif
+#ifndef VMA_FLAG_FIXED
 #define VMA_FLAG_FIXED          0x40
+#endif
 
 /* Maximum VMA per process */
 #define VMA_MAX_PER_PROCESS     64
@@ -48,6 +72,9 @@
  */
 
 /* Virtual Memory Area descriptor */
+#undef _VMA_T_DEFINED
+#ifndef _VMA_T_DEFINED
+#define _VMA_T_DEFINED
 typedef struct vma {
     tak_bertanda32_t magic;         /* Magic number untuk validasi */
     struct vma *next;               /* VMA berikutnya */
@@ -60,9 +87,13 @@ typedef struct vma {
     ukuran_t size;                  /* Ukuran region */
     tak_bertanda32_t ref_count;     /* Reference count */
 } vma_t;
+#endif /* _VMA_T_DEFINED */
 
 /* Virtual memory descriptor untuk process */
-typedef struct {
+#undef _VM_DESCRIPTOR_T_DEFINED
+#ifndef _VM_DESCRIPTOR_T_DEFINED
+#define _VM_DESCRIPTOR_T_DEFINED
+typedef struct vm_descriptor {
     vma_t *vma_list;                /* List VMA */
     vma_t *vma_free_list;           /* Free VMA descriptors */
     tak_bertanda32_t vma_count;     /* Jumlah VMA aktif */
@@ -73,6 +104,7 @@ typedef struct {
     alamat_virtual_t stack_end;     /* Akhir stack */
     spinlock_t lock;                /* Lock untuk thread safety */
 } vm_descriptor_t;
+#endif /* _VM_DESCRIPTOR_T_DEFINED */
 
 /*
  * ============================================================================
@@ -484,13 +516,13 @@ vm_descriptor_t *vm_create_address_space(void)
  *
  * Return: Status operasi
  */
-status_t vm_destroy_address_space(vm_descriptor_t *vm)
+void vm_destroy_address_space(vm_descriptor_t *vm)
 {
     vma_t *vma;
     vma_t *next;
 
     if (vm == NULL) {
-        return STATUS_PARAM_INVALID;
+        return;
     }
 
     spinlock_kunci(&vm->lock);
@@ -525,8 +557,6 @@ status_t vm_destroy_address_space(vm_descriptor_t *vm)
 
     /* Bebaskan descriptor */
     kfree(vm);
-
-    return STATUS_BERHASIL;
 }
 
 /*

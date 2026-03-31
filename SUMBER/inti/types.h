@@ -187,34 +187,61 @@ typedef tak_bertanda64_t tak_bertanda_terbesar_t;
  */
 
 /* Tipe untuk Process ID */
+#ifndef _PID_T_DEFINED
+#define _PID_T_DEFINED
 typedef tak_bertanda32_t pid_t;
+#endif
 
 /* Tipe untuk Thread ID */
+#ifndef _TID_T_DEFINED
+#define _TID_T_DEFINED
 typedef tak_bertanda32_t tid_t;
+#endif
 
 /* Tipe untuk Group ID */
+#ifndef _GID_T_DEFINED
+#define _GID_T_DEFINED
 typedef tak_bertanda32_t gid_t;
+#endif
 
 /* Tipe untuk User ID */
+#ifndef _UID_T_DEFINED
+#define _UID_T_DEFINED
 typedef tak_bertanda32_t uid_t;
+#endif
 
 /* Tipe untuk mode file dan permission */
+#ifndef _MODE_T_DEFINED
+#define _MODE_T_DEFINED
 typedef tak_bertanda16_t mode_t;
+#endif
 
 /* Tipe untuk device number */
+#ifndef _DEV_T_DEFINED
+#define _DEV_T_DEFINED
 typedef tak_bertanda32_t dev_t;
+#endif
 
 /* Tipe untuk inode number */
+#ifndef _INO_T_DEFINED
+#define _INO_T_DEFINED
 typedef tak_bertanda64_t ino_t;
+#endif
 
 /* Tipe untuk file offset */
+#ifndef _OFF_T_DEFINED
+#define _OFF_T_DEFINED
 typedef tanda64_t off_t;
+#endif
 
 /* Tipe untuk waktu (detik sejak epoch) */
 typedef tanda64_t waktu_t;
 
 /* Tipe untuk clock ticks */
+#ifndef _CLOCK_T_DEFINED
+#define _CLOCK_T_DEFINED
 typedef tak_bertanda64_t clock_t;
+#endif
 
 /* Tipe untuk milliseconds */
 typedef tak_bertanda64_t mdetik_t;
@@ -226,10 +253,16 @@ typedef tak_bertanda64_t udetik_t;
 typedef tak_bertanda64_t ndetik_t;
 
 /* Tipe untuk microseconds (useconds_t) */
+#ifndef _USECONDS_T_DEFINED
+#define _USECONDS_T_DEFINED
 typedef tak_bertanda32_t useconds_t;
+#endif
 
 /* Tipe untuk clock ID */
+#ifndef _CLOCKID_T_DEFINED
+#define _CLOCKID_T_DEFINED
 typedef tak_bertanda32_t clockid_t;
+#endif
 
 /* Tipe untuk signal handler */
 typedef void (*sighandler_t)(int);
@@ -242,9 +275,18 @@ typedef void (*sighandler_t)(int);
 /*
  * Alias untuk kompatibilitas POSIX
  */
+#ifndef _TIME_T_DEFINED
+#define _TIME_T_DEFINED
 typedef waktu_t time_t;             /* Alias untuk waktu_t */
+#endif
+#ifndef _SIZE_T_DEFINED
+#define _SIZE_T_DEFINED
 typedef ukuran_t size_t;            /* Alias untuk ukuran_t */
+#endif
+#ifndef _PTRDIFF_T_DEFINED
+#define _PTRDIFF_T_DEFINED
 typedef jarak_ptr_t ptrdiff_t;      /* Alias untuk jarak_ptr_t */
+#endif
 
 /*
  * ===========================================================================
@@ -840,16 +882,22 @@ STATIC_ASSERT_SIZE(tak_bertanda64_t, 8);
  */
 
 /* Struktur untuk waktu dengan presisi tinggi */
+#ifndef _STRUCT_TIMESPEC
+#define _STRUCT_TIMESPEC
 struct timespec {
     waktu_t tv_sec;     /* Detik */
     tanda64_t tv_nsec;   /* Nanodetik */
 };
+#endif
 
 /* Struktur untuk timeval */
+#ifndef _STRUCT_TIMEVAL
+#define _STRUCT_TIMEVAL
 struct timeval {
     waktu_t tv_sec;     /* Detik */
     tanda64_t tv_usec;   /* Microdetik */
 };
+#endif
 
 /* Struktur untuk informasi sistem (uname) */
 struct utsname {
@@ -861,6 +909,8 @@ struct utsname {
 };
 
 /* Struktur untuk status file (stat) */
+#ifndef _STRUCT_STAT
+#define _STRUCT_STAT
 struct stat {
     dev_t st_dev;       /* Device */
     ino_t st_ino;       /* Inode */
@@ -876,6 +926,7 @@ struct stat {
     tak_bertanda64_t st_blksize; /* Ukuran block I/O optimal */
     tak_bertanda64_t st_blocks;  /* Jumlah 512-byte blocks */
 };
+#endif /* _STRUCT_STAT */
 
 /* Struktur untuk sigaction */
 struct sigaction {

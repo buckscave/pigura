@@ -183,7 +183,10 @@ status_t syscall_init(void)
     syscall_register_handlers();
 
     /* Setup interrupt handler */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-function-type"
     isr_set_handler(SYSCALL_INT_VECTOR, (isr_handler_t)syscall_handler);
+#pragma GCC diagnostic pop
 
     syscall_initialized = BENAR;
 
@@ -287,16 +290,13 @@ tanda64_t syscall_handler(register_context_t *ctx)
 
 #elif defined(ARSITEKTUR_X86)
     /* x86 (32-bit): EAX = syscall number, argumen di EBX, ECX, EDX, ESI, EDI, EBP */
-    /* Pada x86, register_context memiliki field r[0..15] untuk kompatibilitas */
-    /* Kita perlu mendapatkan nilai dari stack frame yang dibuat assembly */
-    /* Untuk saat ini, gunakan stack pointer untuk mengakses argumen */
-    syscall_num = (tak_bertanda32_t)ctx->rax;  /* r[0] = eax */
-    args[0] = (tanda64_t)ctx->rbx;  /* r[1] = ebx */
-    args[1] = (tanda64_t)ctx->rcx;  /* r[2] = ecx */
-    args[2] = (tanda64_t)ctx->rdx;  /* r[3] = edx */
-    args[3] = (tanda64_t)ctx->rsi;  /* r[4] = esi */
-    args[4] = (tanda64_t)ctx->rdi;  /* r[5] = edi */
-    args[5] = (tanda64_t)ctx->rbp;  /* r[6] = ebp */
+    syscall_num = (tak_bertanda32_t)ctx->eax;
+    args[0] = (tanda64_t)ctx->ebx;
+    args[1] = (tanda64_t)ctx->ecx;
+    args[2] = (tanda64_t)ctx->edx;
+    args[3] = (tanda64_t)ctx->esi;
+    args[4] = (tanda64_t)ctx->edi;
+    args[5] = (tanda64_t)ctx->ebp;
 
 #elif defined(ARSITEKTUR_ARM) || defined(ARSITEKTUR_ARMV7)
     /* ARM 32-bit: r7 = syscall number, argumen di r0-r5 */

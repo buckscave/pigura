@@ -183,7 +183,7 @@ static page_table_t *get_page_table(page_directory_t *dir,
     if (pde->value & PDE_PRESENT) {
         /* Page table sudah ada */
         table_phys = pde->value & PDE_FRAME;
-        return (page_table_t *)table_phys;
+        return (page_table_t *)(uintptr_t)table_phys;
     }
 
     if (!create) {
@@ -197,12 +197,12 @@ static page_table_t *get_page_table(page_directory_t *dir,
     }
 
     /* Clear page table */
-    kernel_memset((void *)table_phys, 0, PAGE_SIZE_4KB);
+    kernel_memset((void *)(uintptr_t)table_phys, 0, PAGE_SIZE_4KB);
 
     /* Set PDE */
     *pde = pde_create(table_phys, PDE_PRESENT | PDE_WRITABLE | PDE_USER);
 
-    return (page_table_t *)table_phys;
+    return (page_table_t *)(uintptr_t)table_phys;
 }
 
 /*
@@ -245,7 +245,7 @@ status_t paging_init(tak_bertanda64_t mem_size)
     }
 
     /* Alokasikan page directory */
-    kernel_page_dir = (page_directory_t *)pmm_alloc_page();
+    kernel_page_dir = (page_directory_t *)(uintptr_t)pmm_alloc_page();
     if (kernel_page_dir == NULL) {
         return STATUS_MEMORI_HABIS;
     }
@@ -256,7 +256,7 @@ status_t paging_init(tak_bertanda64_t mem_size)
     num_tables = 256;
 
     /* Alokasikan page tables untuk kernel */
-    kernel_page_tables = (page_table_t *)pmm_alloc_pages(num_tables);
+    kernel_page_tables = (page_table_t *)(uintptr_t)pmm_alloc_pages(num_tables);
     if (kernel_page_tables == NULL) {
         return STATUS_MEMORI_HABIS;
     }
@@ -278,7 +278,7 @@ status_t paging_init(tak_bertanda64_t mem_size)
         alamat_fisik_t table_phys;
 
         /* Set PDE untuk kernel space */
-        table_phys = (alamat_fisik_t)&kernel_page_tables[i];
+        table_phys = (alamat_fisik_t)(uintptr_t)&kernel_page_tables[i];
         kernel_page_dir->entries[table_index] = pde_create(table_phys,
             PDE_PRESENT | PTE_WRITABLE);
 
@@ -299,8 +299,8 @@ status_t paging_init(tak_bertanda64_t mem_size)
 
     /* Enable paging */
     {
-        tak_bertanda64_t cr0 = cpu_read_cr0();
-        cr0 |= (1ULL << 31);  /* Set PG bit */
+        tak_bertanda32_t cr0 = (tak_bertanda32_t)cpu_read_cr0();
+        cr0 |= (1U << 31);  /* Set PG bit */
         cpu_write_cr0(cr0);
     }
 
@@ -453,7 +453,7 @@ page_directory_t *paging_create_address_space(void)
     }
 
     /* Alokasikan page directory baru */
-    new_dir = (page_directory_t *)pmm_alloc_page();
+    new_dir = (page_directory_t *)(uintptr_t)pmm_alloc_page();
     if (new_dir == NULL) {
         return NULL;
     }
@@ -499,7 +499,7 @@ status_t paging_destroy_address_space(page_directory_t *dir)
     }
 
     /* Bebaskan page directory */
-    pmm_free_page((alamat_fisik_t)dir);
+    pmm_free_page((alamat_fisik_t)(uintptr_t)dir);
 
     return STATUS_BERHASIL;
 }

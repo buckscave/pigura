@@ -11,6 +11,9 @@
  */
 
 #include "../kernel.h"
+#include <errno.h>
+#include <string.h>
+#include <sys/types.h>
 
 /*
  * ============================================================================
@@ -116,8 +119,17 @@
 #define SYSCALL_CHECK(res) \
     do { \
         if ((res) < 0 && (res) >= -255) { \
-            errno = -(res); \
+            errno = (int)(-(res)); \
             return -1; \
+        } \
+    } while (0)
+
+/* Cek error dari syscall untuk fungsi yang mengembalikan pointer */
+#define SYSCALL_CHECK_PTR(res) \
+    do { \
+        if ((res) < 0 && (res) >= -255) { \
+            errno = (int)(-(res)); \
+            return (void *)-1; \
         } \
     } while (0)
 
@@ -239,7 +251,7 @@ void *sbrk(ptrdiff_t increment)
 
     res = SYSCALL1(SYS_SBRK, increment);
 
-    SYSCALL_CHECK(res);
+    SYSCALL_CHECK_PTR(res);
 
     return (void *)res;
 }
@@ -263,7 +275,7 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
 
     res = SYSCALL6(SYS_MMAP, addr, len, prot, flags, fd, offset);
 
-    SYSCALL_CHECK(res);
+    SYSCALL_CHECK_PTR(res);
 
     return (void *)res;
 }
@@ -295,7 +307,7 @@ int open(const char *path, int flags, ...)
     if (flags & 0x100) {
         va_list args;
         va_start(args, flags);
-        mode = va_arg(args, mode_t);
+        mode = (mode_t)va_arg(args, int);
         va_end(args);
     }
 
@@ -325,7 +337,10 @@ ssize_t read(int fd, void *buf, size_t count)
 
     res = SYSCALL3(SYS_READ, fd, buf, count);
 
-    SYSCALL_CHECK(res);
+    if (res < 0 && res >= -255) {
+        errno = (int)(-res);
+        return -1;
+    }
 
     return (ssize_t)res;
 }
@@ -337,7 +352,10 @@ ssize_t write(int fd, const void *buf, size_t count)
 
     res = SYSCALL3(SYS_WRITE, fd, buf, count);
 
-    SYSCALL_CHECK(res);
+    if (res < 0 && res >= -255) {
+        errno = (int)(-res);
+        return -1;
+    }
 
     return (ssize_t)res;
 }
@@ -742,9 +760,11 @@ void perror(const char *s)
         [EROFS]     = "Read-only file system",
         [EMLINK]    = "Too many links",
         [EPIPE]     = "Broken pipe",
-        [EDOM]      = "Math argument out of domain",
         [ERANGE]    = "Math result not representable"
     };
+
+    /* EDOM tidak ditampilkan karena nilainya sama dengan EPERM (=1),
+     * designated initializer akan menimpa EPERM */
 
     if (errno >= 0 && errno < (int)(sizeof(err_strings) /
         sizeof(err_strings[0])) && err_strings[errno] != NULL) {

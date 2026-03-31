@@ -1295,10 +1295,10 @@ void context_return_to_user(cpu_context_t *ctx)
 #if defined(ARSITEKTUR_X86)
     /* Restore ke user mode menggunakan IRET */
     __asm__ __volatile__(
-        "movw %0, %%ds\n\t"
-        "movw %0, %%es\n\t"
-        "movw %0, %%fs\n\t"
-        "movw %0, %%gs\n\t"
+        "movw %%ax, %%ds\n\t"
+        "movw %%ax, %%es\n\t"
+        "movw %%ax, %%fs\n\t"
+        "movw %%ax, %%gs\n\t"
         "pushl %1\n\t"       /* SS */
         "pushl %2\n\t"       /* ESP */
         "pushl %3\n\t"       /* EFLAGS */
@@ -1313,7 +1313,7 @@ void context_return_to_user(cpu_context_t *ctx)
         "movl %12, %%ebp\n\t"
         "iret\n\t"
         :
-        : "r"((tak_bertanda32_t)ctx->ss),
+        : "a"((tak_bertanda32_t)ctx->ss),
           "r"((tak_bertanda32_t)ctx->ss),
           "r"(ctx->esp),
           "r"(ctx->eflags),

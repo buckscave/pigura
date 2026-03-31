@@ -43,7 +43,7 @@
 #define DEFAULT_STACK_LIMIT     (8UL * 1024UL * 1024UL)
 #define DEFAULT_DATA_LIMIT      (256UL * 1024UL * 1024UL)
 #define DEFAULT_CORE_LIMIT      0
-#define DEFAULT_MEMORY_LIMIT    0xFFFFFFFFFFFFFFFFULL
+#define DEFAULT_MEMORY_LIMIT    (~(ukuran_t)0)
 #define DEFAULT_CPU_LIMIT       0
 #define DEFAULT_NOFILE_LIMIT    1024
 #define DEFAULT_NPROC_LIMIT     4096
@@ -973,7 +973,7 @@ proses_t *proses_cari(pid_t pid)
 {
     proses_t *proses;
     
-    if (!g_proses_diinit || pid < 0) {
+    if (!g_proses_diinit || pid == 0) {
         return NULL;
     }
     
@@ -1621,7 +1621,7 @@ bool_t proses_valid(proses_t *proses)
  */
 bool_t proses_pid_valid(pid_t pid)
 {
-    if (pid < 0) {
+    if (pid == 0) {
         return SALAH;
     }
     

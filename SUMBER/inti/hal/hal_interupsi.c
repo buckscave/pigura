@@ -49,7 +49,7 @@
 static void (*irq_handlers[MAX_IRQ_HANDLERS])(void) = {NULL};
 
 /* IRQ mask state */
-static tak_bertanda16_t irq_mask = 0xFFFB; /* Semua disabled kecuali cascade */
+static tak_bertanda16_t irq_mask __attribute__((unused)) = 0xFFFB;
 
 /* State inisialisasi */
 static bool_t interrupt_initialized = SALAH;

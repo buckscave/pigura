@@ -369,7 +369,7 @@ static void signal_execute_default(proses_t *proses, tak_bertanda32_t sig)
 static void signal_deliver(proses_t *proses, tak_bertanda32_t sig)
 {
     void (*handler)(int);
-    tak_bertanda32_t action;
+    tak_bertanda32_t action __attribute__((unused));
     
     if (proses == NULL || !SIGNAL_VALID(sig)) {
         return;

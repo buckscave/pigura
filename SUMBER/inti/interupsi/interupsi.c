@@ -57,7 +57,7 @@ typedef struct {
     tak_bertanda32_t int_no, err_code;
     tak_bertanda32_t eip, cs, eflags;
     tak_bertanda32_t useresp, ss;
-} __attribute__((packed)) interrupt_frame_t;
+} __attribute__((packed)) inti_interrupt_frame_t;
 
 /*
  * ============================================================================

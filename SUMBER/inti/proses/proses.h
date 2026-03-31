@@ -309,7 +309,10 @@ struct page_directory;
  * ===========================================================================
  */
 
+#ifndef _VMA_TYPES_SUPPRESSED
 /* Struktur VMA (Virtual Memory Area) */
+#ifndef _VMA_T_DEFINED
+#define _VMA_T_DEFINED
 typedef struct vma {
     alamat_virtual_t mulai;     /* Alamat awal */
     alamat_virtual_t akhir;     /* Alamat akhir */
@@ -319,8 +322,11 @@ typedef struct vma {
     struct vma *prev;           /* VMA sebelumnya */
     void *file;                 /* File yang di-map (jika ada) */
 } vma_t;
+#endif /* _VMA_T_DEFINED */
 
 /* Struktur VM Descriptor */
+#ifndef _VM_DESCRIPTOR_T_DEFINED
+#define _VM_DESCRIPTOR_T_DEFINED
 typedef struct vm_descriptor {
     tak_bertanda32_t magic;         /* Magic number */
     tak_bertanda32_t ref_count;     /* Reference count */
@@ -332,6 +338,8 @@ typedef struct vm_descriptor {
     struct vm_descriptor *next;     /* Untuk list */
     struct vm_descriptor *prev;     /* Untuk list */
 } vm_descriptor_t;
+#endif /* _VM_DESCRIPTOR_T_DEFINED */
+#endif /* _VMA_TYPES_SUPPRESSED */
 
 /*
  * ===========================================================================
@@ -1432,6 +1440,7 @@ bool_t thread_runnable(thread_t *thread);
 /* Inisialisasi VM */
 status_t vm_init(void);
 
+#ifndef _VMA_TYPES_SUPPRESSED
 /* Buat dan hancurkan address space */
 vm_descriptor_t *vm_create_address_space(void);
 void vm_destroy_address_space(vm_descriptor_t *vm);
@@ -1448,6 +1457,7 @@ bool_t vm_query(vm_descriptor_t *vm, alamat_virtual_t addr,
 
 /* Validasi */
 bool_t vm_validate_address(vm_descriptor_t *vm, alamat_virtual_t addr);
+#endif /* _VMA_TYPES_SUPPRESSED */
 
 /* Get runqueue index */
 tak_bertanda32_t dapatkan_runqueue_idx(tak_bertanda32_t prioritas);
@@ -1554,8 +1564,10 @@ tak_bertanda64_t berkas_seek(berkas_t *berkas, tak_bertanda64_t offset,
  * ===========================================================================
  */
 
+#ifndef _VMA_TYPES_SUPPRESSED
 /* Alokasi memori di alamat tertentu */
 status_t vm_alloc_at(vm_descriptor_t *vm, ukuran_t size, tak_bertanda32_t flags,
                      alamat_virtual_t addr);
+#endif /* _VMA_TYPES_SUPPRESSED */
 
 #endif /* PROSES_PROSES_H */

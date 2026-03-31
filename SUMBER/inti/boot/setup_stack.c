@@ -85,6 +85,8 @@ status_t setup_kernel_stack(void)
     kernel_esp = (void *)((ukuran_t)kernel_stack + STACK_KERNEL_SIZE);
 
 #if defined(ARSITEKTUR_X86) || defined(ARSITEKTUR_X86_64)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated"
     __asm__ __volatile__(
         "mov %0, %%esp\n\t"
         "mov %0, %%ebp\n\t"
@@ -92,7 +94,10 @@ status_t setup_kernel_stack(void)
         : "r"(kernel_esp)
         : "esp", "ebp"
     );
+#pragma GCC diagnostic pop
 #elif defined(ARSITEKTUR_ARM32) || defined(ARSITEKTUR_ARM64)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated"
     __asm__ __volatile__(
         "mov sp, %0\n\t"
         "mov fp, %0\n\t"
@@ -100,6 +105,7 @@ status_t setup_kernel_stack(void)
         : "r"(kernel_esp)
         : "sp", "fp"
     );
+#pragma GCC diagnostic pop
 #endif
 
     stack_initialized = BENAR;
@@ -121,6 +127,8 @@ status_t setup_kernel_stack_early(void *stack_top, ukuran_t size)
     kernel_esp = stack_top;
 
 #if defined(ARSITEKTUR_X86) || defined(ARSITEKTUR_X86_64)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated"
     __asm__ __volatile__(
         "mov %0, %%esp\n\t"
         "mov %0, %%ebp\n\t"
@@ -128,7 +136,10 @@ status_t setup_kernel_stack_early(void *stack_top, ukuran_t size)
         : "r"(kernel_esp)
         : "esp", "ebp"
     );
+#pragma GCC diagnostic pop
 #elif defined(ARSITEKTUR_ARM32) || defined(ARSITEKTUR_ARM64)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated"
     __asm__ __volatile__(
         "mov sp, %0\n\t"
         "mov fp, %0\n\t"
@@ -136,6 +147,7 @@ status_t setup_kernel_stack_early(void *stack_top, ukuran_t size)
         : "r"(kernel_esp)
         : "sp", "fp"
     );
+#pragma GCC diagnostic pop
 #endif
 
     stack_initialized = BENAR;

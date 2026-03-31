@@ -536,7 +536,7 @@ bool_t validasi_pid(pid_t pid)
     /* pid == 0 adalah proses group */
     /* pid < -1 adalah proses group spesifik */
 
-    if (pid < -1 || pid > CONFIG_MAKS_PROSES) {
+    if ((tanda32_t)pid > (tanda32_t)CONFIG_MAKS_PROSES) {
         validasi_stats.failures++;
         return SALAH;
     }

@@ -128,7 +128,7 @@ static proses_t *find_child(proses_t *parent, pid_t pid)
     child = parent->children;
     
     while (child != NULL) {
-        if (pid == -1) {
+        if (pid == (pid_t)-1) {
             /* Any child */
             return child;
         } else if (pid == 0) {
@@ -182,7 +182,7 @@ static proses_t *find_zombie_child(proses_t *parent, pid_t pid,
         match = SALAH;
         
         /* Cek PID match */
-        if (pid == -1) {
+        if (pid == (pid_t)-1) {
             match = BENAR;
         } else if (pid == 0) {
             match = (child->pgid == parent->pgid);
@@ -343,7 +343,7 @@ status_t wait_init(void)
  * Return: PID child yang berubah, atau -1 jika error
  */
 pid_t do_wait(pid_t pid, tanda32_t *status, tak_bertanda32_t options,
-              void *rusage)
+              void *rusage __attribute__((unused)))
 {
     proses_t *parent;
     proses_t *child;
@@ -513,7 +513,7 @@ tanda32_t sys_waitid(tak_bertanda32_t idtype, pid_t id,
     
     result = do_wait(target_pid, &status, options, NULL);
     
-    if (result < 0) {
+    if (result == 0) {
         return result;
     }
     
@@ -647,10 +647,11 @@ void wait_wakeup_parent(proses_t *child)
     /* Cek jika parent menunggu */
     if (parent->wait_state != WAIT_STATE_NONE) {
         /* Cek jika menunggu child ini */
-        if (parent->wait_pid == -1 ||
+        if (parent->wait_pid == (pid_t)-1 ||
             parent->wait_pid == child->pid ||
             (parent->wait_pid == 0 && parent->pgid == child->pgid) ||
-            (parent->wait_pid < -1 && -parent->wait_pid == child->pgid)) {
+            ((tanda32_t)parent->wait_pid < (tanda32_t)-1 &&
+             (tanda32_t)(-parent->wait_pid) == (tanda32_t)child->pgid)) {
             
             /* Wake up parent */
             if (parent->main_thread != NULL) {

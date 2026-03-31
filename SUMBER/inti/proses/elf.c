@@ -625,7 +625,7 @@ status_t elf_load(const char *path, proses_t *proses, void *info)
     ctx.berkas = berkas;
     ctx.class = elf_class;
     ctx.machine = machine;
-    ctx.min_addr = 0xFFFFFFFFFFFFFFFFULL;
+    ctx.min_addr = 0xFFFFFFFFUL;
     ctx.max_addr = 0;
     
     /* Load berdasarkan class */
@@ -887,7 +887,7 @@ status_t elf_load_from_memory(const void *buffer, ukuran_t size,
                 
                 /* Copy data */
                 if (phdr->p_filesz > 0) {
-                    kernel_memcpy((void *)phdr->p_vaddr,
+                    kernel_memcpy((void *)(uintptr_t)phdr->p_vaddr,
                                   (const tak_bertanda8_t *)buffer +
                                   phdr->p_offset,
                                   phdr->p_filesz);
@@ -895,7 +895,7 @@ status_t elf_load_from_memory(const void *buffer, ukuran_t size,
                 
                 /* Zero BSS */
                 if (phdr->p_memsz > phdr->p_filesz) {
-                    kernel_memset((void *)(phdr->p_vaddr + phdr->p_filesz),
+                    kernel_memset((void *)(uintptr_t)(phdr->p_vaddr + phdr->p_filesz),
                                   0, phdr->p_memsz - phdr->p_filesz);
                 }
             }
