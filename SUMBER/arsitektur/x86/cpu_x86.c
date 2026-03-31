@@ -726,9 +726,13 @@ void hal_cpu_reset(bool_t keras)
         cpu_halt();
     } else {
         /* Soft reset via BIOS */
-        tak_bertanda32_t *warm_reset_flag = 
-            (tak_bertanda32_t *)0x0472;
-        *warm_reset_flag = 0x1234;
+        __asm__ __volatile__ (
+            "movw $0x1234, %w0\n\t"
+            "movw %w0, %%ds:(%1)\n\t"
+            :
+            : "a" (0x1234), "r" ((unsigned short *)0x0472)
+            : "memory"
+        );
 
         /* Jump to reset vector */
         __asm__ __volatile__(

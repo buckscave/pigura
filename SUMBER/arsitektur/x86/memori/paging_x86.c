@@ -139,7 +139,7 @@ static tak_bertanda32_t _buat_pde_4kb(tak_bertanda32_t pt_fisik,
     pde.besar = 0;
     pde.alamat = pt_fisik >> PAGING_SHIFT_4KB;
 
-    return *(tak_bertanda32_t *)&pde;
+    { tak_bertanda32_t val; kernel_memcpy(&val, &pde, sizeof(val)); return val; }
 }
 
 /*
@@ -160,7 +160,7 @@ static tak_bertanda32_t _buat_pde_4mb(tak_bertanda32_t addr_fisik,
     pde.besar = 1;
     pde.alamat = addr_fisik >> PAGING_SHIFT_4KB;
 
-    return *(tak_bertanda32_t *)&pde;
+    { tak_bertanda32_t val; kernel_memcpy(&val, &pde, sizeof(val)); return val; }
 }
 
 /*
@@ -180,7 +180,7 @@ static tak_bertanda32_t _buat_pte(tak_bertanda32_t addr_fisik,
     pte.user = user ? 1 : 0;
     pte.alamat = addr_fisik >> PAGING_SHIFT_4KB;
 
-    return *(tak_bertanda32_t *)&pte;
+    { tak_bertanda32_t val; kernel_memcpy(&val, &pte, sizeof(val)); return val; }
 }
 
 /*

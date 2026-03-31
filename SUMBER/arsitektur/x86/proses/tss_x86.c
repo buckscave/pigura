@@ -205,9 +205,9 @@ tak_bertanda32_t tss_get_esp0(void)
  * Parameter:
  *   cr3 - Alamat page directory
  */
-void tss_set_cr3(tak_bertanda32_t cr3)
+void tss_set_cr3(tak_bertanda64_t cr3)
 {
-    g_tss_kernel.cr3 = cr3;
+    g_tss_kernel.cr3 = (tak_bertanda32_t)cr3;
 }
 
 /*

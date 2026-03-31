@@ -71,8 +71,8 @@
 /* Flag untuk status inisialisasi arsitektur */
 static bool_t g_arch_initialized = SALAH;
 
-/* Pointer ke boot info */
-static void *g_boot_info_ptr = NULL;
+/* Pointer ke boot info - digunakan oleh hal_x86_get_boot_info */
+static void *g_boot_info_ptr __attribute__((unused)) = NULL;
 
 /*
  * ============================================================================
