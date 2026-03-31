@@ -14,6 +14,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include "types.h"
 
 /* =============================================================================
  * KONSTANTA
@@ -100,19 +101,26 @@ typedef struct {
  * =============================================================================
  */
 
-/* GDT untuk long mode */
-static gdt_entry64_t g_gdt64[5] __attribute__((aligned(16)));
+/* Status long mode */
+static int g_long_mode_enabled = 0;
 
 /* GDT pointer */
 static gdt_ptr64_t g_gdt_ptr64;
+
+/*
+ * Variabel berikut hanya digunakan pada x86_64.
+ * Ditempatkan di luar guard agar stub 32-bit tetap dapat mengakses g_gdt_ptr64.
+ */
+
+#ifndef __i386__
+
+/* GDT untuk long mode */
+static gdt_entry64_t g_gdt64[5] __attribute__((aligned(16)));
 
 /* Page tables (ditempatkan di alamat tertentu) */
 static pte64_t g_pml4[512] __attribute__((aligned(4096)));
 static pte64_t g_pdpt[512] __attribute__((aligned(4096)));
 static pte64_t g_pd[512] __attribute__((aligned(4096)));
-
-/* Status long mode */
-static int g_long_mode_enabled = 0;
 
 /* =============================================================================
  * FUNGSI INLINE ASSEMBLY
@@ -297,7 +305,7 @@ static void _setup_gdt64(void)
 
     /* Set GDT pointer */
     g_gdt_ptr64.limit = sizeof(g_gdt64) - 1;
-    g_gdt_ptr64.base = (uint64_t)&g_gdt64;
+    g_gdt_ptr64.base = (uint64_t)(uintptr_t)&g_gdt64;
 }
 
 /*
@@ -318,11 +326,11 @@ static void _setup_page_tables(void)
     }
 
     /* Setup PML4[0] -> PDPT */
-    g_pml4[0] = ((uint64_t)g_pdpt) |
+    g_pml4[0] = ((uint64_t)(uintptr_t)g_pdpt) |
                 PTE_PRESENT | PTE_WRITABLE;
 
     /* Setup PDPT[0] -> PD */
-    g_pdpt[0] = ((uint64_t)g_pd) |
+    g_pdpt[0] = ((uint64_t)(uintptr_t)g_pd) |
                 PTE_PRESENT | PTE_WRITABLE;
 
     /* Setup PD entries with 2MB pages (identity mapping first 1GB) */
@@ -478,7 +486,7 @@ void mode_long_enter(uint64_t entry_point)
     _write_cr4(cr4);
 
     /* Load PML4 into CR3 */
-    _write_cr3((uint64_t)g_pml4);
+    _write_cr3((uint64_t)(uintptr_t)g_pml4);
 
     /* Enable long mode in EFER */
     efer = _read_msr(MSR_EFER);
@@ -530,7 +538,7 @@ int mode_long_is_enabled(void)
  */
 uint64_t mode_long_get_pml4(void)
 {
-    return (uint64_t)g_pml4;
+    return (uint64_t)(uintptr_t)g_pml4;
 }
 
 /*
@@ -610,3 +618,74 @@ uint64_t mode_long_get_fs_base(void)
 {
     return _read_msr(MSR_FS_BASE);
 }
+
+#else /* __i386__ - 32-bit stubs */
+
+/* =============================================================================
+ * STUB 32-BIT
+ * =============================================================================
+ * Long mode tidak tersedia pada x86 32-bit.
+ * Fungsi-fungsi ini mengembalikan nilai default/error.
+ * =============================================================================
+ */
+
+int mode_long_check_support(void)
+{
+    return 0;
+}
+
+int mode_long_init(void)
+{
+    return -1;
+}
+
+void mode_long_enter(uint64_t entry_point)
+{
+    (void)entry_point;
+}
+
+int mode_long_is_enabled(void)
+{
+    return g_long_mode_enabled;
+}
+
+uint64_t mode_long_get_pml4(void)
+{
+    return 0;
+}
+
+gdt_ptr64_t *mode_long_get_gdt(void)
+{
+    return &g_gdt_ptr64;
+}
+
+void mode_long_invalidate_tlb(void)
+{
+}
+
+void mode_long_invalidate_tlb_page(uint64_t addr)
+{
+    (void)addr;
+}
+
+void mode_long_set_gs_base(uint64_t base)
+{
+    (void)base;
+}
+
+uint64_t mode_long_get_gs_base(void)
+{
+    return 0;
+}
+
+void mode_long_set_fs_base(uint64_t base)
+{
+    (void)base;
+}
+
+uint64_t mode_long_get_fs_base(void)
+{
+    return 0;
+}
+
+#endif /* __i386__ */

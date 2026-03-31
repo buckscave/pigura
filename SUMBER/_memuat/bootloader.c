@@ -14,6 +14,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include "types.h"
 
 /* =============================================================================
  * KONSTANTA
@@ -320,22 +321,16 @@ static void _putdec(uint32_t val)
  */
 
 /*
- * _check_a20
- * ----------
- * Memeriksa apakah A20 line aktif.
+ * _a20_compare
+ * ------------
+ * Helper untuk A20 check. Membaca dan membandingkan memori pada dua alamat.
+ * Menggunakan noipa untuk mencegah GCC menganalisis asal pointer.
  */
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Warray-bounds"
-static int _check_a20(void)
+static int __attribute__((noinline, noipa)) _a20_compare(
+    volatile uint8_t *low, volatile uint8_t *high)
 {
-    volatile uint8_t *low;
-    volatile uint8_t *high;
     uint8_t save_low;
     uint8_t save_high;
-
-    /* Direct memory access for A20 check */
-    low = (volatile uint8_t *)(uintptr_t)0x00000500ULL;
-    high = (volatile uint8_t *)(uintptr_t)0x10000500ULL;
 
     save_low = *low;
     save_high = *high;
@@ -353,7 +348,23 @@ static int _check_a20(void)
     *high = save_high;
     return 1;       /* A20 aktif */
 }
-#pragma GCC diagnostic pop
+
+/*
+ * _check_a20
+ * ----------
+ * Memeriksa apakah A20 line aktif.
+ */
+static int _check_a20(void)
+{
+    volatile uint8_t *low;
+    volatile uint8_t *high;
+
+    /* Direct memory access for A20 check */
+    low = (volatile uint8_t *)(uintptr_t)0x00000500ULL;
+    high = (volatile uint8_t *)(uintptr_t)0x10000500ULL;
+
+    return _a20_compare(low, high);
+}
 
 /*
  * _enable_a20_fast

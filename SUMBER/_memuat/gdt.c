@@ -14,6 +14,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include "types.h"
 
 /* =============================================================================
  * KONSTANTA

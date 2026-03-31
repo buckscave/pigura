@@ -14,6 +14,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include "types.h"
 
 /* =============================================================================
  * KONSTANTA
@@ -216,11 +217,13 @@ static uint32_t _detect_bios_e801(void)
 
     /* Call BIOS interrupt */
     __asm__ __volatile__(
-        "int $0x15\n\t"
-        "setc %4"
-        : "=a"(ax), "=b"(bx), "=c"(cx), "=d"(dx), "=rm"(cf)
-        : "a"(0xE801), "0"(0), "1"(0), "2"(0), "3"(0)
+        "int $0x15"
+        : "=a"(ax), "=b"(bx), "=c"(cx), "=d"(dx)
+        : "a"(0xE801), "b"(0), "c"(0), "d"(0)
     );
+
+    /* Capture carry flag */
+    __asm__ __volatile__("setc %0" : "=qm"(cf));
 
     if (cf) {
         /* Call failed */
@@ -261,6 +264,7 @@ static int _detect_bios_e820(void)
     uint32_t cont;
     uint32_t signature;
     uint32_t bytes;
+    uint32_t edx_tmp;
     struct {
         uint64_t base;
         uint64_t length;
@@ -272,6 +276,7 @@ static int _detect_bios_e820(void)
 
     count = 0;
     cont = 0;
+    cf = 0;
     signature = 0x534D4150;     /* "SMAP" */
 
     _memset(&g_mem_map, 0, sizeof(g_mem_map));
@@ -282,15 +287,16 @@ static int _detect_bios_e820(void)
 
         /* Call BIOS */
         __asm__ __volatile__(
-            "int $0x15\n\t"
-            "setc %5"
-            : "=a"(signature), "=b"(bytes), "=c"(cont),
-              "=d"(signature)
-            : "a"(0xE820), "0"(cont), "1"(bytes),
-              "2"(sizeof(entry)), "3"(signature),
-              "D"(&entry)
+            "int $0x15"
+            : "=a"(signature), "=b"(cont), "=c"(bytes),
+              "=d"(edx_tmp)
+            : "a"(0xE820), "b"(cont), "c"(sizeof(entry)),
+              "d"(signature), "D"(&entry)
             : "memory"
         );
+
+        /* Capture carry flag */
+        __asm__ __volatile__("setc %0" : "=qm"(cf));
 
         /* Check for error */
         if (cf || signature != 0x534D4150) {
