@@ -145,8 +145,10 @@ status_t pengolah_busur(struct p_konteks *ktx,
 
         /* Cek apakah sudah melewati sudut akhir */
         if (sudut_awal <= sudut_akhir) {
-            if (sudut_sekarang >= sudut_akhir) {
-                sudut_sekarang = sudut_akhir;
+            if (sudut_sekarang >=
+                (tak_bertanda32_t)sudut_akhir) {
+                sudut_sekarang =
+                    (tak_bertanda32_t)sudut_akhir;
                 selesai = BENAR;
             }
         } else {
@@ -154,11 +156,14 @@ status_t pengolah_busur(struct p_konteks *ktx,
                 sudut_sekarang -= 360;
             }
             if (sudut_awal > sudut_akhir) {
-                if (sudut_sekarang >= sudut_akhir &&
+                if (sudut_sekarang >=
+                    (tak_bertanda32_t)sudut_akhir &&
                     i > 1) {
                     selesai = BENAR;
-                    if (sudut_sekarang != sudut_akhir) {
-                        sudut_sekarang = sudut_akhir;
+                    if (sudut_sekarang !=
+                        (tak_bertanda32_t)sudut_akhir) {
+                        sudut_sekarang =
+                            (tak_bertanda32_t)sudut_akhir;
                     }
                 }
             }

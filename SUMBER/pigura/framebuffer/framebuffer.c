@@ -185,7 +185,7 @@ permukaan_t *permukaan_buat_display(tak_bertanda64_t alamat_fisik,
 
     /* Gunakan alamat fisik dari video driver */
     p->alamat_fisik = alamat_fisik;
-    p->piksel = (tak_bertanda32_t *)alamat_fisik;
+    p->piksel = (tak_bertanda32_t *)(uintptr_t)alamat_fisik;
     p->pitch = pitch;
     p->ukuran = (ukuran_t)pitch * tinggi;
 
@@ -421,7 +421,7 @@ void permukaan_flip(permukaan_t *handle)
     /* Copy ke display jika ini permukaan display */
     if (p == g_display && p->alamat_fisik != 0) {
         kernel_memcpy(
-            (void *)p->alamat_fisik, p->piksel, p->ukuran);
+            (void *)(uintptr_t)p->alamat_fisik, p->piksel, p->ukuran);
     }
 
     p->kotor = SALAH;

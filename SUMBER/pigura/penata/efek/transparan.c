@@ -118,7 +118,7 @@ status_t penata_campur_alpha(permukaan_t *target,
     tak_bertanda32_t x, y;
     tak_bertanda32_t ax, ay, aw, ah;
     tak_bertanda32_t sw_lebar, sw_tinggi;
-    tak_bertanda32_t piksel, piksel_bg, piksel_fg, hasil;
+    tak_bertanda32_t piksel_bg, piksel_fg, hasil;
 
     if (target == NULL || area == NULL) {
         return STATUS_PARAM_NULL;

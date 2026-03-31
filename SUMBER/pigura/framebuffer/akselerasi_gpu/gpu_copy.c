@@ -99,6 +99,9 @@ status_t gpu_salin_blok(const tak_bertanda32_t *src_buffer,
     status_t status;
     tak_bertanda32_t row, col;
 
+    (void)src_x;
+    (void)src_y;
+
     /* Siapkan dan validasi konteks */
     status = gpu_konteks_siapkan(&ctx,
                                    src_buffer, src_lebar, src_tinggi,
@@ -235,6 +238,9 @@ status_t gpu_salin_flip_h(const tak_bertanda32_t *src_buffer,
     tak_bertanda32_t row, col;
     tak_bertanda32_t mirror_col;
 
+    (void)src_x;
+    (void)src_y;
+
     /* Siapkan dan validasi konteks */
     status = gpu_konteks_siapkan(&ctx,
                                    src_buffer, src_lebar, src_tinggi,
@@ -323,6 +329,9 @@ status_t gpu_salin_flip_v(const tak_bertanda32_t *src_buffer,
     tak_bertanda32_t row;
     tak_bertanda32_t mirror_row;
 
+    (void)src_x;
+    (void)src_y;
+
     /* Siapkan dan validasi konteks */
     status = gpu_konteks_siapkan(&ctx,
                                    src_buffer, src_lebar, src_tinggi,
@@ -409,6 +418,9 @@ status_t gpu_salin_flip_hv(const tak_bertanda32_t *src_buffer,
     status_t status;
     tak_bertanda32_t row, col;
     tak_bertanda32_t mirror_row, mirror_col;
+
+    (void)src_x;
+    (void)src_y;
 
     /* Siapkan dan validasi konteks */
     status = gpu_konteks_siapkan(&ctx,

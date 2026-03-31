@@ -289,6 +289,9 @@ status_t gpu_blit(const tak_bertanda32_t *src_buffer,
     status_t status;
     tak_bertanda32_t row, col;
 
+    (void)src_x;
+    (void)src_y;
+
     status = gpu_konteks_siapkan(&ctx,
                                    src_buffer, src_lebar, src_tinggi,
                                    src_pitch,
@@ -374,6 +377,9 @@ status_t gpu_blit_alpha(const tak_bertanda32_t *src_buffer,
     struct gpu_konteks ctx;
     status_t status;
     tak_bertanda32_t row, col;
+
+    (void)src_x;
+    (void)src_y;
 
     status = gpu_konteks_siapkan(&ctx,
                                    src_buffer, src_lebar, src_tinggi,
@@ -464,6 +470,9 @@ status_t gpu_blit_alpha_global(const tak_bertanda32_t *src_buffer,
     struct gpu_konteks ctx;
     status_t status;
     tak_bertanda32_t row, col;
+
+    (void)src_x;
+    (void)src_y;
 
     status = gpu_konteks_siapkan(&ctx,
                                    src_buffer, src_lebar, src_tinggi,
@@ -558,6 +567,9 @@ status_t gpu_blit_warna_kunci(const tak_bertanda32_t *src_buffer,
     status_t status;
     tak_bertanda32_t row, col;
 
+    (void)src_x;
+    (void)src_y;
+
     status = gpu_konteks_siapkan(&ctx,
                                    src_buffer, src_lebar, src_tinggi,
                                    src_pitch,
@@ -651,6 +663,9 @@ status_t gpu_blit_alpha_warna_kunci(
     struct gpu_konteks ctx;
     status_t status;
     tak_bertanda32_t row, col;
+
+    (void)src_x;
+    (void)src_y;
 
     status = gpu_konteks_siapkan(&ctx,
                                    src_buffer, src_lebar, src_tinggi,
@@ -748,6 +763,9 @@ status_t gpu_blit_tint(const tak_bertanda32_t *src_buffer,
     status_t status;
     tak_bertanda32_t row, col;
     tak_bertanda8_t tr, tg, tb, ta;
+
+    (void)src_x;
+    (void)src_y;
 
     gpu_ekstrak_warna(warna_tint, &tr, &tg, &tb, &ta);
 

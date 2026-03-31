@@ -260,6 +260,8 @@ static void cpu_lingkaran_garis_horisontal(
     tanda32_t x_aktual, x_max;
     tak_bertanda32_t offset;
 
+    (void)x0;
+
     x_aktual = (tanda32_t)(cx - x1);
     x_max = (tanda32_t)(cx + x1);
 
@@ -1087,7 +1089,7 @@ status_t cpu_kurva_bezier2(struct p_konteks *ktx,
 
     /* Evaluasi kurva kuadratik: B(t) = (1-t)^2*P0 + 2(1-t)t*P1 + t^2*P2 */
     for (i = 1; i <= langkah; i++) {
-        tak_bertanda32_t t, t_256;
+        tak_bertanda32_t t_256;
         tak_bertanda64_t t_fp, satu_t_fp;
         tak_bertanda64_t bx, by;
 

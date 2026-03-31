@@ -393,6 +393,9 @@ status_t gpu_blend_permukaan(const tak_bertanda32_t *src_buffer,
     status_t status;
     tak_bertanda32_t row, col;
 
+    (void)src_x;
+    (void)src_y;
+
     status = gpu_konteks_siapkan(&ctx,
                                    src_buffer, src_lebar, src_tinggi,
                                    src_pitch,
@@ -482,6 +485,9 @@ status_t gpu_blend_alpha_global(const tak_bertanda32_t *src_buffer,
     status_t status;
     tak_bertanda32_t row, col;
     tak_bertanda8_t inv_alpha;
+
+    (void)src_x;
+    (void)src_y;
 
     status = gpu_konteks_siapkan(&ctx,
                                    src_buffer, src_lebar, src_tinggi,
@@ -589,6 +595,9 @@ status_t gpu_blend_add(const tak_bertanda32_t *src_buffer,
     status_t status;
     tak_bertanda32_t row, col;
 
+    (void)src_x;
+    (void)src_y;
+
     status = gpu_konteks_siapkan(&ctx,
                                    src_buffer, src_lebar, src_tinggi,
                                    src_pitch,
@@ -664,6 +673,9 @@ status_t gpu_blend_kurang(const tak_bertanda32_t *src_buffer,
     status_t status;
     tak_bertanda32_t row, col;
 
+    (void)src_x;
+    (void)src_y;
+
     status = gpu_konteks_siapkan(&ctx,
                                    src_buffer, src_lebar, src_tinggi,
                                    src_pitch,
@@ -737,6 +749,9 @@ status_t gpu_blend_kali(const tak_bertanda32_t *src_buffer,
     struct gpu_konteks ctx;
     status_t status;
     tak_bertanda32_t row, col;
+
+    (void)src_x;
+    (void)src_y;
 
     status = gpu_konteks_siapkan(&ctx,
                                    src_buffer, src_lebar, src_tinggi,
@@ -812,6 +827,9 @@ status_t gpu_blend_layar(const tak_bertanda32_t *src_buffer,
     status_t status;
     tak_bertanda32_t row, col;
 
+    (void)src_x;
+    (void)src_y;
+
     status = gpu_konteks_siapkan(&ctx,
                                    src_buffer, src_lebar, src_tinggi,
                                    src_pitch,
@@ -885,6 +903,9 @@ status_t gpu_blend_tumpuk(const tak_bertanda32_t *src_buffer,
     struct gpu_konteks ctx;
     status_t status;
     tak_bertanda32_t row, col;
+
+    (void)src_x;
+    (void)src_y;
 
     status = gpu_konteks_siapkan(&ctx,
                                    src_buffer, src_lebar, src_tinggi,

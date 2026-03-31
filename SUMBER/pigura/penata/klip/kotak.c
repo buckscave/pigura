@@ -93,8 +93,6 @@ bool_t penata_klip_kotak(const penata_rect_t *klip,
 
 void penata_rect_normalisasi(penata_rect_t *r)
 {
-    tanda32_t tmp;
-
     if (r == NULL) return;
 
     if ((tanda32_t)r->lebar < 0) {

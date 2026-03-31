@@ -32,7 +32,7 @@
 #define WIDGET_H
 
 #include "../inti/kernel.h"
-#include "framebuffer/framebuffer.h"
+#include "../framebuffer/framebuffer.h"
 #include "../peristiwa/peristiwa.h"
 
 /*

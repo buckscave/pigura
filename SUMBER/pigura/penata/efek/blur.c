@@ -126,7 +126,7 @@ static status_t blur_horizontal(permukaan_t *target,
     tak_bertanda32_t x, y;
     tak_bertanda32_t ax, ay, aw, ah;
     tak_bertanda32_t diameter;
-    tanda32_t kx, ky;
+    tanda32_t kx;
     tak_bertanda32_t total_r, total_g, total_b, total_a;
     tak_bertanda32_t count;
     tak_bertanda32_t piksel;

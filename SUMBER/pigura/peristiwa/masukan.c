@@ -303,8 +303,6 @@ static void proses_touch_event(const input_event_t *event)
 
 status_t masukan_proses_init(void)
 {
-    tak_bertanda32_t i;
-
     if (g_masukan_aktif) {
         return STATUS_SUDAH_ADA;
     }
