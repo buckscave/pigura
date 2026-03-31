@@ -66,8 +66,8 @@ typedef struct {
 static bool_t g_acpi_initialized = SALAH;
 static rsdp_t *g_rsdp = NULL;
 static void *g_rsdt = NULL;
-static void *g_madt = NULL;
-static void *g_fadt = NULL;
+static void *g_madt __attribute__((unused)) = NULL;
+static void *g_fadt __attribute__((unused)) = NULL;
 
 /*
  * ===========================================================================
@@ -81,7 +81,11 @@ static rsdp_t *acpi_find_rsdp(void)
     tak_bertanda64_t *ptr;
     
     /* Cari di EBDA (Extended BIOS Data Area) */
-    ptr = (tak_bertanda64_t *)(*(tak_bertanda16_t *)0x040E << 4);
+    {
+        tak_bertanda16_t ebda_seg;
+        __asm__ __volatile__("movw %%ds:0x40E, %0" : "=r"(ebda_seg));
+        ptr = (tak_bertanda64_t *)((tak_bertanda32_t)ebda_seg << 4);
+    }
     
     for (addr = 0; addr < 1024; addr += 16) {
         if (ptr[addr / 8] == ACPI_RSDP_SIGNATURE) {
@@ -122,9 +126,9 @@ status_t cpu_acpi_init(void)
     
     /* Parse RSDT/XSDT */
     if (g_rsdp->revision >= 2 && g_rsdp->xsdt_address != 0) {
-        g_rsdt = (void *)(tak_bertanda64_t)g_rsdp->xsdt_address;
+        g_rsdt = (void *)(uintptr_t)g_rsdp->xsdt_address;
     } else {
-        g_rsdt = (void *)(tak_bertanda64_t)g_rsdp->rsdt_address;
+        g_rsdt = (void *)(uintptr_t)g_rsdp->rsdt_address;
     }
     
     g_acpi_initialized = BENAR;
@@ -141,10 +145,11 @@ void cpu_acpi_shutdown(void)
     port = ACPI_PM1A_CNT_BLK;
     value = (5 << 10) | ACPI_SLP_EN;  /* SLP_TYP = S5, SLP_EN = 1 */
     
-    outw(port, value);
+    __asm__ __volatile__("outw %w0, %w1" : : "a"(value), "Nd"(port));
     
     /* Should not reach here */
     cpu_halt();
+    while (1) { /* TIDAK_RETURN compliance */ }
 }
 
 void cpu_acpi_reboot(void)
@@ -158,5 +163,7 @@ void cpu_acpi_reboot(void)
 
 status_t cpu_acpi_find_table(const char *signature, void **table)
 {
+    (void)signature;
+    (void)table;
     return STATUS_TIDAK_DITEMUKAN;
 }

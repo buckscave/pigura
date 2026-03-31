@@ -18,6 +18,7 @@ static status_t ic_db_arm_core_tambah(tak_bertanda16_t vendor_id,
                                        tak_bertanda32_t freq_mhz,
                                        tak_bertanda32_t cache_kb)
 {
+    (void)cores; (void)freq_mhz; (void)cache_kb;
     ic_entri_t *entri;
     status_t hasil;
     

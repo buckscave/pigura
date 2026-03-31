@@ -17,6 +17,7 @@ static status_t ic_db_mobile_gpu_tambah(tak_bertanda16_t vendor_id,
                                          tak_bertanda32_t shader_cores,
                                          tak_bertanda32_t freq_mhz)
 {
+    (void)shader_cores; (void)freq_mhz;
     ic_entri_t *entri;
     status_t hasil;
     

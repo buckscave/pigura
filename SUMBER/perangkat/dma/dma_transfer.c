@@ -184,6 +184,7 @@ static void isa_dma_set_mode(tak_bertanda32_t channel,
                              tak_bertanda32_t direction,
                              bool_t autoinit)
 {
+    (void)mode;
     tak_bertanda16_t port;
     tak_bertanda8_t nilai;
 

@@ -19,7 +19,6 @@ static status_t wifi_umum_init(ic_perangkat_t *perangkat)
 {
     ic_parameter_t *param;
     tak_bertanda64_t rate;
-    tak_bertanda64_t tx_power;
     
     if (perangkat == NULL) {
         return STATUS_PARAM_NULL;

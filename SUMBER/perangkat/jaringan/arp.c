@@ -519,6 +519,7 @@ status_t arp_cari(netdev_t *dev, alamat_ipv4_t *ip, alamat_mac_t *mac)
  */
 status_t arp_tambah(netdev_t *dev, alamat_ipv4_t *ip, alamat_mac_t *mac)
 {
+    (void)dev;
     tak_bertanda32_t entry_idx;
 
     if (ip == NULL || mac == NULL) {
@@ -560,6 +561,7 @@ status_t arp_tambah(netdev_t *dev, alamat_ipv4_t *ip, alamat_mac_t *mac)
  */
 status_t arp_hapus(netdev_t *dev, alamat_ipv4_t *ip)
 {
+    (void)dev;
     tak_bertanda32_t entry_idx;
 
     if (ip == NULL) {

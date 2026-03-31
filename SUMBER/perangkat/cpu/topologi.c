@@ -62,6 +62,7 @@ status_t cpu_topologi_init(void)
 tak_bertanda32_t cpu_topologi_level(tak_bertanda32_t cpu_id,
                                      cpu_topologi_level_t level)
 {
+    (void)level;
     if (!g_topologi_initialized) {
         return 0;
     }
@@ -71,10 +72,12 @@ tak_bertanda32_t cpu_topologi_level(tak_bertanda32_t cpu_id,
 
 tak_bertanda32_t cpu_topologi_siblings(tak_bertanda32_t cpu_id)
 {
+    (void)cpu_id;
     return 1;
 }
 
 tak_bertanda32_t cpu_topologi_cores(tak_bertanda32_t socket_id)
 {
+    (void)socket_id;
     return 1;
 }

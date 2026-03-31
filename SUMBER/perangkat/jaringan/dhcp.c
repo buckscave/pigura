@@ -17,6 +17,11 @@
 #include "jaringan.h"
 #include "../../inti/kernel.h"
 
+/* Forward declaration */
+extern status_t udp_send(tak_bertanda16_t src_port, tak_bertanda32_t dest_ip,
+                          tak_bertanda16_t dest_port, const void *data,
+                          ukuran_t len);
+
 /*
  * ===========================================================================
  * KONSTANTA DHCP
@@ -382,6 +387,7 @@ static status_t dhcp_send_release(netdev_t *dev, dhcp_client_t *client)
  */
 static dhcp_client_t *dhcp_find_client(tak_bertanda32_t iface_id)
 {
+    (void)iface_id;
     tak_bertanda32_t i;
 
     for (i = 0; i < DHCP_CLIENT_MAKS; i++) {

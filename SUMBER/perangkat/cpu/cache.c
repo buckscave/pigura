@@ -137,6 +137,7 @@ status_t cache_enable(tak_bertanda32_t level)
 
 status_t cache_disable(tak_bertanda32_t level)
 {
+    (void)level;
     if (!g_cache_initialized) {
         return STATUS_GAGAL;
     }
@@ -162,6 +163,7 @@ status_t cache_disable(tak_bertanda32_t level)
 
 status_t cache_flush(tak_bertanda32_t level)
 {
+    (void)level;
     if (!g_cache_initialized) {
         return STATUS_GAGAL;
     }
@@ -176,6 +178,7 @@ status_t cache_flush(tak_bertanda32_t level)
 
 status_t cache_invalidate(tak_bertanda32_t level)
 {
+    (void)level;
     if (!g_cache_initialized) {
         return STATUS_GAGAL;
     }
@@ -190,6 +193,7 @@ status_t cache_invalidate(tak_bertanda32_t level)
 
 status_t cache_info(tak_bertanda32_t level, cache_controller_t *ctrl)
 {
+    (void)level;
     if (ctrl == NULL) {
         return STATUS_PARAM_NULL;
     }

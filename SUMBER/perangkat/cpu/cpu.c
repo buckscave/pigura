@@ -36,7 +36,7 @@ bool_t g_cpu_diinisialisasi = SALAH;
 static char g_cpu_error_msg[256];
 
 /* Flag untuk fitur yang sudah dideteksi */
-static bool_t g_fitur_dideteksi = SALAH;
+static bool_t g_fitur_dideteksi __attribute__((unused)) = SALAH;
 
 /*
  * ===========================================================================
@@ -1264,6 +1264,8 @@ status_t cpu_cache_flush(void *addr, ukuran_t ukuran)
 
 status_t cpu_cache_invalidate(void *addr, ukuran_t ukuran)
 {
+    (void)addr;
+    (void)ukuran;
     if (!g_cpu_diinisialisasi) {
         return STATUS_GAGAL;
     }

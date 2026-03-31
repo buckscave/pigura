@@ -17,6 +17,9 @@
 #include "jaringan.h"
 #include "../../inti/kernel.h"
 
+/* Forward declarations */
+extern status_t arp_proses(paket_t *paket);
+
 /*
  * ===========================================================================
  * KONSTANTA ETHERNET
@@ -47,7 +50,7 @@ static const alamat_mac_t g_mac_broadcast = {
 };
 
 /* Multicast MAC prefix */
-static const tak_bertanda8_t g_multicast_prefix = 0x01;
+static const tak_bertanda8_t g_multicast_prefix __attribute__((unused)) = 0x01;
 
 /*
  * ===========================================================================
@@ -249,7 +252,6 @@ static tak_bertanda32_t ethernet_calc_fcs(const tak_bertanda8_t *data,
     tak_bertanda32_t crc;
     tak_bertanda32_t i;
     tak_bertanda32_t j;
-    tak_bertanda8_t bit;
 
     if (data == NULL || len == 0) {
         return 0;

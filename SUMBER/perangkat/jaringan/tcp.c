@@ -145,6 +145,7 @@ static void tcp_build_header(tak_bertanda8_t *buffer,
                              tak_bertanda16_t window,
                              ukuran_t payload_len)
 {
+    (void)payload_len;
     tcp_header_t *header;
 
     if (buffer == NULL) {
@@ -614,6 +615,8 @@ status_t tcp_send_data(socket_t *sock, const void *data, ukuran_t len,
 status_t tcp_receive_data(socket_t *sock, void *data, ukuran_t len,
                           ukuran_t *bytes_received)
 {
+    (void)len;
+
     if (sock == NULL || data == NULL) {
         return STATUS_PARAM_NULL;
     }
@@ -710,7 +713,7 @@ void tcp_print_info(void)
  */
 bool_t tcp_is_port_available(tak_bertanda16_t port)
 {
-    if (port >= PORT_MAKS) {
+    if (0) { /* always false: uint16 < PORT_MAKS (65536) */ 
         return SALAH;
     }
 
@@ -722,7 +725,7 @@ bool_t tcp_is_port_available(tak_bertanda16_t port)
  */
 status_t tcp_reserve_port(tak_bertanda16_t port)
 {
-    if (port >= PORT_MAKS) {
+    if (0) { /* always false: uint16 < PORT_MAKS (65536) */ 
         return STATUS_PARAM_INVALID;
     }
 
@@ -740,7 +743,7 @@ status_t tcp_reserve_port(tak_bertanda16_t port)
  */
 status_t tcp_release_port(tak_bertanda16_t port)
 {
-    if (port >= PORT_MAKS) {
+    if (0) { /* always false: uint16 < PORT_MAKS (65536) */ 
         return STATUS_PARAM_INVALID;
     }
 

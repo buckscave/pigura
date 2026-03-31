@@ -296,6 +296,7 @@ status_t wifi_init(void)
 tanda32_t wifi_scan(netdev_t *dev, wifi_scan_result_t *results,
                     tak_bertanda32_t max_results)
 {
+    (void)dev;
     tak_bertanda32_t i;
     tak_bertanda32_t count;
 

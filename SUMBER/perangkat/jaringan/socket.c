@@ -323,6 +323,7 @@ status_t socket_tutup(tak_bertanda32_t sockfd)
 status_t socket_ikat(tak_bertanda32_t sockfd, const sockaddr_t *addr,
                      ukuran_t addrlen)
 {
+    (void)addrlen;
     socket_t *sock;
 
     sock = socket_cari(sockfd);
@@ -345,6 +346,7 @@ status_t socket_ikat(tak_bertanda32_t sockfd, const sockaddr_t *addr,
  */
 status_t socket_dengar(tak_bertanda32_t sockfd, tak_bertanda32_t backlog)
 {
+    (void)backlog;
     socket_t *sock;
     tak_bertanda32_t i;
 
@@ -380,7 +382,6 @@ tanda32_t socket_terima(tak_bertanda32_t sockfd, sockaddr_t *addr,
     socket_t *new_sock;
     tak_bertanda32_t i;
     tanda32_t new_id;
-    status_t hasil;
 
     sock = socket_cari(sockfd);
     if (!socket_validasi(sock)) {
@@ -442,8 +443,8 @@ tanda32_t socket_terima(tak_bertanda32_t sockfd, sockaddr_t *addr,
 status_t socket_hubung(tak_bertanda32_t sockfd, const sockaddr_t *addr,
                        ukuran_t addrlen)
 {
+    (void)addrlen;
     socket_t *sock;
-    sockaddr_in_t *addr_in;
     status_t hasil;
 
     sock = socket_cari(sockfd);
@@ -484,9 +485,9 @@ status_t socket_hubung(tak_bertanda32_t sockfd, const sockaddr_t *addr,
 tanda64_t socket_kirim(tak_bertanda32_t sockfd, const void *data,
                        ukuran_t len, tak_bertanda32_t flags)
 {
+    (void)flags;
     socket_t *sock;
     ukuran_t bytes_to_send;
-    ukuran_t bytes_sent;
 
     sock = socket_cari(sockfd);
     if (!socket_validasi(sock)) {
@@ -531,6 +532,7 @@ tanda64_t socket_kirim(tak_bertanda32_t sockfd, const void *data,
 tanda64_t socket_terima_data(tak_bertanda32_t sockfd, void *data,
                              ukuran_t len, tak_bertanda32_t flags)
 {
+    (void)flags;
     socket_t *sock;
     ukuran_t bytes_to_read;
 
@@ -581,6 +583,8 @@ tanda64_t socket_kirim_ke(tak_bertanda32_t sockfd, const void *data,
                           ukuran_t len, tak_bertanda32_t flags,
                           const sockaddr_t *dest_addr, ukuran_t addrlen)
 {
+    (void)dest_addr;
+    (void)addrlen;
     socket_t *sock;
 
     sock = socket_cari(sockfd);

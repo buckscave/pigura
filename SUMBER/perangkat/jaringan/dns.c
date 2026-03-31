@@ -17,6 +17,11 @@
 #include "jaringan.h"
 #include "../../inti/kernel.h"
 
+/* Forward declaration */
+extern status_t udp_send(tak_bertanda16_t src_port, tak_bertanda32_t dest_ip,
+                          tak_bertanda16_t dest_port, const void *data,
+                          ukuran_t len);
+
 /*
  * ===========================================================================
  * KONSTANTA DNS
@@ -267,8 +272,6 @@ static ukuran_t dns_build_query(tak_bertanda8_t *buffer, ukuran_t maxlen,
     dns_header_t *header;
     ukuran_t name_len;
     ukuran_t pos;
-    tak_bertanda8_t *qtype;
-    tak_bertanda8_t *qclass;
 
     if (buffer == NULL || hostname == NULL || maxlen < DNS_HEADER_SIZE + 6) {
         return 0;

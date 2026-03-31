@@ -10,6 +10,9 @@
 #include "jaringan.h"
 #include "../../inti/kernel.h"
 
+/* Forward declaration - defined at line ~1005 */
+extern status_t arp_proses(paket_t *paket);
+
 /*
  * ===========================================================================
  * VARIABEL GLOBAL
@@ -550,7 +553,6 @@ status_t netdev_terima(netdev_t *dev, void *data, ukuran_t *len)
 tak_bertanda32_t ipv4_ke_string(alamat_ipv4_t *addr, char *buffer,
                                   ukuran_t len)
 {
-    tak_bertanda32_t n;
     char temp[4];
     ukuran_t pos;
     tak_bertanda32_t i;
@@ -795,6 +797,7 @@ static netdev_t *g_loopback_dev = NULL;
 
 static status_t loopback_kirim(netdev_t *dev, const void *data, ukuran_t len)
 {
+    (void)dev; (void)data; (void)len;
     /* Loopback: kirim ke diri sendiri */
     /* Untuk implementasi lengkap, perlu queue RX */
     return STATUS_BERHASIL;
@@ -939,6 +942,7 @@ status_t arp_init(void)
 
 status_t arp_cari(netdev_t *dev, alamat_ipv4_t *ip, alamat_mac_t *mac)
 {
+    (void)dev;
     tak_bertanda32_t i;
     
     if (ip == NULL || mac == NULL) {
@@ -962,6 +966,7 @@ status_t arp_cari(netdev_t *dev, alamat_ipv4_t *ip, alamat_mac_t *mac)
 
 status_t arp_tambah(netdev_t *dev, alamat_ipv4_t *ip, alamat_mac_t *mac)
 {
+    (void)dev;
     tak_bertanda32_t index;
     
     if (ip == NULL || mac == NULL) {
@@ -983,6 +988,7 @@ status_t arp_tambah(netdev_t *dev, alamat_ipv4_t *ip, alamat_mac_t *mac)
 
 status_t arp_hapus(netdev_t *dev, alamat_ipv4_t *ip)
 {
+    (void)dev;
     tak_bertanda32_t i;
     
     if (ip == NULL) {
@@ -1032,14 +1038,14 @@ status_t arp_proses(paket_t *paket)
  */
 
 status_t tcp_init(void) { return STATUS_BERHASIL; }
-status_t tcp_proses(paket_t *paket) { return STATUS_BERHASIL; }
-status_t tcp_kirim_syn(socket_t *sock) { return STATUS_BERHASIL; }
-status_t tcp_kirim_ack(socket_t *sock) { return STATUS_BERHASIL; }
-status_t tcp_kirim_fin(socket_t *sock) { return STATUS_BERHASIL; }
-status_t tcp_kirim_rst(socket_t *sock) { return STATUS_BERHASIL; }
+status_t tcp_proses(paket_t *paket) { (void)paket; return STATUS_BERHASIL; }
+status_t tcp_kirim_syn(socket_t *sock) { (void)sock; return STATUS_BERHASIL; }
+status_t tcp_kirim_ack(socket_t *sock) { (void)sock; return STATUS_BERHASIL; }
+status_t tcp_kirim_fin(socket_t *sock) { (void)sock; return STATUS_BERHASIL; }
+status_t tcp_kirim_rst(socket_t *sock) { (void)sock; return STATUS_BERHASIL; }
 
 status_t udp_init(void) { return STATUS_BERHASIL; }
-status_t udp_proses(paket_t *paket) { return STATUS_BERHASIL; }
+status_t udp_proses(paket_t *paket) { (void)paket; return STATUS_BERHASIL; }
 
 status_t dns_init(void) { return STATUS_BERHASIL; }
 status_t dns_resolve(const char *hostname, alamat_ipv4_t *ipv4)
@@ -1061,11 +1067,13 @@ status_t dns_set_server(tak_bertanda32_t index, alamat_ipv4_t *server)
 status_t dhcp_init(void) { return STATUS_BERHASIL; }
 status_t dhcp_request(netdev_t *dev, dhcp_config_t *config)
 {
+    (void)dev; (void)config;
     return STATUS_TIDAK_DUKUNG;
 }
-status_t dhcp_release(netdev_t *dev) { return STATUS_BERHASIL; }
+status_t dhcp_release(netdev_t *dev) { (void)dev; return STATUS_BERHASIL; }
 status_t dhcp_renew(netdev_t *dev, dhcp_config_t *config)
 {
+    (void)dev; (void)config;
     return STATUS_TIDAK_DUKUNG;
 }
 
@@ -1073,15 +1081,18 @@ status_t wifi_init(void) { return STATUS_BERHASIL; }
 tanda32_t wifi_scan(netdev_t *dev, wifi_scan_result_t *results,
                      tak_bertanda32_t max_results)
 {
+    (void)dev; (void)results; (void)max_results;
     return 0;
 }
 status_t wifi_connect(netdev_t *dev, wifi_config_t *config)
 {
+    (void)dev; (void)config;
     return STATUS_TIDAK_DUKUNG;
 }
-status_t wifi_disconnect(netdev_t *dev) { return STATUS_BERHASIL; }
+status_t wifi_disconnect(netdev_t *dev) { (void)dev; return STATUS_BERHASIL; }
 status_t wifi_status(netdev_t *dev, wifi_status_t *status)
 {
+    (void)dev; (void)status;
     return STATUS_TIDAK_DUKUNG;
 }
 
@@ -1094,45 +1105,53 @@ status_t wifi_status(netdev_t *dev, wifi_status_t *status)
 tanda32_t socket_buat(tak_bertanda32_t domain, tak_bertanda32_t tipe,
                        tak_bertanda32_t protocol)
 {
+    (void)domain; (void)tipe; (void)protocol;
     return -1;
 }
 
 status_t socket_tutup(tak_bertanda32_t sockfd)
 {
+    (void)sockfd;
     return STATUS_TIDAK_DUKUNG;
 }
 
 status_t socket_ikat(tak_bertanda32_t sockfd, const sockaddr_t *addr,
                       ukuran_t addrlen)
 {
+    (void)sockfd; (void)addr; (void)addrlen;
     return STATUS_TIDAK_DUKUNG;
 }
 
 status_t socket_dengar(tak_bertanda32_t sockfd, tak_bertanda32_t backlog)
 {
+    (void)sockfd; (void)backlog;
     return STATUS_TIDAK_DUKUNG;
 }
 
 tanda32_t socket_terima(tak_bertanda32_t sockfd, sockaddr_t *addr,
                          ukuran_t *addrlen)
 {
+    (void)sockfd; (void)addr; (void)addrlen;
     return -1;
 }
 
 status_t socket_hubung(tak_bertanda32_t sockfd, const sockaddr_t *addr,
                         ukuran_t addrlen)
 {
+    (void)sockfd; (void)addr; (void)addrlen;
     return STATUS_TIDAK_DUKUNG;
 }
 
 tanda64_t socket_kirim(tak_bertanda32_t sockfd, const void *data,
                         ukuran_t len, tak_bertanda32_t flags)
 {
+    (void)sockfd; (void)data; (void)len; (void)flags;
     return -1;
 }
 
 tanda64_t socket_terima_data(tak_bertanda32_t sockfd, void *data,
                               ukuran_t len, tak_bertanda32_t flags)
 {
+    (void)sockfd; (void)data; (void)len; (void)flags;
     return -1;
 }

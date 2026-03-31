@@ -157,7 +157,6 @@ netdev_t *netdev_register(const char *nama, tak_bertanda32_t tipe)
 {
     netdev_t *dev;
     ukuran_t nama_len;
-    ukuran_t i;
 
     if (nama == NULL) {
         return NULL;

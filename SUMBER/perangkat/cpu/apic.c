@@ -204,8 +204,8 @@ status_t cpu_apic_init(void)
     cpu_msr_baca(apic_base_msr, &apic_base_low, &apic_base_high);
     
     /* Ekstrak base address */
-    g_apic_base = ((alamat_virtual_t)apic_base_high << 32) |
-                  (apic_base_low & 0xFFFFF000UL);
+    g_apic_base = (alamat_virtual_t)(((tak_bertanda64_t)apic_base_high << 32) |
+                  (tak_bertanda64_t)(apic_base_low & 0xFFFFF000UL));
     
     /* Jika tidak ada base, gunakan default */
     if (g_apic_base == 0) {

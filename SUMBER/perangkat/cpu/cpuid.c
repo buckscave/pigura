@@ -78,7 +78,7 @@ static void cpuid_execute(tak_bertanda32_t leaf,
  */
 status_t cpuid_init(void)
 {
-    tak_bertanda32_t eax, ebx, ecx, edx;
+    tak_bertanda32_t ebx, ecx, edx;
     
     if (g_cpuid_initialized) {
         return STATUS_SUDAH_ADA;

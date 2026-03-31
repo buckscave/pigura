@@ -131,7 +131,7 @@ status_t dma_init(void)
     g_dma_konteks.controllers[0].enabled = BENAR;
     
     /* Reset ISA DMA controller */
-    isa_dma_init();
+    /* isa_dma_init(); TODO: implement */
     
     /* Finalisasi */
     g_dma_konteks.magic = DMA_MAGIC;
@@ -212,8 +212,6 @@ dma_channel_t *dma_channel_alokasi(tak_bertanda32_t tipe, tanda32_t nomor)
 {
     dma_channel_t *channel;
     tak_bertanda32_t i;
-    tak_bertanda32_t start;
-    tak_bertanda32_t end;
     
     if (!g_dma_diinisialisasi) {
         return NULL;
@@ -337,6 +335,9 @@ status_t dma_channel_set_callback(dma_channel_t *channel,
 status_t dma_transfer_mem(alamat_fisik_t src, alamat_fisik_t dst,
                            ukuran_t size)
 {
+    (void)src;
+    (void)dst;
+    (void)size;
     /* DMA memory-to-memory memerlukan controller khusus */
     return STATUS_TIDAK_DUKUNG;
 }
@@ -475,13 +476,17 @@ status_t dma_transfer_from_device(dma_channel_t *channel,
 status_t dma_transfer_async(dma_channel_t *channel, alamat_fisik_t src,
                              alamat_fisik_t dst, ukuran_t size)
 {
+    (void)channel;
+    (void)src;
+    (void)dst;
+    (void)size;
     return STATUS_TIDAK_DUKUNG;
 }
 
 status_t dma_transfer_wait(dma_channel_t *channel,
                             tak_bertanda32_t timeout_ms)
 {
-    tak_bertanda64_t start;
+    (void)timeout_ms;
     
     if (channel == NULL || channel->magic != DMA_CHANNEL_MAGIC) {
         return STATUS_PARAM_INVALID;
@@ -547,7 +552,7 @@ void dma_buffer_bebaskan(void *buffer)
 alamat_fisik_t dma_buffer_phys(void *buffer)
 {
     /* Perlu implementasi virtual to physical mapping */
-    return (alamat_fisik_t)(tak_bertanda64_t)buffer;
+    return (alamat_fisik_t)(uintptr_t)buffer;
 }
 
 /*
@@ -558,11 +563,13 @@ alamat_fisik_t dma_buffer_phys(void *buffer)
 
 status_t dma_bus_master_init(void *dev)
 {
+    (void)dev;
     return STATUS_TIDAK_DUKUNG;
 }
 
 status_t dma_bus_master_enable(void *dev)
 {
+    (void)dev;
     return STATUS_TIDAK_DUKUNG;
 }
 

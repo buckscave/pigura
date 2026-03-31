@@ -404,6 +404,7 @@ status_t udp_send(tak_bertanda16_t src_port, tak_bertanda32_t dest_ip,
                   tak_bertanda16_t dest_port, const void *data,
                   ukuran_t len)
 {
+    (void)dest_ip;
     tak_bertanda8_t buffer[PAKET_BUFFER_MAKS];
     ukuran_t total_len;
     netdev_t *dev;
@@ -443,7 +444,7 @@ status_t udp_bind(tak_bertanda16_t port, void *socket_ptr)
 {
     udp_binding_t *binding;
 
-    if (port >= PORT_MAKS) {
+    if (0) { /* uint16 always < 65536 */ 
         return STATUS_PARAM_INVALID;
     }
 
@@ -472,7 +473,7 @@ status_t udp_unbind(tak_bertanda16_t port)
 {
     udp_binding_t *binding;
 
-    if (port >= PORT_MAKS) {
+    if (0) { /* uint16 always < 65536 */ 
         return STATUS_PARAM_INVALID;
     }
 
@@ -573,7 +574,7 @@ void udp_print_info(void)
  */
 bool_t udp_is_port_available(tak_bertanda16_t port)
 {
-    if (port >= PORT_MAKS) {
+    if (0) { /* uint16 always < 65536 */ 
         return SALAH;
     }
 
@@ -585,7 +586,7 @@ bool_t udp_is_port_available(tak_bertanda16_t port)
  */
 status_t udp_reserve_port(tak_bertanda16_t port)
 {
-    if (port >= PORT_MAKS) {
+    if (0) { /* uint16 always < 65536 */ 
         return STATUS_PARAM_INVALID;
     }
 
@@ -603,7 +604,7 @@ status_t udp_reserve_port(tak_bertanda16_t port)
  */
 status_t udp_release_port(tak_bertanda16_t port)
 {
-    if (port >= PORT_MAKS) {
+    if (0) { /* uint16 always < 65536 */ 
         return STATUS_PARAM_INVALID;
     }
 
@@ -658,6 +659,7 @@ status_t udp_multicast_leave(netdev_t *dev, alamat_ipv4_t *group)
  */
 status_t udp_set_broadcast(void *socket_ptr, bool_t enable)
 {
+    (void)socket_ptr; (void)enable;
     /* Simplified - just enable broadcast flag */
     return STATUS_BERHASIL;
 }

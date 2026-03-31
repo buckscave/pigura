@@ -101,7 +101,7 @@ static const struct {
     tak_bertanda16_t mode_port;
     tak_bertanda16_t mask_port;
     tak_bertanda16_t clear_ff_port;
-} g_dma_chan_config[8] = {
+} g_dma_chan_config[8] __attribute__((unused)) = {
     /* Channel 0 */
     { DMA_REG_CHAN0_ADDR, DMA_REG_CHAN0_COUNT, DMA_PAGE_CHAN0,
       DMA_REG_MODE0, DMA_REG_MASK0, DMA_REG_FF0 },

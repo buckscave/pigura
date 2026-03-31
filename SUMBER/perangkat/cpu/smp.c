@@ -85,6 +85,7 @@ status_t cpu_smp_boot(tak_bertanda32_t cpu_id)
 
 status_t cpu_smp_broadcast(tak_bertanda32_t vector)
 {
+    (void)vector;
     return STATUS_TIDAK_DUKUNG;
 }
 
