@@ -332,7 +332,7 @@ status_t ntfs_boot_baca(void *device, ntfs_boot_sector_t *boot)
 status_t ntfs_boot_validasi(ntfs_boot_sector_t *boot)
 {
     status_t status;
-    tak_bertanda32_t cluster_size;
+    tak_bertanda32_t     __attribute__((unused)) cluster_size;
 
     if (boot == NULL) {
         return STATUS_PARAM_NULL;
@@ -381,7 +381,7 @@ status_t ntfs_boot_validasi(ntfs_boot_sector_t *boot)
  */
 status_t ntfs_boot_parse(ntfs_boot_sector_t *boot, ntfs_params_t *params)
 {
-    tak_bertanda32_t cluster_size;
+    tak_bertanda32_t     __attribute__((unused)) cluster_size;
 
     if (boot == NULL || params == NULL) {
         return STATUS_PARAM_NULL;

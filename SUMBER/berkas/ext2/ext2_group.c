@@ -25,6 +25,7 @@
 #include "../vfs/vfs.h"
 #include "../../inti/types.h"
 #include "../../inti/konstanta.h"
+#include <string.h>
 
 /*
  * ===========================================================================
@@ -208,10 +209,11 @@ tak_bertanda32_t ext2_group_get_desc_per_block(tak_bertanda32_t block_size)
  * Inisialisasi group descriptor dengan nilai default.
  */
 status_t ext2_group_desc_init(ext2_group_desc_t *gd,
-    tak_bertanda32_t group_num, tak_bertanda32_t block_size,
+    tak_bertanda32_t group_num, tak_bertanda32_t __attribute__((unused)) block_size,
     tak_bertanda32_t blocks_per_group, tak_bertanda32_t inodes_per_group,
     tak_bertanda32_t first_data_block)
 {
+    (void)block_size;
     tak_bertanda32_t group_start_block;
 
     if (gd == NULL) {
@@ -292,6 +294,8 @@ status_t ext2_group_baca_desc(void *device, tak_bertanda32_t group_num,
     char block_buffer[EXT2_DEF_BLOCK_SIZE];
     char *desc_ptr;
     tak_bertanda32_t i;
+
+    memset(block_buffer, 0, sizeof(block_buffer));
 
     if (device == NULL || gd == NULL) {
         return STATUS_PARAM_NULL;

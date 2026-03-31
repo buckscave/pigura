@@ -180,7 +180,7 @@ tak_bertanda32_t fat32_byte_to_cluster(fat32_sb_t *sb,
                                         tak_bertanda64_t offset)
 {
     tak_bertanda32_t cluster_offset;
-    tak_bertanda32_t cluster_index;
+    tak_bertanda32_t __attribute__((unused)) cluster_index;
     
     if (sb == NULL || first_cluster < FAT32_FIRST_CLUSTER) {
         return 0;

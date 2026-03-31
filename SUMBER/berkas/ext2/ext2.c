@@ -301,9 +301,6 @@ static status_t ext2_tulis_inode(superblock_t *sb, ino_t ino,
 
 /* VFS operations */
 static vfs_super_operations_t ext2_super_ops;
-static vfs_inode_operations_t ext2_inode_ops;
-static vfs_file_operations_t ext2_file_ops;
-static vfs_dentry_operations_t ext2_dentry_ops;
 
 /*
  * ===========================================================================
@@ -1073,7 +1070,7 @@ static vfs_super_operations_t ext2_super_ops = {
 };
 
 /* Placeholder untuk inode dan file operations */
-static vfs_inode_operations_t ext2_inode_ops = {
+static vfs_inode_operations_t __attribute__((unused)) ext2_inode_ops = {
     NULL, /* lookup */
     NULL, /* create */
     NULL, /* mkdir */
@@ -1087,7 +1084,7 @@ static vfs_inode_operations_t ext2_inode_ops = {
     NULL  /* setattr */
 };
 
-static vfs_file_operations_t ext2_file_ops = {
+static vfs_file_operations_t __attribute__((unused)) ext2_file_ops = {
     NULL, /* read */
     NULL, /* write */
     NULL, /* lseek */
@@ -1100,7 +1097,7 @@ static vfs_file_operations_t ext2_file_ops = {
     NULL  /* mmap */
 };
 
-static vfs_dentry_operations_t ext2_dentry_ops = {
+static vfs_dentry_operations_t __attribute__((unused)) ext2_dentry_ops = {
     NULL, /* d_revalidate */
     NULL, /* d_hash */
     NULL, /* d_compare */

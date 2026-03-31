@@ -338,7 +338,7 @@ tak_bertanda32_t ext2_bitmap_count_set(tak_bertanda8_t *bitmap,
 {
     tak_bertanda32_t count;
     tak_bertanda32_t i;
-    tak_bertanda8_t byte_val;
+    tak_bertanda8_t __attribute__((unused)) byte_val;
 
     if (bitmap == NULL || size_bits == 0) {
         return 0;

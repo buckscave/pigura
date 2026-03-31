@@ -258,10 +258,11 @@ static status_t pfs_journal_tulis_header(pfs_journal_t *journal)
 }
 
 static status_t pfs_journal_baca_entry(pfs_journal_t *journal,
-                                       tak_bertanda32_t block,
+                                       tak_bertanda32_t __attribute__((unused)) block,
                                        pfs_journal_entry_t *entry,
                                        void *buffer)
 {
+    (void)block;
     if (journal == NULL || entry == NULL) {
         return STATUS_PARAM_NULL;
     }
@@ -277,10 +278,11 @@ static status_t pfs_journal_baca_entry(pfs_journal_t *journal,
 }
 
 static status_t pfs_journal_tulis_entry(pfs_journal_t *journal,
-                                        tak_bertanda32_t block,
+                                        tak_bertanda32_t __attribute__((unused)) block,
                                         const pfs_journal_entry_t *entry,
-                                        const void *buffer)
+                                        const void * __attribute__((unused)) buffer)
 {
+    (void)block; (void)buffer;
     if (journal == NULL || entry == NULL) {
         return STATUS_PARAM_NULL;
     }

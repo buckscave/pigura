@@ -245,7 +245,7 @@ static status_t ext2_dir_entry_validasi(ext2_dir_entry_t *entry,
     }
 
     /* Cek name_len */
-    if (entry->name_len > EXT2_NAME_LEN_MAX) {
+    if (entry->name_len >= EXT2_NAME_LEN_MAX) {
         return STATUS_FS_CORRUPT;
     }
 
@@ -267,10 +267,11 @@ static status_t ext2_dir_entry_validasi(ext2_dir_entry_t *entry,
  * ext2_dir_baca_entry
  * Membaca satu directory entry dari posisi tertentu.
  */
-status_t ext2_dir_baca_entry(void *dir_data, tak_bertanda32_t block_num,
+status_t ext2_dir_baca_entry(void *dir_data, tak_bertanda32_t __attribute__((unused)) block_num,
     tak_bertanda32_t offset, ext2_dir_entry_t *entry,
     tak_bertanda32_t block_size)
 {
+    (void)block_num;
     char *block_ptr;
     char *entry_ptr;
     tak_bertanda32_t i;

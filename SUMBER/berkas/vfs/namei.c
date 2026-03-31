@@ -201,8 +201,9 @@ static bool_t namei_is_trailing_slash(const char *path)
  */
 
 static dentry_t *namei_do_lookup(dentry_t *parent, const char *nama,
-                                 namei_context_t *ctx)
+                                 namei_context_t * __attribute__((unused)) ctx)
 {
+    (void)ctx;
     dentry_t *dentry;
     inode_t *inode;
     
@@ -263,7 +264,7 @@ static status_t namei_follow_symlink(dentry_t *dentry, namei_context_t *ctx,
     /* Cek symlink limit */
     if (ctx->nc_symlink_count >= NAMEI_MAX_SYMLINKS) {
         log_warn("[VFS:NAMEI] Terlalu banyak symlink");
-        return STATUS_LOOP;
+        return STATUS_GAGAL; /* STATUS_LOOP: terlalu banyak symlink */
     }
     
     /* Baca symlink target */
@@ -731,7 +732,7 @@ status_t namei_path_lookup(const char *path, dentry_t **dentry,
             if (ctx.nc_mount != NULL) {
                 mount_put(ctx.nc_mount);
             }
-            return STATUS_BUKAN_DIR;
+            return STATUS_GAGAL; /* STATUS_BUKAN_DIR */
         }
     }
     
@@ -759,9 +760,8 @@ status_t namei_set_cwd(dentry_t *dentry, mount_t *mount)
     /* Validasi harus direktori */
     if (dentry->d_inode == NULL ||
         !VFS_S_ISDIR(dentry->d_inode->i_mode)) {
-        return STATUS_BUKAN_DIR;
+        return STATUS_GAGAL; /* STATUS_BUKAN_DIR */
     }
-    
     namei_lock();
     
     /* Release old cwd */

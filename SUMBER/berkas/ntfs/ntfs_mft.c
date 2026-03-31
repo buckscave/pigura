@@ -234,7 +234,7 @@ static status_t ntfs_mft_apply_fixups(void *record, tak_bertanda32_t size)
     ntfs_mft_header_t *header;
     tak_bertanda16_t *fixup_array;
     tak_bertanda16_t original_value;
-    tak_bertanda16_t sector_value;
+    tak_bertanda16_t __attribute__((unused)) sector_value;
     tak_bertanda32_t num_sectors;
     tak_bertanda32_t sector_size;
     tak_bertanda32_t i;
@@ -297,7 +297,7 @@ status_t ntfs_mft_baca_record(ntfs_mft_ctx_t *ctx, tak_bertanda64_t ino,
     void *buffer)
 {
     tak_bertanda64_t cluster;
-    tak_bertanda64_t sector;
+    tak_bertanda64_t __attribute__((unused)) sector;
     tak_bertanda64_t byte_offset;
     tak_bertanda32_t records_per_cluster;
     tak_bertanda32_t record_in_cluster;
@@ -430,13 +430,14 @@ static status_t ntfs_mft_find_attr(void *record, tak_bertanda32_t type,
  * Mencari atribut dengan tipe dan nama tertentu.
  */
 status_t ntfs_mft_find_attr_by_name(void *record, tak_bertanda32_t type,
-    const char *nama, void **attr)
+    const char * __attribute__((unused)) nama, void **attr)
 {
+    (void)nama;
     ntfs_mft_header_t *header;
     ntfs_attr_header_t *attr_hdr;
     tak_bertanda32_t offset;
     tak_bertanda32_t record_size;
-    tak_bertanda32_t i;
+        tak_bertanda32_t __attribute__((unused)) i;
 
     if (record == NULL || attr == NULL) {
         return STATUS_PARAM_NULL;

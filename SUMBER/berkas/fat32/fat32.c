@@ -894,14 +894,16 @@ static void fat32_destroy_inode_vfs(struct inode *inode)
     fat32_free_inode((fat32_inode_t *)inode);
 }
 
-static status_t fat32_write_inode_vfs(struct inode *inode)
+static status_t fat32_write_inode_vfs(struct inode * __attribute__((unused)) inode)
 {
+    (void)inode;
     /* TODO: Implement write inode to disk */
     return STATUS_BERHASIL;
 }
 
-static status_t fat32_read_inode_vfs(struct inode *inode)
+static status_t fat32_read_inode_vfs(struct inode * __attribute__((unused)) inode)
 {
+    (void)inode;
     /* TODO: Implement read inode from disk */
     return STATUS_BERHASIL;
 }
@@ -997,28 +999,32 @@ static struct dentry *fat32_lookup_vfs(struct inode *dir, const char *name)
     return vfs_dentry;
 }
 
-static status_t fat32_create_vfs(struct inode *dir, struct dentry *dentry,
-                                  mode_t mode)
+static status_t fat32_create_vfs(struct inode * __attribute__((unused)) dir, struct dentry * __attribute__((unused)) dentry,
+                                  mode_t __attribute__((unused)) mode)
 {
+    (void)dir; (void)dentry; (void)mode;
     /* TODO: Implement create file */
     return STATUS_BELUM_IMPLEMENTASI;
 }
 
-static status_t fat32_mkdir_vfs(struct inode *dir, struct dentry *dentry,
-                                 mode_t mode)
+static status_t fat32_mkdir_vfs(struct inode * __attribute__((unused)) dir, struct dentry * __attribute__((unused)) dentry,
+                                 mode_t __attribute__((unused)) mode)
 {
+    (void)dir; (void)dentry; (void)mode;
     /* TODO: Implement mkdir */
     return STATUS_BELUM_IMPLEMENTASI;
 }
 
-static status_t fat32_rmdir_vfs(struct inode *dir, struct dentry *dentry)
+static status_t fat32_rmdir_vfs(struct inode * __attribute__((unused)) dir, struct dentry * __attribute__((unused)) dentry)
 {
+    (void)dir; (void)dentry;
     /* TODO: Implement rmdir */
     return STATUS_BELUM_IMPLEMENTASI;
 }
 
-static status_t fat32_unlink_vfs(struct inode *dir, struct dentry *dentry)
+static status_t fat32_unlink_vfs(struct inode * __attribute__((unused)) dir, struct dentry * __attribute__((unused)) dentry)
 {
+    (void)dir; (void)dentry;
     /* TODO: Implement unlink */
     return STATUS_BELUM_IMPLEMENTASI;
 }
@@ -1182,10 +1188,11 @@ static off_t fat32_lseek_vfs(struct file *file, off_t offset,
     return new_pos;
 }
 
-static tak_bertandas_t fat32_readdir_vfs(struct file *file,
-                                          struct vfs_dirent *dirent,
-                                          ukuran_t count)
+static tak_bertandas_t fat32_readdir_vfs(struct file * __attribute__((unused)) file,
+                                          struct vfs_dirent * __attribute__((unused)) dirent,
+                                          ukuran_t __attribute__((unused)) count)
 {
+    (void)file; (void)dirent; (void)count;
     /* TODO: Implement readdir */
     return (tak_bertandas_t)STATUS_BELUM_IMPLEMENTASI;
 }
@@ -1197,8 +1204,8 @@ static tak_bertandas_t fat32_readdir_vfs(struct file *file,
  */
 
 static struct superblock *fat32_mount_vfs(struct filesystem *fs,
-                                           const char *device,
-                                           const char *path,
+                                           const char * __attribute__((unused)) device,
+                                           const char * __attribute__((unused)) path,
                                            tak_bertanda32_t flags)
 {
     struct superblock *sb;
@@ -1207,6 +1214,7 @@ static struct superblock *fat32_mount_vfs(struct filesystem *fs,
     if (fs == NULL) {
         return NULL;
     }
+    (void)device; (void)path;
     
     fat32_lock();
     
@@ -1269,8 +1277,9 @@ static status_t fat32_umount_vfs(struct superblock *sb)
     return STATUS_BERHASIL;
 }
 
-static status_t fat32_detect_vfs(const char *device)
+static status_t fat32_detect_vfs(const char * __attribute__((unused)) device)
 {
+    (void)device;
     /* TODO: Implement FAT32 detection */
     return STATUS_BERHASIL;
 }
@@ -1281,7 +1290,7 @@ static status_t fat32_detect_vfs(const char *device)
  * ===========================================================================
  */
 
-static vfs_super_operations_t fat32_super_ops = {
+static vfs_super_operations_t __attribute__((unused)) fat32_super_ops = {
     .alloc_inode   = fat32_alloc_inode_vfs,
     .destroy_inode = fat32_destroy_inode_vfs,
     .write_inode   = fat32_write_inode_vfs,
@@ -1291,7 +1300,7 @@ static vfs_super_operations_t fat32_super_ops = {
     .statfs        = fat32_statfs_vfs,
 };
 
-static vfs_inode_operations_t fat32_inode_ops = {
+static vfs_inode_operations_t __attribute__((unused)) fat32_inode_ops = {
     .lookup   = fat32_lookup_vfs,
     .create   = fat32_create_vfs,
     .mkdir    = fat32_mkdir_vfs,
@@ -1300,7 +1309,7 @@ static vfs_inode_operations_t fat32_inode_ops = {
     .getattr  = fat32_getattr_vfs,
 };
 
-static vfs_file_operations_t fat32_file_ops = {
+static vfs_file_operations_t __attribute__((unused)) fat32_file_ops = {
     .read    = fat32_read_vfs,
     .write   = fat32_write_vfs,
     .lseek   = fat32_lseek_vfs,

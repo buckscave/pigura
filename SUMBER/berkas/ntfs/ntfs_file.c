@@ -344,7 +344,7 @@ static status_t ntfs_file_read_nonresident(ntfs_file_ctx_t *ctx,
         }
 
         /* Handle encrypted */
-        if (lcn == NTFS_LCN_ENCRYPTED) {
+        if (lcn == (tak_bertanda64_t)NTFS_LCN_ENCRYPTED) {
             return STATUS_AKSES_DITOLAK;
         }
 
@@ -710,8 +710,9 @@ status_t ntfs_file_close(ntfs_file_handle_t *handle)
  * VFS read callback.
  */
 tak_bertandas_t ntfs_vfs_read(struct file *file, void *buffer,
-    ukuran_t size, off_t *pos)
+    ukuran_t __attribute__((unused)) size, off_t __attribute__((unused)) pos)
 {
+    (void)size; (void)pos;
     if (file == NULL || buffer == NULL) {
         return (tak_bertandas_t)STATUS_PARAM_NULL;
     }
@@ -725,9 +726,10 @@ tak_bertandas_t ntfs_vfs_read(struct file *file, void *buffer,
  * ntfs_vfs_lseek
  * VFS lseek callback.
  */
-off_t ntfs_vfs_lseek(struct file *file, off_t offset,
-    tak_bertanda32_t whence)
+off_t ntfs_vfs_lseek(struct file *file, off_t __attribute__((unused)) offset,
+    tak_bertanda32_t __attribute__((unused)) whence)
 {
+    (void)offset; (void)whence;
     if (file == NULL) {
         return (off_t)STATUS_PARAM_NULL;
     }

@@ -19,6 +19,10 @@
 #include "../vfs/vfs.h"
 #include "../../inti/kernel.h"
 
+/* File ini berisi banyak stub TODO yang memiliki parameter tidak terpakai */
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Wunused-variable"
+
 /*
  * ===========================================================================
  * KONSTANTA INTERNAL (INTERNAL CONSTANTS)
@@ -231,7 +235,7 @@ static status_t initramfs_add_dentry(initramfs_inode_t *dir,
     }
     
     if (!VFS_S_ISDIR(dir->i_mode)) {
-        return STATUS_BUKAN_DIR;
+        return STATUS_GAGAL; /* STATUS_BUKAN_DIR */
     }
     
     dentry->d_parent = dir->i_children ? dir->i_children->d_parent : NULL;
@@ -534,7 +538,7 @@ static tak_bertandas_t initramfs_read_vfs(struct file *file,
     
     if (to_read > 0 && inode->i_data != NULL) {
         kernel_memcpy(buffer,
-                      (const void *)((uintptr_t)inode->i_data + *pos),
+                      (const void *)((uintptr_t)inode->i_data + (uintptr_t)*pos),
                       to_read);
         *pos += (off_t)to_read;
     }

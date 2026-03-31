@@ -120,9 +120,10 @@ static status_t pfs_file_map_block(pfs_file_info_t *fi,
  */
 
 static status_t pfs_file_baca_block(pfs_sb_info_t *sbi,
-                                    tak_bertanda32_t phys_block,
+                                    tak_bertanda32_t __attribute__((unused)) phys_block,
                                     void *buffer)
 {
+    (void)phys_block;
     if (sbi == NULL || buffer == NULL) {
         return STATUS_PARAM_NULL;
     }
@@ -133,9 +134,10 @@ static status_t pfs_file_baca_block(pfs_sb_info_t *sbi,
 }
 
 static status_t pfs_file_tulis_block(pfs_sb_info_t *sbi,
-                                     tak_bertanda32_t phys_block,
+                                     tak_bertanda32_t __attribute__((unused)) phys_block,
                                      const void *buffer)
 {
+    (void)phys_block;
     if (sbi == NULL || buffer == NULL) {
         return STATUS_PARAM_NULL;
     }
@@ -158,7 +160,7 @@ static status_t pfs_file_alloc_block(pfs_file_info_t *fi,
                                      tak_bertanda32_t *phys_block)
 {
     tak_bertanda32_t new_block;
-    status_t status;
+    status_t __attribute__((unused)) status;
 
     if (fi == NULL || ii == NULL || sbi == NULL || phys_block == NULL) {
         return STATUS_PARAM_NULL;

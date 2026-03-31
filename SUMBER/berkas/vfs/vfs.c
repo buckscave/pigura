@@ -19,6 +19,9 @@
 #include "../../inti/kernel.h"
 #include "../../inti/types.h"
 
+/* Forward declaration - defined in initramfs */
+extern char *kernel_strtok_r(char *str, const char *delim, char **saveptr);
+
 /*
  * ===========================================================================
  * VARIABEL GLOBAL VFS (VFS GLOBAL VARIABLES)
@@ -2225,7 +2228,7 @@ dentry_t *namei_lookup_parent(const char *path, char *nama,
 {
     char dir_path[VFS_PATH_MAKS + 1];
     dentry_t *parent;
-    const char *base;
+    const char * __attribute__((unused)) base;
     
     if (path == NULL || nama == NULL || nama_size == 0) {
         return NULL;
@@ -3132,7 +3135,7 @@ tak_bertandas_t vfs_readlink(const char *path, char *buffer,
         return (tak_bertandas_t)STATUS_TIDAK_DUKUNG;
     }
     
-    if (dentry->d_inode->i_op->readlink(dentry, buffer, size) == NULL) {
+    if (dentry->d_inode->i_op->readlink(dentry, buffer, size) != STATUS_BERHASIL) {
         dentry_put(dentry);
         return (tak_bertandas_t)STATUS_GAGAL;
     }

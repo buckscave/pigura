@@ -358,8 +358,8 @@ static status_t ntfs_index_cari_entry(ntfs_index_context_t *ctx,
 
         /* Iterasi entries */
         while (entry != NULL) {
-            char entry_name[256];
-            tak_bertanda32_t name_len;
+            char __attribute__((unused)) entry_name[256];
+                tak_bertanda32_t __attribute__((unused)) name_len;
 
             /* Get entry name */
             /* CATATAN: Parse filename dari entry */
@@ -479,9 +479,10 @@ status_t ntfs_index_iterator_init(ntfs_index_iterator_t *iter,
  * Mendapatkan entry berikutnya.
  */
 status_t ntfs_index_iterator_next(ntfs_index_iterator_t *iter,
-    tak_bertanda64_t *inode, char *nama, tak_bertanda32_t *nama_len)
+    tak_bertanda64_t *inode, char * __attribute__((unused)) nama, tak_bertanda32_t * __attribute__((unused)) nama_len)
 {
-    ntfs_index_entry_t *next;
+    (void)nama; (void)nama_len;
+    ntfs_index_entry_t *next = NULL;
     status_t status;
 
     if (iter == NULL) {

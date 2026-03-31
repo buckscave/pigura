@@ -182,7 +182,7 @@ static status_t pfs_dir_parse_entry(const tak_bertanda8_t *buffer,
     entry->d_file_type = buffer[7];
 
     /* Copy nama */
-    if (entry->d_nama_len > 0 && entry->d_nama_len <= PFS_NAMA_MAKS) {
+    if (entry->d_nama_len > 0 && entry->d_nama_len < PFS_NAMA_MAKS) {
         kernel_memcpy(entry->d_nama, buffer + 8, entry->d_nama_len);
         entry->d_nama[entry->d_nama_len] = '\0';
     } else {
@@ -224,9 +224,10 @@ static status_t pfs_dir_write_entry(tak_bertanda8_t *buffer,
  */
 
 static status_t pfs_dir_baca_block(pfs_dir_ctx_t *ctx,
-                                   tak_bertanda32_t block,
+                                   tak_bertanda32_t __attribute__((unused)) block,
                                    void *buffer)
 {
+    (void)block;
     if (ctx == NULL || buffer == NULL) {
         return STATUS_PARAM_NULL;
     }
@@ -237,9 +238,10 @@ static status_t pfs_dir_baca_block(pfs_dir_ctx_t *ctx,
 }
 
 static status_t pfs_dir_tulis_block(pfs_dir_ctx_t *ctx,
-                                    tak_bertanda32_t block,
+                                    tak_bertanda32_t __attribute__((unused)) block,
                                     const void *buffer)
 {
+    (void)block;
     if (ctx == NULL || buffer == NULL) {
         return STATUS_PARAM_NULL;
     }

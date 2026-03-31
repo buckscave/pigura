@@ -265,7 +265,7 @@ static status_t extract_mkdir_recursive(const char *path)
                 /* Buat direktori baru */
                 initramfs_create_directory(curr_path, 0755, 0, 0);
             } else if (!VFS_S_ISDIR(inode->i_mode)) {
-                return STATUS_BUKAN_DIR;
+                return STATUS_GAGAL /* STATUS_BUKAN_DIR */;
             }
         }
         
@@ -438,8 +438,9 @@ static status_t extract_device(cpio_entry_t *cpio_entry,
     return STATUS_BERHASIL;
 }
 
-static status_t extract_pipe(cpio_entry_t *cpio_entry, const char *path)
+static status_t extract_pipe(cpio_entry_t * __attribute__((unused)) cpio_entry, const char *path)
 {
+    (void)cpio_entry;
     /* Named pipes tidak di-support untuk initramfs */
     log_warn("[INITRAMFS] Named pipe %s not supported, skipping", path);
     
@@ -448,8 +449,9 @@ static status_t extract_pipe(cpio_entry_t *cpio_entry, const char *path)
     return STATUS_BERHASIL;
 }
 
-static status_t extract_socket(cpio_entry_t *cpio_entry, const char *path)
+static status_t extract_socket(cpio_entry_t * __attribute__((unused)) cpio_entry, const char *path)
 {
+    (void)cpio_entry;
     /* Unix sockets tidak di-support untuk initramfs */
     log_warn("[INITRAMFS] Unix socket %s not supported, skipping", path);
     
@@ -527,7 +529,7 @@ status_t initramfs_extract(const void *buffer, ukuran_t size)
     cpio_entry_t *curr;
     tak_bertanda32_t count;
     status_t ret;
-    tak_bertanda32_t i;
+        tak_bertanda32_t __attribute__((unused)) i;
     
     if (buffer == NULL || size == 0) {
         return STATUS_PARAM_NULL;
@@ -746,8 +748,8 @@ bool_t initramfs_validate_cpio(const void *buffer, ukuran_t size)
 
 bool_t initramfs_is_loaded(void)
 {
-    return (g_extract_initialized && 
-            g_extract_stats.es_files > 0 ||
+    return ((g_extract_initialized && 
+            g_extract_stats.es_files > 0) ||
             g_extract_stats.es_directories > 0) ? BENAR : SALAH;
 }
 
@@ -947,7 +949,7 @@ status_t initramfs_list_directory(const char *path,
     
     dir_inode = dentry->d_inode;
     if (dir_inode == NULL || !VFS_S_ISDIR(dir_inode->i_mode)) {
-        return STATUS_BUKAN_DIR;
+        return STATUS_GAGAL /* STATUS_BUKAN_DIR */;
     }
     
     curr = dir_inode->i_children;

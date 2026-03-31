@@ -234,7 +234,7 @@ status_t ntfs_dir_get_next_entry(ntfs_index_entry_t *current,
     next_ptr = (char *)current + current->ie_length;
 
     /* Validasi buffer boundary */
-    if ((next_ptr - (char *)current) > buffer_size) {
+    if ((tak_bertanda32_t)(next_ptr - (char *)current) > buffer_size) {
         *next = NULL;
         return STATUS_FS_CORRUPT;
     }
@@ -357,8 +357,9 @@ tak_bertanda64_t ntfs_dir_get_entry_inode(ntfs_index_entry_t *entry)
  * Mendapatkan nama file dari entry.
  */
 status_t ntfs_dir_get_entry_name(ntfs_index_entry_t *entry,
-    char *buffer, tak_bertanda32_t buffer_size)
+    char *buffer, tak_bertanda32_t __attribute__((unused)) buffer_size)
 {
+    (void)buffer_size;
     tak_bertanda32_t name_len;
 
     if (entry == NULL || buffer == NULL) {
@@ -605,9 +606,9 @@ status_t ntfs_dir_find_entry(void *record, const char *name,
  */
 status_t ntfs_dir_lookup(inode_t *dir, const char *name, inode_t **result)
 {
-    void *record;
-    tak_bertanda64_t inode_num;
-    status_t status;
+    void * __attribute__((unused)) record;
+    tak_bertanda64_t __attribute__((unused)) inode_num;
+    status_t __attribute__((unused)) status;
 
     if (dir == NULL || name == NULL || result == NULL) {
         return STATUS_PARAM_NULL;

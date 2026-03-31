@@ -206,7 +206,7 @@ static status_t ntfs_decompress_lznt1(tak_bertanda8_t *input,
         /* Process 8 tokens */
         for (i = 0; i < 8 && in_pos < input_size &&
             out_pos < *output_size; i++) {
-            tak_bertanda8_t token;
+            tak_bertanda8_t __attribute__((unused)) token;
 
             /* Check flag bit */
             if (flags & (1 << i)) {
@@ -450,7 +450,7 @@ static status_t ntfs_compress_block(tak_bertanda8_t *input,
     tak_bertanda8_t flags;
     tak_bertanda32_t flag_pos;
     tak_bertanda32_t token_count;
-    tak_bertanda32_t i;
+    tak_bertanda32_t __attribute__((unused)) i;
 
     if (input == NULL || output == NULL || output_size == NULL) {
         return STATUS_PARAM_NULL;
@@ -578,12 +578,13 @@ status_t ntfs_compress_data(tak_bertanda8_t *input,
  * ntfs_vfs_read_compressed
  * Membaca data terkompresi dan mendekompresi.
  */
-tak_bertandas_t ntfs_vfs_read_compressed(void *ctx, tak_bertanda64_t offset,
+tak_bertandas_t ntfs_vfs_read_compressed(void *ctx, tak_bertanda64_t __attribute__((unused)) offset,
     void *buffer, ukuran_t size)
 {
+    (void)offset;
     tak_bertanda8_t *comp_buffer;
     tak_bertanda8_t *decomp_buffer;
-    tak_bertanda32_t comp_size;
+    tak_bertanda32_t comp_size = 0;
     tak_bertanda32_t decomp_size;
     status_t status;
 

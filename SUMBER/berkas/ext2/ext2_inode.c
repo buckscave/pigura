@@ -25,6 +25,7 @@
 #include "../vfs/vfs.h"
 #include "../../inti/types.h"
 #include "../../inti/konstanta.h"
+#include <string.h>
 
 /*
  * ===========================================================================
@@ -457,6 +458,8 @@ status_t ext2_inode_free(ext2_data_t *data, ino_t ino)
     tak_bertanda32_t index;
     ext2_inode_t inode;
     status_t status;
+
+    memset(&inode, 0, sizeof(inode));
 
     if (data == NULL) {
         return STATUS_PARAM_NULL;

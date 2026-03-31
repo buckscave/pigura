@@ -419,8 +419,9 @@ tak_bertandas_t ext2_file_baca(ext2_file_handle_t *handle, void *buffer,
  */
 status_t ext2_file_tulis_block(ext2_inode_t *inode,
     tak_bertanda32_t logical_block, const void *buffer,
-    tak_bertanda32_t block_size)
+    tak_bertanda32_t __attribute__((unused)) block_size)
 {
+    (void)block_size;
     tak_bertanda32_t physical_block;
     status_t status;
 

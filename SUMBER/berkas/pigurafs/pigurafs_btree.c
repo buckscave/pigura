@@ -175,9 +175,10 @@ static status_t pfs_btree_tulis_node(pfs_btree_t *tree,
 }
 
 static status_t pfs_btree_alloc_node(pfs_btree_t *tree,
-                                     tak_bertanda8_t tipe,
+                                     tak_bertanda8_t __attribute__((unused)) tipe,
                                      tak_bertanda32_t *block)
 {
+    (void)tipe;
     if (tree == NULL || block == NULL) {
         return STATUS_PARAM_NULL;
     }
@@ -191,8 +192,9 @@ static status_t pfs_btree_alloc_node(pfs_btree_t *tree,
 }
 
 static status_t pfs_btree_free_node(pfs_btree_t *tree,
-                                    tak_bertanda32_t block)
+                                    tak_bertanda32_t __attribute__((unused)) block)
 {
+    (void)block;
     if (tree == NULL) {
         return STATUS_PARAM_NULL;
     }
@@ -266,8 +268,9 @@ static status_t pfs_btree_insert_to_node(pfs_btree_node_t *node,
 static status_t pfs_btree_split_node(pfs_btree_t *tree,
                                      pfs_btree_node_t *node,
                                      tak_bertanda32_t node_block,
-                                     tak_bertanda16_t insert_index)
+                                     tak_bertanda16_t __attribute__((unused)) insert_index)
 {
+    (void)insert_index;
     pfs_btree_node_t new_node;
     pfs_btree_node_t parent;
     tak_bertanda32_t new_block;
@@ -358,9 +361,10 @@ static status_t pfs_btree_split_node(pfs_btree_t *tree,
 static status_t pfs_btree_merge_nodes(pfs_btree_t *tree,
                                       pfs_btree_node_t *left,
                                       pfs_btree_node_t *right,
-                                      tak_bertanda32_t left_block,
+                                      tak_bertanda32_t __attribute__((unused)) left_block,
                                       tak_bertanda32_t right_block)
 {
+    (void)left_block;
     tak_bertanda16_t i;
 
     if (tree == NULL || left == NULL || right == NULL) {
@@ -485,7 +489,7 @@ void pfs_btree_destroy(pfs_btree_t *tree)
 status_t pfs_btree_insert(pfs_btree_t *tree, tak_bertanda64_t key,
                           tak_bertanda64_t data)
 {
-    pfs_btree_node_t node;
+    pfs_btree_node_t __attribute__((unused)) node;
     pfs_btree_node_t current;
     tak_bertanda32_t current_block;
     tak_bertanda16_t index;

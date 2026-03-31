@@ -378,7 +378,7 @@ status_t pfs_extent_add(pfs_extent_map_t *map, tak_bertanda32_t log_block,
         return STATUS_PARAM_NULL;
     }
 
-    if (len == 0 || len > PFS_EXTENT_MAX_LEN) {
+    if (len == 0 || len >= PFS_EXTENT_MAX_LEN) {
         return STATUS_PARAM_INVALID;
     }
 

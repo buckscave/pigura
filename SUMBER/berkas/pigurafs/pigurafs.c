@@ -1324,8 +1324,9 @@ static tak_bertandas_t pfs_read(file_t *file, void *buffer,
 }
 
 static tak_bertandas_t pfs_write(file_t *file, const void *buffer,
-                                 ukuran_t size, off_t *pos)
+                                 ukuran_t __attribute__((unused)) size, off_t *pos)
 {
+    (void)size;
     pfs_sb_info_t *sbi;
     pfs_inode_info_t *ii;
     tak_bertanda64_t write_pos;
@@ -1411,8 +1412,9 @@ static off_t pfs_lseek(file_t *file, off_t offset, tak_bertanda32_t whence)
 }
 
 static tak_bertandas_t pfs_readdir(file_t *file, vfs_dirent_t *dirent,
-                                   ukuran_t count)
+                                   ukuran_t __attribute__((unused)) count)
 {
+    (void)count;
     pfs_inode_info_t *ii;
     ukuran_t entries_read;
 

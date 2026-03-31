@@ -421,11 +421,8 @@ static tak_bertanda32_t ntfs_cluster_size_bytes(tak_bertanda8_t cluster_size,
     tak_bertanda32_t size;
 
     if (cluster_size > 0) {
-        /* Positif: cluster = 2^cluster_size * sector_size */
+        /* cluster = 2^cluster_size * sector_size */
         size = sector_size << cluster_size;
-    } else if (cluster_size < 0) {
-        /* Negatif: cluster = sector_size / 2^(-cluster_size) */
-        size = sector_size >> (-cluster_size);
     } else {
         size = sector_size;
     }
@@ -440,7 +437,7 @@ static tak_bertanda32_t ntfs_cluster_size_bytes(tak_bertanda8_t cluster_size,
 static status_t ntfs_parse_boot_sector(ntfs_boot_sector_t *boot,
     ntfs_data_t *data)
 {
-    tak_bertanda32_t i;
+    tak_bertanda32_t __attribute__((unused)) i;
 
     if (boot == NULL || data == NULL) {
         return STATUS_PARAM_NULL;
@@ -480,9 +477,6 @@ static status_t ntfs_parse_boot_sector(ntfs_boot_sector_t *boot,
     if (boot->b_mft_record_size > 0) {
         data->nd_mft_record_size = data->nd_cluster_size <<
             boot->b_mft_record_size;
-    } else if (boot->b_mft_record_size < 0) {
-        data->nd_mft_record_size = data->nd_cluster_size >>
-            (-boot->b_mft_record_size);
     } else {
         data->nd_mft_record_size = data->nd_cluster_size;
     }
@@ -490,9 +484,6 @@ static status_t ntfs_parse_boot_sector(ntfs_boot_sector_t *boot,
     /* Index size */
     if (boot->b_index_size > 0) {
         data->nd_index_size = data->nd_cluster_size << boot->b_index_size;
-    } else if (boot->b_index_size < 0) {
-        data->nd_index_size = data->nd_cluster_size >>
-            (-boot->b_index_size);
     } else {
         data->nd_index_size = data->nd_cluster_size;
     }
@@ -773,8 +764,9 @@ static status_t ntfs_umount(superblock_t *sb)
  * ntfs_alloc_inode
  * Alokasi inode baru.
  */
-static inode_t *ntfs_alloc_inode(superblock_t *sb)
+static inode_t *ntfs_alloc_inode(superblock_t * __attribute__((unused)) sb)
 {
+    (void)sb;
     /* NTFS tidak mengalokasi inode secara tradisional */
     /* Inode number ditentukan oleh MFT record number */
     return NULL;
@@ -937,7 +929,7 @@ static vfs_super_operations_t ntfs_super_ops = {
     ntfs_remount_fs
 };
 
-static vfs_inode_operations_t ntfs_inode_ops = {
+static vfs_inode_operations_t __attribute__((unused)) ntfs_inode_ops = {
     NULL, /* lookup */
     NULL, /* create */
     NULL, /* mkdir */
@@ -951,7 +943,7 @@ static vfs_inode_operations_t ntfs_inode_ops = {
     NULL  /* setattr */
 };
 
-static vfs_file_operations_t ntfs_file_ops = {
+static vfs_file_operations_t __attribute__((unused)) ntfs_file_ops = {
     NULL, /* read */
     NULL, /* write */
     NULL, /* lseek */
@@ -964,7 +956,7 @@ static vfs_file_operations_t ntfs_file_ops = {
     NULL  /* mmap */
 };
 
-static vfs_dentry_operations_t ntfs_dentry_ops = {
+static vfs_dentry_operations_t __attribute__((unused)) ntfs_dentry_ops = {
     NULL, /* d_revalidate */
     NULL, /* d_hash */
     NULL, /* d_compare */
