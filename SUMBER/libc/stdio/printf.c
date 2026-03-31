@@ -336,7 +336,7 @@ static int _float_to_str(double value, char *buffer, int buf_size, int precision
 #define LEN_LDBL       8      /* L */
 
 /* Parse format specifier */
-static const char *_parse_format(const char *format, va_list *pap,
+static const char *_parse_format(const char *format, va_list ap,
                                   int *flags, int *width,
                                   int *precision, int *length, int *spec) {
     const char *p = format;
@@ -385,7 +385,7 @@ done_flags:
         }
     } else if (*p == '*') {
         /* Width dari argument */
-        *width = va_arg(*pap, int);
+        *width = va_arg(ap, int);
         if (*width < 0) {
             /* Negative width berarti left justify */
             *flags |= FLAG_LEFT;
@@ -406,7 +406,7 @@ done_flags:
             }
         } else if (*p == '*') {
             /* Precision dari argument */
-            *precision = va_arg(*pap, int);
+            *precision = va_arg(ap, int);
             if (*precision < 0) {
                 *precision = -1;  /* Negative precision = no precision */
             }
@@ -511,7 +511,7 @@ int _do_printf(const char *format, va_list ap,
         }
 
         /* Parse format specifier (pass va_list pointer for * width/precision) */
-        p = _parse_format(p, &ap, &flags, &width, &precision, &length, &spec);
+        p = _parse_format(p, ap, &flags, &width, &precision, &length, &spec);
 
         /* Default precision untuk string dan float */
         if (precision < 0) {

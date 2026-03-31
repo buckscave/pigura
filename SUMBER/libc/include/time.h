@@ -36,13 +36,22 @@ struct sigevent;
  */
 
 /* Tipe untuk waktu dalam detik */
+#ifndef _TIME_T_DEFINED
+#define _TIME_T_DEFINED
 typedef long time_t;
+#endif
 
 /* Tipe untuk clock ticks */
+#ifndef _CLOCK_T_DEFINED
+#define _CLOCK_T_DEFINED
 typedef unsigned long clock_t;
+#endif
 
 /* Tipe untuk microseconds */
+#ifndef _SUSECONDS_T_DEFINED
+#define _SUSECONDS_T_DEFINED
 typedef long suseconds_t;
+#endif
 
 /* Tipe untuk nanoseconds */
 typedef long nanoseconds_t;
@@ -63,16 +72,22 @@ struct tm {
 };
 
 /* Struktur untuk timeval (POSIX) */
+#ifndef _STRUCT_TIMEVAL
+#define _STRUCT_TIMEVAL
 struct timeval {
     time_t tv_sec;       /* Detik */
     suseconds_t tv_usec; /* Microseconds */
 };
+#endif
 
 /* Struktur untuk timespec (POSIX) */
+#ifndef _STRUCT_TIMESPEC
+#define _STRUCT_TIMESPEC
 struct timespec {
     time_t tv_sec;   /* Detik */
     long tv_nsec;    /* Nanoseconds */
 };
+#endif
 
 /* Struktur untuk timezone (legacy) */
 struct timezone {
@@ -256,7 +271,10 @@ extern unsigned int alarm(unsigned int seconds);
  */
 
 /* Tipe untuk timer ID */
+#ifndef _TIMER_T_DEFINED
+#define _TIMER_T_DEFINED
 typedef int timer_t;
+#endif
 
 /*
  * timer_create - Buat timer

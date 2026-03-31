@@ -23,6 +23,8 @@
  * Struktur untuk menyimpan informasi file.
  */
 
+#ifndef _STRUCT_STAT
+#define _STRUCT_STAT
 struct stat {
     dev_t     st_dev;      /* Device ID */
     ino_t     st_ino;      /* Inode number */
@@ -41,10 +43,17 @@ struct stat {
     struct timespec st_ctim;  /* Waktu perubahan status */
     
     /* Alias untuk kompatibilitas */
+#ifndef st_atime
 #define st_atime st_atim.tv_sec
+#endif
+#ifndef st_mtime
 #define st_mtime st_mtim.tv_sec
+#endif
+#ifndef st_ctime
 #define st_ctime st_ctim.tv_sec
+#endif
 };
+#endif /* _STRUCT_STAT */
 
 /* ============================================================
  * FUNGSI STAT

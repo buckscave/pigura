@@ -54,7 +54,7 @@
 /*
  * setjmp - Simpan konteks untuk non-local goto
  */
-int setjmp(jmp_buf env) {
+int __attribute__((noinline)) setjmp(jmp_buf env) {
     __asm__ volatile (
         "movq %%rbx, %0\n"
         "movq %%rbp, %1\n"
@@ -127,7 +127,7 @@ void longjmp(jmp_buf env, int val) {
 /*
  * setjmp - Simpan konteks untuk non-local goto
  */
-int setjmp(jmp_buf env) {
+int __attribute__((noinline)) setjmp(jmp_buf env) {
     __asm__ volatile (
         "movl %%ebx, %0\n"
         "movl %%esi, %1\n"
@@ -203,7 +203,7 @@ void longjmp(jmp_buf env, int val) {
 /*
  * setjmp - Simpan konteks untuk non-local goto
  */
-int setjmp(jmp_buf env) {
+int __attribute__((noinline)) setjmp(jmp_buf env) {
     __asm__ volatile (
         "stmia %0, {r4-r11, sp, lr}\n"
         :
@@ -252,7 +252,7 @@ void longjmp(jmp_buf env, int val) {
 /*
  * setjmp - Simpan konteks untuk non-local goto
  */
-int setjmp(jmp_buf env) {
+int __attribute__((noinline)) setjmp(jmp_buf env) {
     __asm__ volatile (
         "stp x19, x20, [%0, #0]\n"
         "stp x21, x22, [%0, #16]\n"
@@ -313,7 +313,7 @@ void longjmp(jmp_buf env, int val) {
  * kompilasi fallback. Implementasi sebenarnya memerlukan
  * kode assembly spesifik arsitektur.
  */
-int setjmp(jmp_buf env) {
+int __attribute__((noinline)) setjmp(jmp_buf env) {
     /* Placeholder - tidak portable */
     (void)env;
     return 0;

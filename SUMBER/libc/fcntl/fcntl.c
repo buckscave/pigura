@@ -143,7 +143,7 @@ int open(const char *pathname, int flags, ...) {
     /* Ambil mode jika O_CREAT digunakan */
     if (flags & O_CREAT) {
         va_start(args, flags);
-        mode = va_arg(args, mode_t);
+        mode = (mode_t)va_arg(args, int);
         va_end(args);
     } else {
         mode = 0;
@@ -197,7 +197,7 @@ int openat(int dirfd, const char *pathname, int flags, ...) {
     /* Ambil mode jika O_CREAT digunakan */
     if (flags & O_CREAT) {
         va_start(args, flags);
-        mode = va_arg(args, mode_t);
+        mode = (mode_t)va_arg(args, int);
         va_end(args);
     } else {
         mode = 0;

@@ -30,46 +30,88 @@
  */
 
 /* Tipe untuk Process ID */
+#ifndef _PID_T_DEFINED
+#define _PID_T_DEFINED
 typedef int pid_t;
+#endif
 
 /* Tipe untuk Thread ID */
+#ifndef _PTHREAD_T_DEFINED
+#define _PTHREAD_T_DEFINED
 typedef unsigned long pthread_t;
+#endif
 
 /* Tipe untuk User ID */
+#ifndef _UID_T_DEFINED
+#define _UID_T_DEFINED
 typedef unsigned int uid_t;
+#endif
 
 /* Tipe untuk Group ID */
+#ifndef _GID_T_DEFINED
+#define _GID_T_DEFINED
 typedef unsigned int gid_t;
+#endif
 
 /* Tipe untuk Device ID */
+#ifndef _DEV_T_DEFINED
+#define _DEV_T_DEFINED
 typedef unsigned long dev_t;
+#endif
 
 /* Tipe untuk Inode number */
+#ifndef _INO_T_DEFINED
+#define _INO_T_DEFINED
 typedef unsigned long long ino_t;
+#endif
 
 /* Tipe untuk Mode permission */
+#ifndef _MODE_T_DEFINED
+#define _MODE_T_DEFINED
 typedef unsigned int mode_t;
+#endif
 
 /* Tipe untuk Number of links */
+#ifndef _NLINK_T_DEFINED
+#define _NLINK_T_DEFINED
 typedef unsigned int nlink_t;
+#endif
 
 /* Tipe untuk Block count */
+#ifndef _BLKCNT_T_DEFINED
+#define _BLKCNT_T_DEFINED
 typedef long long blkcnt_t;
+#endif
 
 /* Tipe untuk Block size */
+#ifndef _BLKSIZE_T_DEFINED
+#define _BLKSIZE_T_DEFINED
 typedef long blksize_t;
+#endif
 
 /* Tipe untuk File offset */
+#ifndef _OFF_T_DEFINED
+#define _OFF_T_DEFINED
 typedef long long off_t;
+#endif
 
 /* Tipe untuk Signed size */
+#ifndef _SSIZE_T_DEFINED
+#define _SSIZE_T_DEFINED
 typedef long ssize_t;
+#endif
 
 /* Tipe untuk Clock ID */
+#ifndef _CLOCKID_T_DEFINED
+#define _CLOCKID_T_DEFINED
 typedef int clockid_t;
+#endif
 
 /* Tipe untuk Timer */
+#ifndef _TIMER_T_DEFINED
+#define _TIMER_T_DEFINED
 typedef int timer_t;
+#endif
 
 /* Tipe untuk Key IPC */
 typedef int key_t;
@@ -87,13 +129,22 @@ typedef int fd_t;
 typedef int sock_t;
 
 /* Tipe untuk usecond */
+#ifndef _USECONDS_T_DEFINED
+#define _USECONDS_T_DEFINED
 typedef unsigned int useconds_t;
+#endif
 
 /* Tipe untuk second (signed) */
+#ifndef _SUSECONDS_T_DEFINED
+#define _SUSECONDS_T_DEFINED
 typedef long suseconds_t;
+#endif
 
 /* Tipe untuk pthread attribute */
+#ifndef _PTHREAD_ATTR_T_DEFINED
+#define _PTHREAD_ATTR_T_DEFINED
 typedef unsigned long pthread_attr_t;
+#endif
 
 /* Tipe untuk pthread mutex */
 typedef struct {
@@ -165,21 +216,31 @@ struct iovec {
  */
 
 /* Ukuran maksimum nama */
+#ifndef NAME_MAX
 #define NAME_MAX         255
+#endif
+#ifndef PATH_MAX
 #define PATH_MAX         4096
+#endif
+#ifndef FILENAME_MAX
 #define FILENAME_MAX     4096
+#endif
 
 /* Ukuran maksimum pipe buffer */
 #define PIPE_BUF         4096
 
 /* Ukuran maksimum argument list */
+#ifndef ARG_MAX
 #define ARG_MAX          131072
+#endif
 
 /* Ukuran maksimum child processes */
 #define CHILD_MAX        1024
 
 /* Ukuran maksimum open files */
+#ifndef OPEN_MAX
 #define OPEN_MAX         1024
+#endif
 
 /* ============================================================
  * TIPE CPU SET
