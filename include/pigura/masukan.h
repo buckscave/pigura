@@ -10,7 +10,7 @@
 #define PIGURA_MASUKAN_H
 
 #include "pigura/tipe.h"
-#include "pigura/peristiwa.h"
+#include "pigura/aksi.h"
 #include "pigura/layar.h"
 
 #ifdef __cplusplus
@@ -40,10 +40,10 @@ pg_galat pg_buka_masukan(pg_masukan_t **out, const pg_masukan_config_t *cfg,
 pg_galat pg_tutup_masukan(pg_masukan_t *in);
 
 /* Dorong peristiwa sintetik ke antrian keluaran input. */
-pg_galat pg_masukan_emit(pg_masukan_t *in, const pg_peristiwa_t *e);
+pg_galat pg_masukan_emit(pg_masukan_t *in, const pg_aksi_t *e);
 
 /* Pompa semua peristiwa yang tertunda. Mengembalikan jumlah yang ditarik. */
-int pg_masukan_tarik(pg_masukan_t *in, pg_peristiwa_t *buf, int maks);
+int pg_masukan_tarik(pg_masukan_t *in, pg_aksi_t *buf, int maks);
 
 #ifdef __cplusplus
 }

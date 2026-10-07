@@ -113,6 +113,16 @@ void pg_isian_teks_ulangi(pg_isian_teks_t *it);
 /* Setel padding internal (px). Default 6. */
 void pg_isian_teks_setel_padding(pg_isian_teks_t *it, int padding);
 
+/* ---- Aktif / Nonaktif ---- */
+
+/* Setel status aktif. Nonaktif: tidak respon input (klik, key),
+ * visual: latar NONAKTIF_ISI, batas ABU_TERANG, teks NONAKTIF_TEKS.
+ * Lepaskan fokus bila sedang fokus. */
+void pg_isian_teks_setel_aktif(pg_isian_teks_t *it, pg_bool aktif);
+
+/* Ambil status aktif. */
+pg_bool pg_isian_teks_aktif(pg_isian_teks_t *it);
+
 /* ---- Warna custom ---- */
 
 /* Setel warna eksplisit. Pass PG_TRANSPARAN (alpha=0) pada salah

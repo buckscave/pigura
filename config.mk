@@ -98,12 +98,23 @@ else ifeq ($(PG_BACKEND),linuxfb)
   PG_PLATFORM_OBJS := $(PG_OBJS_DIR)/src/layar/linuxfb.o \
                       $(PG_OBJS_DIR)/src/masukan/evdev.o
 else ifeq ($(PG_BACKEND),wayland)
-  # Wayland: stub untuk v0.1. Backend lengkap (wl_compositor, xdg_shell,
-  # wl_shm, wl_seat) dijadwalkan v0.3+. Stub mengembalikan
-  # PG_GALAT_TANPA dengan pesan "Pakai X11".
+  # Wayland: backend lengkap pakai wl_compositor + wl_shell + wl_shm +
+  # wl_seat. Build butuh libwayland-dev (pkg-config wayland-client).
+  # Catatan: header wayland pakai "static inline" yang tidak valid di
+  # C89 strict. Pakai -Dinline=__inline__ supaya compiler GCC accept.
+  # Fallback: kalau pkg-config tidak ketemu, pakai /home/z/wayland-dev.
+  PG_WAYLAND_CFLAGS := $(shell $(PKG_CONFIG) --cflags wayland-client 2>/dev/null)
+  PG_WAYLAND_LIBS   := $(shell $(PKG_CONFIG) --libs wayland-client 2>/dev/null)
+  ifeq ($(PG_WAYLAND_CFLAGS),)
+    PG_WAYLAND_CFLAGS := -I/home/z/wayland-dev/include
+    PG_WAYLAND_LIBS   := -L/home/z/wayland-dev/lib -lwayland-client
+  endif
   PG_CFLAGS_PLATFORM := -D_POSIX_C_SOURCE=200809L -D_DEFAULT_SOURCE \
-                        -D_XOPEN_SOURCE=700 -DHAVE_WAYLAND
-  PG_LDFLAGS_PLATFORM := -lpthread -lrt -lm
+                        -D_XOPEN_SOURCE=700 -DHAVE_WAYLAND \
+                        -Dinline=__inline__ \
+                        $(PG_WAYLAND_CFLAGS)
+  PG_LDFLAGS_PLATFORM := $(PG_WAYLAND_LIBS) \
+                         -lpthread -lrt -lm -Wl,-rpath,/home/z/wayland-dev/lib
   PG_PLATFORM_SRCS := src/layar/wayland.c src/masukan/wayland.c
   PG_PLATFORM_OBJS := $(PG_OBJS_DIR)/src/layar/wayland.o \
                       $(PG_OBJS_DIR)/src/masukan/wayland.o
@@ -187,18 +198,18 @@ PG_WIDGET_SRCS := \
         src/widget/dasar/label.c            \
         src/widget/dasar/tombol.c           \
         src/widget/dasar/isian_teks.c       \
-        src/widget/dasar/cek.c              \
-        src/widget/dasar/radio.c            \
+        src/widget/dasar/kotak_penanda.c     \
+        src/widget/dasar/tombol_radio.c     \
         src/widget/dasar/daftar.c           \
         src/widget/dasar/kemajuan.c         \
-        src/widget/dasar/geser.c            \
+        src/widget/dasar/bilah_geser.c       \
         src/widget/dasar/gambar.c           \
         src/widget/dasar/gulir.c            \
         src/widget/dasar/dropdown.c         \
-        src/widget/komponen/textedit.c      \
-        src/widget/komponen/combobox.c      \
-        src/widget/komponen/spinbox.c       \
-        src/widget/komponen/searchbox.c      \
+        src/widget/komponen/multi_teks.c       \
+        src/widget/komponen/kotak_gabungan.c  \
+        src/widget/komponen/angka_putar.c     \
+        src/widget/komponen/kotak_pencarian.c  \
         src/widget/komponen/passwordinput.c  \
         src/widget/komponen/tableview.c      \
         src/widget/komponen/treeview.c       \

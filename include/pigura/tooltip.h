@@ -20,7 +20,7 @@
 #include "pigura/tipe.h"
 #include "pigura/widget.h"
 #include "pigura/permukaan.h"
-#include "pigura/peristiwa.h"
+#include "pigura/aksi.h"
 #include "pigura/font.h"
 
 #ifdef __cplusplus
@@ -46,7 +46,7 @@ void pg_tooltip_setel_delay(unsigned ms);
 /* Pompa event ke sistem tooltip. Dipanggil oleh app untuk setiap
  * event mouse. Akan tracking widget yang sedang di-hover dan
  * memulai/hentikan timer. */
-void pg_tooltip_tangani(const pg_peristiwa_t *e);
+void pg_tooltip_tangani(const pg_aksi_t *e);
 
 /* Render tooltip ke dest bila visible. Dipanggil paling akhir. */
 void pg_tooltip_catat(pg_permukaan_t *dest, int mouse_x,

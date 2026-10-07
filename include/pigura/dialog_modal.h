@@ -15,7 +15,7 @@
 #include "pigura/font.h"
 #include "pigura/widget.h"
 #include "pigura/permukaan.h"
-#include "pigura/peristiwa.h"
+#include "pigura/aksi.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -58,7 +58,7 @@ void pg_dialog_modal_catat(pg_dialog_modal_t *dm,
 
 /* Tangani peristiwa modal. Bila modal tidak aktif, return SALAH. */
 pg_bool pg_dialog_modal_tangani(pg_dialog_modal_t *dm,
-    const pg_peristiwa_t *e);
+    const pg_aksi_t *e);
 
 /* Posisi dialog: setter + getter. */
 void pg_dialog_modal_pindah(pg_dialog_modal_t *dm, int x, int y);

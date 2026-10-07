@@ -46,6 +46,11 @@ void *pg_permukaan_piksel_mut(pg_permukaan_t *s);
 /* Isi seluruh permukaan dengan warna solid. */
 void pg_isi_permukaan(pg_permukaan_t *s, pg_warna_t c);
 
+/* Bersihkan permukaan ke transparan penuh (0x00000000).
+ * Selalu set pixel ke 0, tidak seperti pg_isi_permukaan
+ * yang skip bila warna = PG_TRANSPARAN. */
+void pg_bersihkan_permukaan(pg_permukaan_t *s);
+
 /* Isi sub-kotak. */
 void pg_isi_permukaan_kotak(pg_permukaan_t *s, pg_kotak_t r, pg_warna_t c);
 

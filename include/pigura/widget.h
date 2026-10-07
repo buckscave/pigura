@@ -12,7 +12,7 @@
 
 #include "pigura/tipe.h"
 #include "pigura/permukaan.h"
-#include "pigura/peristiwa.h"
+#include "pigura/aksi.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,8 +42,8 @@ typedef enum pg_widget_tipe {
 typedef struct pg_widget_vtable pg_widget_vtable_t;
 
 typedef void (*pg_catat_cb)(pg_widget_t *diri, pg_permukaan_t *s);
-typedef pg_bool (*pg_peristiwa_cb_w)(pg_widget_t *diri,
-                                      const pg_peristiwa_t *e);
+typedef pg_bool (*pg_aksi_cb_w)(pg_widget_t *diri,
+                                      const pg_aksi_t *e);
 typedef void (*pg_hancur_cb)(pg_widget_t *diri);
 typedef void (*pg_ubah_ukuran_cb)(pg_widget_t *diri, int w, int h);
 typedef pg_bool (*pg_berisi_cb)(pg_widget_t *diri, pg_titik_t p);
@@ -75,7 +75,7 @@ typedef struct pg_pintasan {
  * crash. Dengan `bebas` terisi, free penuh rekursif aman. */
 struct pg_widget_vtable {
         pg_catat_cb        catat;
-        pg_peristiwa_cb_w  peristiwa;
+        pg_aksi_cb_w  aksi;
         pg_ubah_ukuran_cb  ubah_ukuran;
         pg_hancur_cb       hancur;
         pg_catat_cb        catat_popup;
@@ -166,8 +166,8 @@ pg_warna_t pg_widget_ambil_latar(const pg_widget_t *w);
 
 /* Painting / dispatch peristiwa. */
 void pg_widget_catat(pg_widget_t *w, pg_permukaan_t *dest);
-pg_bool pg_widget_tangani_peristiwa(pg_widget_t *w,
-                                      const pg_peristiwa_t *e);
+pg_bool pg_widget_tangani_aksi(pg_widget_t *w,
+                                      const pg_aksi_t *e);
 
 /* Catat popup overlay (jika ada) langsung ke dest tanpa clip ke
  * kotak widget. Dipanggil SETELAH semua widget normal di-render.

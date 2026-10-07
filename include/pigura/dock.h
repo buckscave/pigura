@@ -26,7 +26,7 @@
 #include "pigura/widget.h"
 #include "pigura/font.h"
 #include "pigura/permukaan.h"
-#include "pigura/peristiwa.h"
+#include "pigura/aksi.h"
 #include "pigura/panel.h"
 
 #ifdef __cplusplus
@@ -114,7 +114,7 @@ void pg_dock_catat_hint(pg_dock_t *d, pg_permukaan_t *dest,
                           int mx, int my, pg_panel_flag_t flag_drag);
 
 /* Tangani peristiwa: splitter drag. */
-pg_bool pg_dock_tangani(pg_dock_t *d, const pg_peristiwa_t *e);
+pg_bool pg_dock_tangani(pg_dock_t *d, const pg_aksi_t *e);
 
 #ifdef __cplusplus
 }

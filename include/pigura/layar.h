@@ -14,7 +14,7 @@
 #define PIGURA_LAYAR_H
 
 #include "pigura/tipe.h"
-#include "pigura/peristiwa.h"
+#include "pigura/aksi.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -66,7 +66,7 @@ pg_galat pg_layar_presentasi(pg_layar_t *layar);
 pg_galat pg_layar_tunggu_vsync(pg_layar_t *layar);
 
 /* Pompa peristiwa windowing backend (kalau ada). */
-pg_galat pg_layar_pompa_peristiwa(pg_layar_t *layar);
+pg_galat pg_layar_pompa_aksi(pg_layar_t *layar);
 
 /* Ambil handle native backend (Display* di X11, HWND di Windows).
  * Berguna untuk backend masukan yang perlu share handle. */
@@ -76,12 +76,12 @@ void *pg_layar_handle_native(pg_layar_t *layar);
 unsigned long pg_layar_jendela_id(pg_layar_t *layar);
 
 /* Cek apakah ada peristiwa pending di antrian native. */
-pg_bool pg_layar_punya_peristiwa(pg_layar_t *layar);
+pg_bool pg_layar_punya_aksi(pg_layar_t *layar);
 
 /* Ambil peristiwa native berikutnya sebagai pigura peristiwa.
- * Mengembalikan PG_BENAR jika ada peristiwa, PG_SALAH jika kosong. */
-pg_bool pg_layar_peristiwa_berikutnya(pg_layar_t *layar,
-                                        pg_peristiwa_t *out);
+ * Mengembalikan PG_BENAR jika ada aksi, PG_SALAH jika kosong. */
+pg_bool pg_layar_aksi_berikutnya(pg_layar_t *layar,
+                                        pg_aksi_t *out);
 
 #ifdef __cplusplus
 }

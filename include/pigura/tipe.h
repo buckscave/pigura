@@ -103,14 +103,16 @@ typedef pg_u32 pg_warna_t;
 
 /* ===== Tema warna widget (default, dapat di-override per-widget) =====
  * Sesuai spec: panel-style buttons dengan state visual jelas. */
-#define PG_WARNA_PANEL          PG_RGB(0xF2, 0xF2, 0xF2) /* 242 — idle tombol */
-#define PG_WARNA_HOVER_ISI      PG_RGB(0xE0, 0xE0, 0xE0) /* 224 — hover isi */
-#define PG_WARNA_HOVER_OUTLINE  PG_RGB(0xCC, 0xCC, 0xCC) /* 204 — border idle/hover */
-#define PG_WARNA_TEKAN_ISI      PG_RGB(0xBF, 0xBF, 0xBF) /* 191 — tekan isi */
+#define PG_WARNA_PANEL          PG_RGB(0xE6, 0xE6, 0xE6) /* 230 — normal/idle */
+#define PG_WARNA_HOVER_ISI      PG_RGB(0xD2, 0xD2, 0xD2) /* 210 — hover/lintas */
+#define PG_WARNA_HOVER_OUTLINE  PG_RGB(0x96, 0x96, 0x96) /* 150 — outline */
+#define PG_WARNA_TEKAN_ISI      PG_RGB(0xAA, 0xAA, 0xAA) /* 170 — tekan */
 #define PG_WARNA_TEKAN_TERANG   PG_RGB(0xF0, 0xF0, 0xF0) /* 240 — tekan atas+kiri */
-#define PG_WARNA_TEKAN_GELAP    PG_RGB(0x99, 0x99, 0x99) /* 153 — tekan kanan+bawah */
+#define PG_WARNA_TEKAN_GELAP    PG_RGB(0x96, 0x96, 0x96) /* 150 — tekan kanan+bawah */
 #define PG_WARNA_FOKUS          PG_RGB(0x4A, 0x90, 0xE2) /* 74,144,226 — border fokus */
 #define PG_WARNA_TEKS_TOMBOL    PG_RGB(0x33, 0x33, 0x33) /* 51 — teks tombol */
+#define PG_WARNA_NONAKTIF_ISI   PG_RGB(0xD2, 0xD2, 0xD2) /* 210 — nonaktif latar = hover */
+#define PG_WARNA_NONAKTIF_TEKS  PG_RGB(0xAA, 0xAA, 0xAA) /* 170 — nonaktif teks = tekan */
 
 /* Makro geometri. */
 #define PG_KOTAK_KOSONG(r)  ((r).w <= 0 || (r).h <= 0)

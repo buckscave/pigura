@@ -48,7 +48,7 @@
 #include "pigura/contextmenu.h"
 #include "pigura/tooltip.h"
 #include "pigura/permukaan.h"
-#include "pigura/peristiwa.h"
+#include "pigura/aksi.h"
 #include "pigura/layar.h"
 #include "pigura/masukan.h"
 #include "pigura/perulangan.h"
@@ -1098,26 +1098,26 @@ static void catat_all(app_t *a, pg_permukaan_t *s)
 
 /* ===== Event handler ===== */
 
-static void on_event(const pg_peristiwa_t *e, void *ctx)
+static void on_event(const pg_aksi_t *e, void *ctx)
 {
         app_t *a = ctx;
         pg_bool consumed = PG_SALAH;
 
-        /* Tombol close window (X) — X11 emit PG_PERISTIWA_KELUAR. */
-        if (e->tipe == PG_PERISTIWA_KELUAR) {
+        /* Tombol close window (X) — X11 emit PG_AKSI_KELUAR. */
+        if (e->tipe == PG_AKSI_KELUAR) {
                 pg_hentikan_perulangan(a->loop);
                 return;
         }
         /* Handle window events (resize, close). */
-        if (e->tipe == PG_PERISTIWA_JENDELA) {
-                if (e->jendela_peristiwa == PG_JENDELA_UBAH_UKURAN) {
+        if (e->tipe == PG_AKSI_JENDELA) {
+                if (e->jendela_aksi == PG_JENDELA_UBAH_UKURAN) {
                         /* Window di-resize/maximize: query layar
                          * untuk ukuran baru, lalu update layout. */
                         pg_layar_info_t info;
                         if (pg_layar_kueri(a->layar, &info) == PG_OK) {
                                 update_layout(a, info.lebar, info.tinggi);
                         }
-                } else if (e->jendela_peristiwa == PG_JENDELA_TUTUP) {
+                } else if (e->jendela_aksi == PG_JENDELA_TUTUP) {
                         /* Tombol close window (X) ditekan. */
                         pg_hentikan_perulangan(a->loop);
                 }
@@ -1125,12 +1125,12 @@ static void on_event(const pg_peristiwa_t *e, void *ctx)
         }
 
         /* Track mouse pos untuk status + context menu positioning. */
-        if (e->tipe == PG_PERISTIWA_TETIK_GERAK ||
-            e->tipe == PG_PERISTIWA_TETIK_TURUN ||
-            e->tipe == PG_PERISTIWA_TETIK_NAIK) {
+        if (e->tipe == PG_AKSI_TETIKUS_GERAK ||
+            e->tipe == PG_AKSI_TETIKUS_TEKAN ||
+            e->tipe == PG_AKSI_TETIKUS_LEPAS) {
                 a->mouse_x = e->tetik_pos.x;
                 a->mouse_y = e->tetik_pos.y;
-                if (e->tipe == PG_PERISTIWA_TETIK_GERAK) {
+                if (e->tipe == PG_AKSI_TETIKUS_GERAK) {
                         char b[64];
                         snprintf(b, sizeof(b), "Mouse: %d, %d",
                                 a->mouse_x, a->mouse_y);
@@ -1139,7 +1139,7 @@ static void on_event(const pg_peristiwa_t *e, void *ctx)
         }
 
         /* ESC: tutup modal/context menu, atau keluar. */
-        if (e->tipe == PG_PERISTIWA_TOMBOL_TURUN &&
+        if (e->tipe == PG_AKSI_TOMBOL_TURUN &&
             e->tombol == PG_TOMBOL_ESCAPE) {
                 if (pg_dialog_modal_aktif(a->dialog_about)) {
                         pg_dialog_modal_tutup(a->dialog_about);
@@ -1162,11 +1162,11 @@ static void on_event(const pg_peristiwa_t *e, void *ctx)
 
         /* Context menu (jika terlihat) — prioritas berikutnya. */
         if (pg_contextmenu_terlihat(a->cm_kanvas)) {
-                consumed = pg_widget_tangani_peristiwa(
+                consumed = pg_widget_tangani_aksi(
                         pg_contextmenu_widget(a->cm_kanvas), e);
                 if (consumed) return;
                 /* Klik di luar context menu: sembunyikan. */
-                if (e->tipe == PG_PERISTIWA_TETIK_TURUN) {
+                if (e->tipe == PG_AKSI_TETIKUS_TEKAN) {
                         pg_contextmenu_sembunyi(a->cm_kanvas);
                         /* Jangan consume — biarkan event ke widget lain. */
                 }
@@ -1174,7 +1174,7 @@ static void on_event(const pg_peristiwa_t *e, void *ctx)
 
         /* Menubar. */
         if (!consumed && a->mbar)
-                consumed = pg_widget_tangani_peristiwa(
+                consumed = pg_widget_tangani_aksi(
                         pg_menubar_widget(a->mbar), e);
 
         /* Panel (z-order: palette > kanvas > props > layers > toolbox > ribbon). */
@@ -1207,7 +1207,7 @@ static void on_event(const pg_peristiwa_t *e, void *ctx)
 
         /* Status bar. */
         if (!consumed && a->status)
-                consumed = pg_widget_tangani_peristiwa(
+                consumed = pg_widget_tangani_aksi(
                         pg_status_bar_widget(a->status), e);
 }
 

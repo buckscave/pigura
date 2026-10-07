@@ -30,7 +30,7 @@
 #include "pigura/font.h"
 #include "pigura/widget.h"
 #include "pigura/permukaan.h"
-#include "pigura/peristiwa.h"
+#include "pigura/aksi.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -123,7 +123,7 @@ void pg_panel_saat_drag_gerak(pg_panel_t *p, pg_panel_drag_gerak_cb cb,
 void pg_panel_catat(pg_panel_t *p, pg_permukaan_t *dest);
 
 /* Tangani peristiwa. Return BENAR bila dikonsumsi. */
-pg_bool pg_panel_tangani(pg_panel_t *p, const pg_peristiwa_t *e);
+pg_bool pg_panel_tangani(pg_panel_t *p, const pg_aksi_t *e);
 
 /* Ambil widget dasar (untuk parent-child tree). */
 pg_widget_t *pg_panel_widget(pg_panel_t *p);

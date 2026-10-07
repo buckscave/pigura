@@ -127,6 +127,32 @@ void pg_gambar_kotak_tumpul_aa(pg_permukaan_t *s, pg_kotak_t r,
 void pg_gambar_kotak_tumpul_isi_aa(pg_permukaan_t *s, pg_kotak_t r,
                                     int radius, pg_warna_t isi);
 
+/* Kotak rounded AA — single pass fill + outline (Cairo-quality).
+ *
+ * Membuat rounded rect dengan:
+ *   - Latar `isi` di interior (di dalam inner rect).
+ *   - Garis `garis` di border (between outer dan inner, 1px).
+ *   - Anti-aliasing Cairo-grade: 4x4 supersampling + sqrt(coverage)
+ *     gamma correction. Edge efektif = 1.0 piksel.
+ *
+ * Kualitas:
+ *   - Tepi luar (silhouette) halus, tidak jagged bahkan untuk
+ *     radius kecil (4-6).
+ *   - Tepi dalam (peralihan isi→garis) ikut halus karena sub-piksel
+ *     sampling di border arc.
+ *   - Tidak double-AA: hanya satu pass, satu warna per piksel.
+ *
+ * Bila radius <= 0: fallback ke kotak tajam (isi solid + 4 garis).
+ * Bila radius > min(w,h)/2: di-clamp otomatis.
+ *
+ * Latar permukaan: diblending alpha-aware; di permukaan transparan
+ * tepi luar akan menghasilkan semi-transparan (smooth saat di-blit). */
+void pg_gambar_kotak_tumpul_isi_garis_aa(pg_permukaan_t *s,
+                                           pg_kotak_t r,
+                                           int radius,
+                                           pg_warna_t isi,
+                                           pg_warna_t garis);
+
 /* ===== Util ===== */
 
 /* BlendCoverage: campur warna foreground ke background dengan alpha. */

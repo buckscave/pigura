@@ -11,16 +11,22 @@
 #include "pigura/tombol.h"
 #include "pigura/gulir.h"
 #include "pigura/isian_teks.h"
-#include "pigura/cek.h"
-#include "pigura/radio.h"
+#include "pigura/kotak_penanda.h"
+#include "pigura/tombol_radio.h"
+#include "pigura/bilah_geser.h"
+#include "pigura/angka_putar.h"
+#include "pigura/kotak_gabungan.h"
+#include "pigura/kotak_pencarian.h"
+#include "pigura/multi_teks.h"
 #include "pigura/papan_klip.h"
 #include "pigura/font.h"
 #include "pigura/permukaan.h"
 #include "pigura/layar.h"
 #include "pigura/masukan.h"
 #include "pigura/perulangan.h"
-#include "pigura/peristiwa.h"
+#include "pigura/aksi.h"
 #include "pigura/gambar.h"
+#include "pigura/ikon.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,6 +43,7 @@ typedef struct {
         pg_masukan_t    *masukan;
         pg_perulangan_t *loop;
         pg_font_t       *font;
+        pg_font_t       *font_ikon;
         pg_kotak_widget_t *root;
         pg_gulir_t       *scroll;
         pg_kotak_widget_t *content;
@@ -100,6 +107,78 @@ static pg_kotak_widget_t *buat_item(const char *caption,
 }
 
 /* ===== Section builders ===== */
+
+static void cb_ikon_tombol(pg_tombol_t *b, void *ctx)
+{
+        const char *nama = (const char *)ctx;
+        (void)b;
+        fprintf(stderr, "[ikon tombol] %s ditekan\n", nama);
+}
+
+static pg_kotak_widget_t *seksi_ikon(app_t *a)
+{
+        pg_kotak_widget_t *s;
+        pg_kotak_widget_t *r;
+        if (!a->font_ikon) return NULL;
+
+        s = pg_buat_kotak_widget(PG_KOTAK_VERTIKAL, 4);
+        pg_kotak_milik(s, PG_BENAR);
+        pg_kotak_setel_padding_kotak(s, 8);
+        pg_kotak_setel_latar(s, PG_PUTIH);
+        pg_kotak_setel_batas(s, PG_WARNA_HOVER_OUTLINE);
+        pg_widget_setel_radius(pg_kotak_widget(s), 4);
+        {
+                pg_label_t *jl = pg_buat_label("Ikon Material Design",
+                        PG_WARNA_TEKS_TOMBOL, a->font);
+                pg_kotak_tambah(s, pg_label_widget(jl), PG_SALAH);
+        }
+        {
+                pg_label_t *dl = pg_buat_label(
+                        "Tombol dengan ikon Material Design subset (5.9KB, 65 ikon).",
+                        PG_ABU_GELAP, a->font);
+                pg_kotak_tambah(s, pg_label_widget(dl), PG_SALAH);
+        }
+
+        r = pg_buat_kotak_widget(PG_KOTAK_HORIZONTAL, ITEM_GAP);
+        pg_kotak_milik(r, PG_BENAR);
+        pg_kotak_setel_padding_kotak(r, 4);
+
+        {
+                struct { const char *ikon; const char *nama; } daftar[] = {
+                        { PG_IKON_HOME,         "home" },
+                        { PG_IKON_SEARCH,       "search" },
+                        { PG_IKON_SETTINGS,     "settings" },
+                        { PG_IKON_ADD,          "add" },
+                        { PG_IKON_DELETE,       "delete" },
+                        { PG_IKON_EDIT,         "edit" },
+                        { PG_IKON_SAVE,         "save" },
+                        { PG_IKON_DOWNLOAD,     "download" },
+                        { PG_IKON_UPLOAD,       "upload" },
+                        { PG_IKON_REFRESH,      "refresh" },
+                        { PG_IKON_FOLDER,       "folder" },
+                        { PG_IKON_PERSON,       "person" },
+                        { PG_IKON_MENU,         "menu" },
+                        { PG_IKON_MORE_VERT,    "more_vert" },
+                        { PG_IKON_CLOSE,        "close" },
+                        { PG_IKON_CHECK,        "check" },
+                        { PG_IKON_INFO,         "info" },
+                        { PG_IKON_WARNING,      "warning" },
+                };
+                int i;
+                int n = (int)(sizeof(daftar) / sizeof(daftar[0]));
+                for (i = 0; i < n; i++) {
+                        pg_tombol_t *b = pg_buat_tombol(daftar[i].ikon,
+                                                          a->font_ikon);
+                        pg_widget_setel_tooltip(pg_tombol_widget(b),
+                                                 daftar[i].nama);
+                        pg_tombol_saatklik(b, cb_ikon_tombol,
+                                            (void *)daftar[i].nama);
+                        pg_kotak_tambah(r, pg_tombol_widget(b), PG_SALAH);
+                }
+        }
+        pg_kotak_tambah(s, pg_kotak_widget(r), PG_SALAH);
+        return s;
+}
 
 static pg_kotak_widget_t *seksi_tombol(pg_font_t *font)
 {
@@ -214,7 +293,6 @@ static pg_kotak_widget_t *seksi_label(pg_font_t *font)
                         PG_PUTIH, font);
                 pg_label_setel_latar(l, PG_BIRU);
                 pg_label_setel_padding(l, 6);
-                pg_widget_setel_radius(pg_label_widget(l), 8);
                 pg_kotak_tambah(r2,
                         pg_kotak_widget(buat_item("latar biru",
                                 pg_label_widget(l), font)), PG_SALAH);
@@ -347,11 +425,21 @@ static pg_kotak_widget_t *seksi_isian_teks(pg_font_t *font)
                 {
                         pg_isian_teks_t *it;
                         it = pg_buat_isian_teks("", 64, font);
-                        pg_widget_setel_radius(
-                                pg_isian_teks_widget(it), 6);
+                        pg_widget_setel_radius(pg_isian_teks_widget(it), 6);
                         if (g_klip) pg_isian_teks_setel_papan_klip(it, g_klip);
                         pg_kotak_tambah(r,
                                 pg_kotak_widget(buat_item("radius 6",
+                                        pg_isian_teks_widget(it), font)),
+                                PG_SALAH);
+                }
+                {
+                        pg_isian_teks_t *it;
+                        it = pg_buat_isian_teks(
+                                "Tidak bisa diubah", 64, font);
+                        pg_isian_teks_setel_aktif(it, PG_SALAH);
+                        if (g_klip) pg_isian_teks_setel_papan_klip(it, g_klip);
+                        pg_kotak_tambah(r,
+                                pg_kotak_widget(buat_item("nonaktif",
                                         pg_isian_teks_widget(it), font)),
                                 PG_SALAH);
                 }
@@ -378,7 +466,7 @@ static pg_kotak_widget_t *seksi_isian_teks(pg_font_t *font)
         return s;
 }
 
-static pg_kotak_widget_t *seksi_cek(pg_font_t *font)
+static pg_kotak_widget_t *seksi_penanda(pg_font_t *font)
 {
         pg_kotak_widget_t *s = buat_seksi("Cek",
                 "Checkbox. Posisi, tri-state, hover, fokus, keyboard.",
@@ -388,24 +476,24 @@ static pg_kotak_widget_t *seksi_cek(pg_font_t *font)
         {
                 pg_kotak_widget_t *r = buat_baris(font);
                 {
-                        pg_cek_t *c = pg_buat_cek("Aktifkan notifikasi", font);
-                        pg_cek_setel_dicek(c, PG_BENAR);
+                        pg_kotak_penanda_t *c = pg_buat_kotak_penanda("Aktifkan notifikasi", font);
+                        pg_kotak_penanda_setel_dicek(c, PG_BENAR);
                         pg_kotak_tambah(r,
                                 pg_kotak_widget(buat_item("dicek",
-                                        pg_cek_widget(c), font)), PG_SALAH);
+                                        pg_kotak_penanda_widget(c), font)), PG_SALAH);
                 }
                 {
-                        pg_cek_t *c = pg_buat_cek("Tidak dicek", font);
+                        pg_kotak_penanda_t *c = pg_buat_kotak_penanda("Tidak dicek", font);
                         pg_kotak_tambah(r,
                                 pg_kotak_widget(buat_item("kosong",
-                                        pg_cek_widget(c), font)), PG_SALAH);
+                                        pg_kotak_penanda_widget(c), font)), PG_SALAH);
                 }
                 {
-                        pg_cek_t *c = pg_buat_cek("Indeterminate", font);
-                        pg_cek_setel_tri(c, PG_TRI_INDETERMINATE);
+                        pg_kotak_penanda_t *c = pg_buat_kotak_penanda("Indeterminate", font);
+                        pg_kotak_penanda_setel_tri(c, PG_TRI_INDETERMINATE);
                         pg_kotak_tambah(r,
                                 pg_kotak_widget(buat_item("tri-state",
-                                        pg_cek_widget(c), font)), PG_SALAH);
+                                        pg_kotak_penanda_widget(c), font)), PG_SALAH);
                 }
                 pg_kotak_tambah(s, pg_kotak_widget(r), PG_SALAH);
         }
@@ -414,31 +502,321 @@ static pg_kotak_widget_t *seksi_cek(pg_font_t *font)
         {
                 pg_kotak_widget_t *r = buat_baris(font);
                 {
-                        pg_cek_t *c = pg_buat_cek("Kanan", font);
-                        pg_cek_setel_posisi(c, PG_POSISI_KANAN);
+                        pg_kotak_penanda_t *c = pg_buat_kotak_penanda("Kanan", font);
+                        pg_kotak_penanda_setel_posisi(c, PG_POSISI_KANAN);
                         pg_kotak_tambah(r,
                                 pg_kotak_widget(buat_item("kotak kanan",
-                                        pg_cek_widget(c), font)), PG_SALAH);
+                                        pg_kotak_penanda_widget(c), font)), PG_SALAH);
                 }
                 {
-                        pg_cek_t *c = pg_buat_cek("Besar", font);
-                        pg_cek_setel_ukuran_kotak(c, 20);
-                        pg_cek_setel_dicek(c, PG_BENAR);
+                        pg_kotak_penanda_t *c = pg_buat_kotak_penanda("Besar", font);
+                        pg_kotak_penanda_setel_ukuran_kotak(c, 20);
+                        pg_kotak_penanda_setel_dicek(c, PG_BENAR);
                         pg_kotak_tambah(r,
                                 pg_kotak_widget(buat_item("ukuran 20",
-                                        pg_cek_widget(c), font)), PG_SALAH);
+                                        pg_kotak_penanda_widget(c), font)), PG_SALAH);
                 }
                 {
-                        pg_cek_t *c = pg_buat_cek("Radius 4", font);
-                        pg_widget_setel_radius(pg_cek_widget(c), 4);
-                        pg_cek_setel_dicek(c, PG_BENAR);
+                        pg_kotak_penanda_t *c = pg_buat_kotak_penanda("Radius 4", font);
+                        pg_widget_setel_radius(pg_kotak_penanda_widget(c), 4);
+                        pg_kotak_penanda_setel_dicek(c, PG_BENAR);
                         pg_kotak_tambah(r,
                                 pg_kotak_widget(buat_item("radius 4",
-                                        pg_cek_widget(c), font)), PG_SALAH);
+                                        pg_kotak_penanda_widget(c), font)), PG_SALAH);
                 }
                 pg_kotak_tambah(s, pg_kotak_widget(r), PG_SALAH);
         }
 
+        return s;
+}
+
+/* ===== Batch 2 widgets ===== */
+
+/* Callback shared untuk demo. */
+static void cb_slider(pg_bilah_geser_t *g, int nilai, void *ctx)
+{
+        char buf[32];
+        pg_label_t *l = (pg_label_t *)ctx;
+        (void)g;
+        snprintf(buf, sizeof(buf), "Nilai: %d", nilai);
+        pg_label_setel_teks(l, buf);
+}
+
+static void cb_spinbox(pg_angka_putar_t *sb, int nilai, void *ctx)
+{
+        char buf[32];
+        pg_label_t *l = (pg_label_t *)ctx;
+        (void)sb;
+        snprintf(buf, sizeof(buf), "Nilai: %d", nilai);
+        pg_label_setel_teks(l, buf);
+}
+
+static void cb_search(pg_kotak_pencarian_t *kp, const char *t, void *ctx)
+{
+        char buf[80];
+        pg_label_t *l = (pg_label_t *)ctx;
+        snprintf(buf, sizeof(buf), "Cari: %s", t);
+        pg_label_setel_teks(l, buf);
+}
+
+static void cb_combo(pg_kotak_gabungan_t *kg, int idx, void *ctx)
+{
+        char buf[80];
+        pg_label_t *l = (pg_label_t *)ctx;
+        snprintf(buf, sizeof(buf), "Idx: %d", idx);
+        pg_label_setel_teks(l, buf);
+}
+
+static pg_kotak_widget_t *seksi_bilah_geser(pg_font_t *font)
+{
+        pg_kotak_widget_t *s = buat_seksi("Bilah Geser",
+                "Slider integer dengan knob AA. Drag, klik track, atau "
+                "panah kiri/kanan untuk ubah nilai.",
+                font);
+        {
+                pg_kotak_widget_t *r = buat_baris(font);
+                pg_label_t *lbl;
+                pg_bilah_geser_t *g;
+
+                /* Slider default + label nilai. */
+                g = pg_buat_bilah_geser(0, 100, 50);
+                pg_widget_setel_kotak(pg_bilah_geser_widget(g),
+                        pg_buat_kotak(0, 0, 180, 24));
+                lbl = pg_buat_label("Nilai: 50", PG_WARNA_TEKS_TOMBOL, font);
+                pg_bilah_geser_saatberubah(g, cb_slider, lbl);
+                pg_kotak_tambah(r, pg_bilah_geser_widget(g), PG_SALAH);
+                pg_kotak_tambah(r, pg_label_widget(lbl), PG_SALAH);
+
+                /* Slider dengan radius 4 (alternatif tema). */
+                {
+                        pg_bilah_geser_t *g2 = pg_buat_bilah_geser(0, 50, 25);
+                        pg_widget_setel_kotak(pg_bilah_geser_widget(g2),
+                                pg_buat_kotak(0, 0, 180, 24));
+                        pg_widget_setel_radius(pg_bilah_geser_widget(g2), 4);
+                        pg_kotak_tambah(r, pg_bilah_geser_widget(g2),
+                                        PG_SALAH);
+                }
+
+                /* Slider disabled. */
+                {
+                        pg_bilah_geser_t *g3 = pg_buat_bilah_geser(0, 10, 5);
+                        pg_widget_setel_kotak(pg_bilah_geser_widget(g3),
+                                pg_buat_kotak(0, 0, 180, 24));
+                        pg_bilah_geser_setel_aktif(g3, PG_SALAH);
+                        pg_kotak_tambah(r, pg_bilah_geser_widget(g3),
+                                        PG_SALAH);
+                }
+                pg_kotak_tambah(s, pg_kotak_widget(r), PG_SALAH);
+        }
+        return s;
+}
+
+static pg_kotak_widget_t *seksi_angka_putar(pg_font_t *font)
+{
+        pg_kotak_widget_t *s = buat_seksi("Angka Putar",
+                "Spinbox dengan tombol ▲▼, roda mouse, dan keyboard "
+                "arrow up/down. Home/End untuk min/maks.",
+                font);
+        {
+                pg_kotak_widget_t *r = buat_baris(font);
+                pg_label_t *lbl;
+                pg_angka_putar_t *sb;
+
+                sb = pg_buat_angka_putar(0, 100, 42, 1, font);
+                pg_widget_setel_kotak(pg_angka_putar_widget(sb),
+                        pg_buat_kotak(0, 0, 100, 28));
+                lbl = pg_buat_label("Nilai: 42", PG_WARNA_TEKS_TOMBOL, font);
+                pg_angka_putar_saatberubah(sb, cb_spinbox, lbl);
+                pg_kotak_tambah(r, pg_angka_putar_widget(sb), PG_SALAH);
+                pg_kotak_tambah(r, pg_label_widget(lbl), PG_SALAH);
+
+                /* Spinbox dengan langkah besar. */
+                {
+                        pg_angka_putar_t *sb2 = pg_buat_angka_putar(
+                                0, 1000, 500, 50, font);
+                        pg_widget_setel_kotak(pg_angka_putar_widget(sb2),
+                                pg_buat_kotak(0, 0, 100, 28));
+                        pg_kotak_tambah(r, pg_angka_putar_widget(sb2),
+                                        PG_SALAH);
+                }
+
+                /* Spinbox radius 4 (alternatif tema). */
+                {
+                        pg_angka_putar_t *sb4 = pg_buat_angka_putar(
+                                0, 100, 30, 5, font);
+                        pg_widget_setel_kotak(pg_angka_putar_widget(sb4),
+                                pg_buat_kotak(0, 0, 100, 28));
+                        pg_widget_setel_radius(pg_angka_putar_widget(sb4), 4);
+                        pg_kotak_tambah(r, pg_angka_putar_widget(sb4),
+                                        PG_SALAH);
+                }
+
+                /* Spinbox disabled. */
+                {
+                        pg_angka_putar_t *sb3 = pg_buat_angka_putar(
+                                0, 10, 5, 1, font);
+                        pg_widget_setel_kotak(pg_angka_putar_widget(sb3),
+                                pg_buat_kotak(0, 0, 100, 28));
+                        pg_angka_putar_setel_aktif(sb3, PG_SALAH);
+                        pg_kotak_tambah(r, pg_angka_putar_widget(sb3),
+                                        PG_SALAH);
+                }
+                pg_kotak_tambah(s, pg_kotak_widget(r), PG_SALAH);
+        }
+        return s;
+}
+
+static pg_kotak_widget_t *seksi_kotak_pencarian(pg_font_t *font)
+{
+        pg_kotak_widget_t *s = buat_seksi("Kotak Pencarian",
+                "Searchbox dengan placeholder + clear button (✕). "
+                "Klik ✕ untuk kosongkan.",
+                font);
+        {
+                pg_kotak_widget_t *r = buat_baris(font);
+                pg_label_t *lbl;
+                pg_kotak_pencarian_t *kp;
+
+                kp = pg_buat_kotak_pencarian("Cari sesuatu...", 64, font); if (g_klip) pg_kotak_pencarian_setel_papan_klip(kp, g_klip);
+                pg_widget_setel_kotak(pg_kotak_pencarian_widget(kp),
+                        pg_buat_kotak(0, 0, 240, 28));
+                lbl = pg_buat_label("Cari: ", PG_WARNA_TEKS_TOMBOL, font);
+                pg_kotak_pencarian_saatberubah(kp, cb_search, lbl);
+                pg_kotak_tambah(r, pg_kotak_pencarian_widget(kp), PG_SALAH);
+                pg_kotak_tambah(r, pg_label_widget(lbl), PG_SALAH);
+
+                /* Searchbox dengan teks awal + radius 4 (alternatif tema). */
+                {
+                        pg_kotak_pencarian_t *kp2 = pg_buat_kotak_pencarian(
+                                "Cari...", 64, font);
+                        pg_widget_setel_kotak(pg_kotak_pencarian_widget(kp2),
+                                pg_buat_kotak(0, 0, 240, 28));
+                        pg_widget_setel_radius(
+                                pg_kotak_pencarian_widget(kp2), 4);
+                        if (g_klip) pg_kotak_pencarian_setel_papan_klip(kp2, g_klip);
+                        pg_kotak_pencarian_setel_teks(kp2, "halo dunia");
+                        pg_kotak_tambah(r, pg_kotak_pencarian_widget(kp2),
+                                        PG_SALAH);
+                }
+
+                /* Searchbox disabled. */
+                {
+                        pg_kotak_pencarian_t *kp3 = pg_buat_kotak_pencarian(
+                                "Nonaktif", 64, font);
+                        pg_widget_setel_kotak(pg_kotak_pencarian_widget(kp3),
+                                pg_buat_kotak(0, 0, 240, 28));
+                        pg_kotak_pencarian_setel_aktif(kp3, PG_SALAH);
+                        pg_kotak_tambah(r, pg_kotak_pencarian_widget(kp3),
+                                        PG_SALAH);
+                }
+                pg_kotak_tambah(s, pg_kotak_widget(r), PG_SALAH);
+        }
+        return s;
+}
+
+static pg_kotak_widget_t *seksi_kotak_gabungan(pg_font_t *font)
+{
+        pg_kotak_widget_t *s = buat_seksi("Kotak Gabungan",
+                "Combobox editable dengan popup dropdown. Klik ▼ atau "
+                "panah bawah untuk buka popup.",
+                font);
+        {
+                pg_kotak_widget_t *r = buat_baris(font);
+                pg_label_t *lbl;
+                pg_kotak_gabungan_t *kg;
+
+                kg = pg_buat_kotak_gabungan(NULL, 64, font);
+                pg_widget_setel_kotak(pg_kotak_gabungan_widget(kg),
+                        pg_buat_kotak(0, 0, 200, 28));
+                pg_kotak_gabungan_tambah_item(kg, "Pilihan A");
+                pg_kotak_gabungan_tambah_item(kg, "Pilihan B");
+                pg_kotak_gabungan_tambah_item(kg, "Pilihan C");
+                pg_kotak_gabungan_tambah_item(kg, "Pilihan D");
+                if (g_klip) pg_kotak_gabungan_setel_papan_klip(kg, g_klip);
+                pg_kotak_gabungan_setel_terpilih(kg, 0);
+                lbl = pg_buat_label("Idx: 0", PG_WARNA_TEKS_TOMBOL, font);
+                pg_kotak_gabungan_saatberubah(kg, cb_combo, lbl);
+                pg_kotak_tambah(r, pg_kotak_gabungan_widget(kg), PG_SALAH);
+                pg_kotak_tambah(r, pg_label_widget(lbl), PG_SALAH);
+
+                /* Combobox dengan radius 6 (alternatif tema). */
+                {
+                        pg_kotak_gabungan_t *kg2 = pg_buat_kotak_gabungan(
+                                NULL, 64, font);
+                        pg_widget_setel_kotak(pg_kotak_gabungan_widget(kg2),
+                                pg_buat_kotak(0, 0, 200, 28));
+                        pg_widget_setel_radius(
+                                pg_kotak_gabungan_widget(kg2), 6);
+                        pg_kotak_gabungan_tambah_item(kg2, "Merah");
+                        pg_kotak_gabungan_tambah_item(kg2, "Hijau");
+                        pg_kotak_gabungan_tambah_item(kg2, "Biru");
+                        if (g_klip) pg_kotak_gabungan_setel_papan_klip(kg2, g_klip);
+                        pg_kotak_gabungan_setel_terpilih(kg2, 0);
+                        pg_kotak_tambah(r, pg_kotak_gabungan_widget(kg2),
+                                        PG_SALAH);
+                }
+
+                /* Combobox disabled. */
+                {
+                        pg_kotak_gabungan_t *kg3 = pg_buat_kotak_gabungan(
+                                NULL, 64, font);
+                        pg_widget_setel_kotak(pg_kotak_gabungan_widget(kg3),
+                                pg_buat_kotak(0, 0, 200, 28));
+                        pg_kotak_gabungan_tambah_item(kg3, "Disabled");
+                        pg_kotak_gabungan_setel_aktif(kg3, PG_SALAH);
+                        pg_kotak_tambah(r, pg_kotak_gabungan_widget(kg3),
+                                        PG_SALAH);
+                }
+                pg_kotak_tambah(s, pg_kotak_widget(r), PG_SALAH);
+        }
+        return s;
+}
+
+static pg_kotak_widget_t *seksi_multi_teks(pg_font_t *font)
+{
+        pg_kotak_widget_t *s = buat_seksi("Multi Teks",
+                "Multiline text editor. Enter untuk baris baru, "
+                "Shift+klik untuk seleksi, Backspace/Delete.",
+                font);
+        {
+                pg_kotak_widget_t *r = buat_baris(font);
+                pg_multi_teks_t *mt;
+
+                mt = pg_buat_multi_teks(
+                        "Baris pertama\nBaris kedua\nBaris ketiga",
+                        512, font);
+                pg_widget_setel_kotak(pg_multi_teks_widget(mt),
+                        pg_buat_kotak(0, 0, 300, 100));
+                pg_multi_teks_setel_bungkus(mt, PG_BENAR);
+                if (g_klip) pg_multi_teks_setel_papan_klip(mt, g_klip);
+                pg_kotak_tambah(r, pg_multi_teks_widget(mt), PG_SALAH);
+
+                /* Multi_teks dengan radius 4 (alternatif tema). */
+                {
+                        pg_multi_teks_t *mt_r = pg_buat_multi_teks(
+                                "Multi_teks rounded\nBorder halus\nAA konsisten",
+                                128, font);
+                        pg_widget_setel_kotak(pg_multi_teks_widget(mt_r),
+                                pg_buat_kotak(0, 0, 200, 100));
+                        if (g_klip) pg_multi_teks_setel_papan_klip(mt_r, g_klip);
+                        pg_widget_setel_radius(pg_multi_teks_widget(mt_r), 4);
+                        pg_kotak_tambah(r, pg_multi_teks_widget(mt_r),
+                                        PG_SALAH);
+                }
+
+                /* Multi_teks disabled. */
+                {
+                        pg_multi_teks_t *mt2 = pg_buat_multi_teks(
+                                "Tidak bisa diubah\nkarena disabled",
+                                128, font);
+                        pg_widget_setel_kotak(pg_multi_teks_widget(mt2),
+                                pg_buat_kotak(0, 0, 200, 100));
+                        pg_multi_teks_setel_aktif(mt2, PG_SALAH);
+                        pg_kotak_tambah(r, pg_multi_teks_widget(mt2),
+                                        PG_SALAH);
+                }
+                pg_kotak_tambah(s, pg_kotak_widget(r), PG_SALAH);
+        }
         return s;
 }
 
@@ -451,25 +829,25 @@ static pg_kotak_widget_t *seksi_radio(pg_font_t *font)
         /* Row 1: group dengan 3 pilihan. */
         {
                 pg_kotak_widget_t *r = buat_baris(font);
-                pg_radio_grup_t *g = pg_buat_radio_grup();
+                pg_tombol_radio_grup_t *g = pg_buat_tombol_radio_grup();
                 {
-                        pg_radio_t *r1 = pg_buat_radio(g, "Pilihan A", font);
-                        pg_radio_pilih(r1);
+                        pg_tombol_radio_t *r1 = pg_buat_tombol_radio(g, "Pilihan A", font);
+                        pg_tombol_radio_pilih(r1);
                         pg_kotak_tambah(r,
                                 pg_kotak_widget(buat_item("A (terpilih)",
-                                        pg_radio_widget(r1), font)), PG_SALAH);
+                                        pg_tombol_radio_widget(r1), font)), PG_SALAH);
                 }
                 {
-                        pg_radio_t *r2 = pg_buat_radio(g, "Pilihan B", font);
+                        pg_tombol_radio_t *r2 = pg_buat_tombol_radio(g, "Pilihan B", font);
                         pg_kotak_tambah(r,
                                 pg_kotak_widget(buat_item("B",
-                                        pg_radio_widget(r2), font)), PG_SALAH);
+                                        pg_tombol_radio_widget(r2), font)), PG_SALAH);
                 }
                 {
-                        pg_radio_t *r3 = pg_buat_radio(g, "Pilihan C", font);
+                        pg_tombol_radio_t *r3 = pg_buat_tombol_radio(g, "Pilihan C", font);
                         pg_kotak_tambah(r,
                                 pg_kotak_widget(buat_item("C",
-                                        pg_radio_widget(r3), font)), PG_SALAH);
+                                        pg_tombol_radio_widget(r3), font)), PG_SALAH);
                 }
                 pg_kotak_tambah(s, pg_kotak_widget(r), PG_SALAH);
         }
@@ -477,21 +855,21 @@ static pg_kotak_widget_t *seksi_radio(pg_font_t *font)
         /* Row 2: posisi + ukuran. */
         {
                 pg_kotak_widget_t *r = buat_baris(font);
-                pg_radio_grup_t *g2 = pg_buat_radio_grup();
+                pg_tombol_radio_grup_t *g2 = pg_buat_tombol_radio_grup();
                 {
-                        pg_radio_t *r1 = pg_buat_radio(g2, "Kanan", font);
-                        pg_radio_setel_posisi(r1, PG_POSISI_KANAN);
-                        pg_radio_pilih(r1);
+                        pg_tombol_radio_t *r1 = pg_buat_tombol_radio(g2, "Kanan", font);
+                        pg_tombol_radio_setel_posisi(r1, PG_POSISI_KANAN);
+                        pg_tombol_radio_pilih(r1);
                         pg_kotak_tambah(r,
                                 pg_kotak_widget(buat_item("posisi kanan",
-                                        pg_radio_widget(r1), font)), PG_SALAH);
+                                        pg_tombol_radio_widget(r1), font)), PG_SALAH);
                 }
                 {
-                        pg_radio_t *r2 = pg_buat_radio(g2, "Besar", font);
-                        pg_radio_setel_ukuran(r2, 20);
+                        pg_tombol_radio_t *r2 = pg_buat_tombol_radio(g2, "Besar", font);
+                        pg_tombol_radio_setel_ukuran(r2, 20);
                         pg_kotak_tambah(r,
                                 pg_kotak_widget(buat_item("ukuran 20",
-                                        pg_radio_widget(r2), font)), PG_SALAH);
+                                        pg_tombol_radio_widget(r2), font)), PG_SALAH);
                 }
                 pg_kotak_tambah(s, pg_kotak_widget(r), PG_SALAH);
         }
@@ -541,6 +919,12 @@ static void build(app_t *a)
         pg_kotak_setel_padding_kotak(a->content, 12);
 
         /* Sections. */
+        {
+                pg_kotak_widget_t *s_ikon = seksi_ikon(a);
+                if (s_ikon)
+                        pg_kotak_tambah(a->content,
+                                pg_kotak_widget(s_ikon), PG_SALAH);
+        }
         pg_kotak_tambah(a->content,
                 pg_kotak_widget(seksi_tombol(a->font)), PG_SALAH);
         pg_kotak_tambah(a->content,
@@ -550,18 +934,28 @@ static void build(app_t *a)
         pg_kotak_tambah(a->content,
                 pg_kotak_widget(seksi_isian_teks(a->font)), PG_SALAH);
         pg_kotak_tambah(a->content,
-                pg_kotak_widget(seksi_cek(a->font)), PG_SALAH);
+                pg_kotak_widget(seksi_penanda(a->font)), PG_SALAH);
         pg_kotak_tambah(a->content,
                 pg_kotak_widget(seksi_radio(a->font)), PG_SALAH);
+        pg_kotak_tambah(a->content,
+                pg_kotak_widget(seksi_bilah_geser(a->font)), PG_SALAH);
+        pg_kotak_tambah(a->content,
+                pg_kotak_widget(seksi_angka_putar(a->font)), PG_SALAH);
+        pg_kotak_tambah(a->content,
+                pg_kotak_widget(seksi_kotak_pencarian(a->font)), PG_SALAH);
+        pg_kotak_tambah(a->content,
+                pg_kotak_widget(seksi_kotak_gabungan(a->font)), PG_SALAH);
+        pg_kotak_tambah(a->content,
+                pg_kotak_widget(seksi_multi_teks(a->font)), PG_SALAH);
 
         /* Set ukuran content. */
         pg_widget_setel_kotak(pg_kotak_widget(a->content),
-                pg_buat_kotak(0, 0, W_AWAL, 1600));
+                pg_buat_kotak(0, 0, W_AWAL, 2600));
         pg_kotak_tata(a->content);
 
         /* Set anak gulir. */
         pg_gulir_setel_anak(a->scroll,
-                pg_kotak_widget(a->content), W_AWAL, 1600);
+                pg_kotak_widget(a->content), W_AWAL, 2600);
 
         a->root = root;
 }
@@ -576,17 +970,17 @@ static void catat_all(app_t *a, pg_permukaan_t *s)
 
 /* ===== Event ===== */
 
-static void on_event(const pg_peristiwa_t *e, void *ctx)
+static void on_event(const pg_aksi_t *e, void *ctx)
 {
         app_t *a = ctx;
-        if (e->tipe == PG_PERISTIWA_KELUAR) {
+        if (e->tipe == PG_AKSI_KELUAR) {
                 pg_hentikan_perulangan(a->loop);
                 return;
         }
-        if (e->tipe == PG_PERISTIWA_JENDELA) {
-                if (e->jendela_peristiwa == PG_JENDELA_TUTUP) {
+        if (e->tipe == PG_AKSI_JENDELA) {
+                if (e->jendela_aksi == PG_JENDELA_TUTUP) {
                         pg_hentikan_perulangan(a->loop);
-                } else if (e->jendela_peristiwa == PG_JENDELA_UBAH_UKURAN) {
+                } else if (e->jendela_aksi == PG_JENDELA_UBAH_UKURAN) {
                         /* Window di-resize/maximize: update layout. */
                         pg_layar_info_t info;
                         if (pg_layar_kueri(a->layar, &info) == PG_OK) {
@@ -599,12 +993,12 @@ static void on_event(const pg_peristiwa_t *e, void *ctx)
                 }
                 return;
         }
-        if (e->tipe == PG_PERISTIWA_TOMBOL_TURUN &&
+        if (e->tipe == PG_AKSI_TOMBOL_TURUN &&
             e->tombol == PG_TOMBOL_ESCAPE) {
                 pg_hentikan_perulangan(a->loop);
                 return;
         }
-        pg_widget_tangani_peristiwa(pg_kotak_widget(a->root), e);
+        pg_widget_tangani_aksi(pg_kotak_widget(a->root), e);
 }
 
 /* ===== Idle ===== */
@@ -648,6 +1042,13 @@ int main(int argc, char **argv)
                 return 1;
         }
 
+        /* Font ikon Material Design subset (5.9KB, 65 ikon). */
+        a.font_ikon = pg_buat_font_ttf(
+                "data/font/MaterialIcons-Subset.ttf", 18);
+        if (!a.font_ikon) {
+                fprintf(stderr, "Gagal load font ikon (lanjut tanpa ikon)\n");
+        }
+
         memset(&lcfg, 0, sizeof(lcfg));
         lcfg.lebar = W_AWAL;
         lcfg.tinggi = H_AWAL;
@@ -656,7 +1057,7 @@ int main(int argc, char **argv)
         if (err != PG_OK) {
                 fprintf(stderr, "pg_buka_layar: %s\n",
                         pg_galat_pesan(pg_galat_terakhir()));
-                pg_hancur_font(a.font);
+                pg_hancur_font(a.font); if (a.font_ikon) pg_hancur_font(a.font_ikon);
                 pigura_selesai();
                 return 1;
         }
@@ -667,7 +1068,7 @@ int main(int argc, char **argv)
                 fprintf(stderr, "pg_buka_masukan: %s\n",
                         pg_galat_pesan(pg_galat_terakhir()));
                 pg_tutup_layar(a.layar);
-                pg_hancur_font(a.font);
+                pg_hancur_font(a.font); if (a.font_ikon) pg_hancur_font(a.font_ikon);
                 pigura_selesai();
                 return 1;
         }
@@ -689,7 +1090,7 @@ int main(int argc, char **argv)
                         pg_galat_pesan(pg_galat_terakhir()));
                 pg_tutup_masukan(a.masukan);
                 pg_tutup_layar(a.layar);
-                pg_hancur_font(a.font);
+                pg_hancur_font(a.font); if (a.font_ikon) pg_hancur_font(a.font_ikon);
                 pigura_selesai();
                 return 1;
         }
@@ -701,7 +1102,7 @@ int main(int argc, char **argv)
         if (a.klip) pg_papan_klip_tutup(a.klip);
         pg_tutup_layar(a.layar);
         pg_kotak_hancur(a.root);
-        pg_hancur_font(a.font);
+        pg_hancur_font(a.font); if (a.font_ikon) pg_hancur_font(a.font_ikon);
         pigura_selesai();
         return 0;
 }

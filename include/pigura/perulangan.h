@@ -10,7 +10,7 @@
 #define PIGURA_PERULANGAN_H
 
 #include "pigura/tipe.h"
-#include "pigura/peristiwa.h"
+#include "pigura/aksi.h"
 #include "pigura/masukan.h"
 #include "pigura/layar.h"
 
@@ -20,7 +20,7 @@ extern "C" {
 
 typedef struct pg_perulangan pg_perulangan_t;
 
-typedef void (*pg_peristiwa_cb)(const pg_peristiwa_t *e, void *ctx);
+typedef void (*pg_aksi_cb)(const pg_aksi_t *e, void *ctx);
 typedef void (*pg_idle_cb)(void *ctx);
 
 typedef struct pg_perulangan_config {
@@ -40,20 +40,20 @@ pg_galat pg_hancur_perulangan(pg_perulangan_t *loop);
 
 /* Jalankan sampai pg_hentikan_perulangan() dipanggil. */
 pg_galat pg_jalankan_perulangan(pg_perulangan_t *loop,
-                                  pg_peristiwa_cb cb, void *ctx);
+                                  pg_aksi_cb cb, void *ctx);
 
 /* Sinyal berhenti. Thread-safe. */
 void pg_hentikan_perulangan(pg_perulangan_t *loop);
 
 /* Dorong peristiwa sintetik. Thread-safe. */
-pg_galat pg_perulangan_emit(pg_perulangan_t *loop,
-                              const pg_peristiwa_t *e);
+pg_galat pg_perulangan_kirim(pg_perulangan_t *loop,
+                              const pg_aksi_t *e);
 
 /* Polling tanpa blok. */
-int pg_perulangan_poll(pg_perulangan_t *loop, pg_peristiwa_t *buf, int maks);
+int pg_perulangan_poll(pg_perulangan_t *loop, pg_aksi_t *buf, int maks);
 
 /* Tunggu peristiwa. */
-int pg_perulangan_tunggu(pg_perulangan_t *loop, pg_peristiwa_t *buf,
+int pg_perulangan_tunggu(pg_perulangan_t *loop, pg_aksi_t *buf,
                           int maks, unsigned timeout_ms);
 
 #ifdef __cplusplus
