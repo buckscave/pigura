@@ -31,7 +31,7 @@
 struct pg_perulangan {
         pg_kunci_t   *kunci;
         pg_kondisi_t *kondisi;
-        pg_peristiwa_t antrian[PG_PERULANGAN_ANTRIAN];
+        pg_aksi_t antrian[PG_PERULANGAN_ANTRIAN];
         int           kepala, ekor, jumlah;
         volatile pg_s32 berhenti;
         pg_masukan_t *masukan;
@@ -77,9 +77,9 @@ pg_galat pg_hancur_perulangan(pg_perulangan_t *loop)
 }
 
 pg_galat pg_jalankan_perulangan(pg_perulangan_t *loop,
-                                  pg_peristiwa_cb cb, void *ctx)
+                                  pg_aksi_cb cb, void *ctx)
 {
-        pg_peristiwa_t buf[64];
+        pg_aksi_t buf[64];
         int n, i;
 
         if (!loop || !cb) PG_KEMBALI_GALAT(PG_GALAT_ARGUMEN);
@@ -106,9 +106,9 @@ pg_galat pg_jalankan_perulangan(pg_perulangan_t *loop,
                         }
                 }
 
-                /* Proses SEMUA peristiwa, TANPA render di dalamnya. */
+                /* Proses SEMUA aksi, TANPA render di dalamnya. */
                 for (;;) {
-                        pg_peristiwa_t ev;
+                        pg_aksi_t ev;
                         pg_kunci_kunci(loop->kunci);
                         if (loop->jumlah > 0) {
                                 ev = loop->antrian[loop->kepala];
@@ -116,10 +116,10 @@ pg_galat pg_jalankan_perulangan(pg_perulangan_t *loop,
                                         PG_PERULANGAN_ANTRIAN;
                                 loop->jumlah--;
                         } else {
-                                ev.tipe = PG_PERISTIWA_KOSONG;
+                                ev.tipe = PG_AKSI_KOSONG;
                         }
                         pg_kunci_buka(loop->kunci);
-                        if (ev.tipe == PG_PERISTIWA_KOSONG) break;
+                        if (ev.tipe == PG_AKSI_KOSONG) break;
                         cb(&ev, ctx);
                         ada_peristiwa = 1;
                 }
@@ -151,7 +151,7 @@ void pg_hentikan_perulangan(pg_perulangan_t *loop)
         pg_atom_simpan(&loop->berhenti, 1);
 }
 
-pg_galat pg_perulangan_emit(pg_perulangan_t *loop, const pg_peristiwa_t *e)
+pg_galat pg_perulangan_kirim(pg_perulangan_t *loop, const pg_aksi_t *e)
 {
         if (!loop || !e) PG_KEMBALI_GALAT(PG_GALAT_ARGUMEN);
         pg_kunci_kunci(loop->kunci);
@@ -164,7 +164,7 @@ pg_galat pg_perulangan_emit(pg_perulangan_t *loop, const pg_peristiwa_t *e)
         return PG_OK;
 }
 
-int pg_perulangan_poll(pg_perulangan_t *loop, pg_peristiwa_t *buf, int maks)
+int pg_perulangan_poll(pg_perulangan_t *loop, pg_aksi_t *buf, int maks)
 {
         int n = 0;
         if (!loop || !buf || maks <= 0) return 0;
@@ -178,7 +178,7 @@ int pg_perulangan_poll(pg_perulangan_t *loop, pg_peristiwa_t *buf, int maks)
         return n;
 }
 
-int pg_perulangan_tunggu(pg_perulangan_t *loop, pg_peristiwa_t *buf,
+int pg_perulangan_tunggu(pg_perulangan_t *loop, pg_aksi_t *buf,
                           int maks, unsigned timeout_ms)
 {
         if (!loop || !buf || maks <= 0) return 0;

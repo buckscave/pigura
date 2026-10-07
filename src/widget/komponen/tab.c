@@ -19,7 +19,7 @@
 #include "pigura/permukaan.h"
 #include "pigura/gambar.h"
 #include "pigura/font.h"
-#include "pigura/peristiwa.h"
+#include "pigura/aksi.h"
 #include "pigura/widget.h"
 
 #include <stdlib.h>
@@ -150,12 +150,12 @@ static void pg_tab_catat_v(pg_widget_t *w, pg_permukaan_t *s)
 }
 
 static pg_bool pg_tab_peristiwa_v(pg_widget_t *w,
-                                   const pg_peristiwa_t *e)
+                                   const pg_aksi_t *e)
 {
         pg_tab_t *t = pg_tab_dari(w);
         int       i, x, tw, idx;
-        if (e->tipe == PG_PERISTIWA_TETIK_TURUN &&
-            e->tetik_tombol == PG_TETIK_KIRI &&
+        if (e->tipe == PG_AKSI_TETIKUS_TEKAN &&
+            e->tetik_tombol == PG_TETIKUS_KIRI &&
             e->tetik_pos.y < t->tab_h) {
                 /* Hitung tab mana yang diklik. */
                 x = 0;
@@ -175,7 +175,7 @@ static pg_bool pg_tab_peristiwa_v(pg_widget_t *w,
                 }
                 return PG_BENAR;
         }
-        if (e->tipe == PG_PERISTIWA_TETIK_GERAK &&
+        if (e->tipe == PG_AKSI_TETIKUS_GERAK &&
             e->tetik_pos.y < t->tab_h) {
                 x = 0;
                 idx = -1;
@@ -197,9 +197,9 @@ static pg_bool pg_tab_peristiwa_v(pg_widget_t *w,
         /* Teruskan ke child aktif. */
         if (t->aktif >= 0 && t->aktif < t->n_item &&
             t->item[t->aktif].child) {
-                pg_peristiwa_t e2 = *e;
+                pg_aksi_t e2 = *e;
                 e2.tetik_pos.y -= t->tab_h;
-                return pg_widget_tangani_peristiwa(
+                return pg_widget_tangani_aksi(
                         t->item[t->aktif].child, &e2);
         }
         return PG_SALAH;

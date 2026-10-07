@@ -2,7 +2,7 @@
 #include "pigura/permukaan.h"
 #include "pigura/gambar.h"
 #include "pigura/font.h"
-#include "pigura/peristiwa.h"
+#include "pigura/aksi.h"
 #include "pigura/widget.h"
 #include <stdlib.h>
 struct pg_spinbutton {
@@ -31,15 +31,15 @@ static void catat_v(pg_widget_t *w, pg_permukaan_t *s) {
 	  pg_garis_h_permukaan(s,cx-2,cx+2,cy-1,sb->fg);
 	  pg_garis_h_permukaan(s,cx-3,cx+3,cy,sb->fg); }
 }
-static pg_bool peristiwa_v(pg_widget_t *w, const pg_peristiwa_t *e) {
+static pg_bool peristiwa_v(pg_widget_t *w, const pg_aksi_t *e) {
 	pg_spinbutton_t *sb=d(w); int sh=w->kotak.h;
-	if(e->tipe==PG_PERISTIWA_TETIK_TURUN && e->tetik_tombol==PG_TETIK_KIRI) {
+	if(e->tipe==PG_AKSI_TETIKUS_TEKAN && e->tetik_tombol==PG_TETIKUS_KIRI) {
 		if(e->tetik_pos.y<sh/2) { sb->naik_tekan=PG_BENAR; if(sb->cb)sb->cb(sb,1,sb->ctx); }
 		else { sb->turun_tekan=PG_BENAR; if(sb->cb)sb->cb(sb,0,sb->ctx); }
 		pg_widget_kotor(w); return PG_BENAR;
 	}
-	if(e->tipe==PG_PERISTIWA_TETIK_NAIK) { sb->naik_tekan=PG_SALAH; sb->turun_tekan=PG_SALAH; pg_widget_kotor(w); return PG_BENAR; }
-	if(e->tipe==PG_PERISTIWA_TETIK_GERAK) {
+	if(e->tipe==PG_AKSI_TETIKUS_LEPAS) { sb->naik_tekan=PG_SALAH; sb->turun_tekan=PG_SALAH; pg_widget_kotor(w); return PG_BENAR; }
+	if(e->tipe==PG_AKSI_TETIKUS_GERAK) {
 		pg_bool nh=(e->tetik_pos.y<sh/2)?PG_BENAR:PG_SALAH;
 		pg_bool th=!nh;
 		if(nh!=sb->naik_hover||th!=sb->turun_hover) { sb->naik_hover=nh; sb->turun_hover=th; pg_widget_kotor(w); }

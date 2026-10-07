@@ -2,7 +2,7 @@
 #include "pigura/permukaan.h"
 #include "pigura/gambar.h"
 #include "pigura/font.h"
-#include "pigura/peristiwa.h"
+#include "pigura/aksi.h"
 #include "pigura/widget.h"
 #include <stdlib.h>
 #include <string.h>
@@ -33,13 +33,13 @@ static void catat_v(pg_widget_t *w, pg_permukaan_t *s) {
 		pg_garis_v_permukaan(s,cx,y-pg_font_ascent(pi->font),y+2,pi->fg);
 	}
 }
-static pg_bool peristiwa_v(pg_widget_t *w, const pg_peristiwa_t *e) {
+static pg_bool peristiwa_v(pg_widget_t *w, const pg_aksi_t *e) {
 	pg_passwordinput_t *pi=d(w);
-	if(e->tipe==PG_PERISTIWA_TETIK_TURUN && e->tetik_tombol==PG_TETIK_KIRI) {
+	if(e->tipe==PG_AKSI_TETIKUS_TEKAN && e->tetik_tombol==PG_TETIKUS_KIRI) {
 		if(!pg_widget_punya_fokus(w)) pg_widget_fokus(w);
 		return PG_BENAR;
 	}
-	if(e->tipe!=PG_PERISTIWA_TOMBOL_TURUN || !pg_widget_punya_fokus(w)) return PG_SALAH;
+	if(e->tipe!=PG_AKSI_TOMBOL_TURUN || !pg_widget_punya_fokus(w)) return PG_SALAH;
 	if(e->tombol==PG_TOMBOL_BACKSPACE) {
 		if(pi->kursor>0 && pi->len>0) { int i; for(i=pi->kursor-1;i<pi->len-1;i++) pi->buf[i]=pi->buf[i+1]; pi->len--; pi->kursor--; pi->buf[pi->len]=0; pg_widget_kotor(w); fire(pi); }
 		return PG_BENAR;

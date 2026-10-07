@@ -26,7 +26,7 @@
 #include "pigura/permukaan.h"
 #include "pigura/gambar.h"
 #include "pigura/font.h"
-#include "pigura/peristiwa.h"
+#include "pigura/aksi.h"
 #include "pigura/widget.h"
 #include "pigura/utf8.h"
 
@@ -85,6 +85,11 @@ struct pg_isian_teks {
         pg_u32        blink_acu_ms;  /* anchor time for blink cycle */
         pg_bool       blink_nyala;  /* cursor currently visible */
 
+        /* Hover state untuk visual feedback saat mouse di atas widget
+         * (tidak fokus). Idle = batas #969696; hover = batas gelap
+         * sedikit (#6E6E6E) supaya kelihatan interaktif. */
+        pg_bool       hover;
+
         /* Warna custom (PG_TRANSPARAN = pakai tema). */
         pg_warna_t    fg;
         pg_warna_t    latar;
@@ -104,20 +109,34 @@ static pg_u32 pg_isian_sekarang_ms(void)
                          (pg_u64)ts.tv_nsec / 1000000ULL);
 }
 
-/* ---- Helper warna tema ---- */
+/* ---- Helper warna tema ----
+ * State visual:
+ *   - nonaktif (base.aktif=SALAH): isi NONAKTIF_ISI, batas ABU_TERANG,
+ *     teks NONAKTIF_TEKS. Tidak respon input.
+ *   - fokus: batas FOKUS (biru). Override semua state lain.
+ *   - hover (tidak fokus): batas gelap sedikit (#6E6E6E) supaya
+ *     kelihatan interaktif. Isi tetap PANEL.
+ *   - idle (tidak fokus, tidak hover): batas HOVER_OUTLINE (#969696). */
 static pg_warna_t pg_isian_warna_fg(pg_isian_teks_t *it)
 {
+        if (!it->base.aktif) return PG_WARNA_NONAKTIF_TEKS;
         if (it->fg != PG_TRANSPARAN) return it->fg;
         return PG_WARNA_TEKS_TOMBOL;
 }
 static pg_warna_t pg_isian_warna_latar(pg_isian_teks_t *it)
 {
+        if (!it->base.aktif) return PG_WARNA_NONAKTIF_ISI;
         if (it->latar != PG_TRANSPARAN) return it->latar;
         return PG_WARNA_PANEL;
 }
 static pg_warna_t pg_isian_warna_batas(pg_isian_teks_t *it)
 {
+        /* Fokus override segalanya. */
+        if (pg_widget_punya_fokus(&it->base)) return PG_WARNA_FOKUS;
+        if (!it->base.aktif) return PG_ABU_TERANG;
         if (it->batas != PG_TRANSPARAN) return it->batas;
+        /* Hover: gelapkan outline idle sedikit. */
+        if (it->hover) return PG_RGB(0x6E, 0x6E, 0x6E);
         return PG_WARNA_HOVER_OUTLINE;
 }
 
@@ -407,26 +426,6 @@ static void sesuaikan_gulir(pg_isian_teks_t *it, int sw)
         }
 }
 
-/* Gambar outline (border) kotak dengan radius opsional. */
-static void gambar_outline(pg_permukaan_t *s, pg_kotak_t r,
-                            int radius, pg_warna_t c)
-{
-        if (radius > 0)
-                pg_gambar_kotak_tumpul_aa(s, r, radius, c);
-        else
-                pg_gambar_kotak_aa(s, r, c);
-}
-
-/* Gambar isi (fill) kotak dengan radius opsional. */
-static void gambar_isi(pg_permukaan_t *s, pg_kotak_t r,
-                        int radius, pg_warna_t c)
-{
-        if (radius > 0)
-                pg_gambar_kotak_tumpul_isi_aa(s, r, radius, c);
-        else
-                pg_isi_permukaan(s, c);
-}
-
 /* ---- vtable: catat ---- */
 static void pg_isian_catat_v(pg_widget_t *w, pg_permukaan_t *s)
 {
@@ -446,23 +445,19 @@ static void pg_isian_catat_v(pg_widget_t *w, pg_permukaan_t *s)
         warna_batas = pg_isian_warna_batas(it);
         warna_fg    = pg_isian_warna_fg(it);
 
-        /* Smart latar: bila alpha < 255, isi transparan (lalu gambar
-         * fill rounded); bila opaque, isi langsung dengan latar. */
+        /* latar cerdas: bila alpha < 255, isi transparan (lalu gambar
+         * fill+outline single-pass); bila opaque, isi langsung dengan
+         * latar (single-pass tetap, fill sudah diisi oleh latar). */
         if (PG_A(w->latar) < 255) {
                 pg_isi_permukaan(s, PG_TRANSPARAN);
-                gambar_isi(s, r, radius, warna_latar);
-        } else {
-                /* widget.c sudah isi dengan w->latar. Kita gambar ulang
-                 * supaya rounded corners konsisten saat radius > 0. */
-                if (radius > 0)
-                        gambar_isi(s, r, radius, warna_latar);
         }
 
-        /* Outline border (tipis). Fokus override ke biru. */
-        if (pg_widget_punya_fokus(w))
-                gambar_outline(s, r, radius, PG_WARNA_FOKUS);
-        else
-                gambar_outline(s, r, radius, warna_batas);
+        /* Render isi + outline dalam satu pass (Cairo-quality:
+         * 4x4/8x8 supersampling adaptif + sqrt(cov) gamma).
+         * Warna isi dan batas sudah dihitung di atas dengan
+         * mempertimbangkan state: aktif / hover / fokus. */
+        pg_gambar_kotak_tumpul_isi_garis_aa(s, r, radius,
+                                              warna_latar, warna_batas);
 
         if (!it->font) return;
 
@@ -571,13 +566,37 @@ static void pg_isian_catat_v(pg_widget_t *w, pg_permukaan_t *s)
 /* ---- vtable: event handler ---- */
 
 static pg_bool pg_isian_peristiwa_v(pg_widget_t *w,
-                                      const pg_peristiwa_t *e)
+                                      const pg_aksi_t *e)
 {
         pg_isian_teks_t *it = pg_isian_dari(w);
+        int sw, sh;
+
+        /* Nonaktif: tidak respon input sama sekali. */
+        if (!w->aktif) return PG_SALAH;
+
+        /* GERAK tanpa tombol: update hover state. */
+        if (e->tipe == PG_AKSI_TETIKUS_GERAK && !it->menyeret) {
+                sw = w->kotak.w;
+                sh = w->kotak.h;
+                {
+                        int mx = e->tetik_pos.x;
+                        int my = e->tetik_pos.y;
+                        pg_bool new_hover = (mx >= 0 && mx < sw &&
+                                              my >= 0 && my < sh) ?
+                                PG_BENAR : PG_SALAH;
+                        if (it->hover != new_hover) {
+                                it->hover = new_hover;
+                                pg_widget_kotor(w);
+                        }
+                }
+                /* Jangan consume — biarkan event lanjut ke drag-selection
+                 * check di bawah. Tapi karena !menyeret, drag check juga
+                 * tidak akan aktif. */
+        }
 
         /* TETIK_TURUN: fokus + klik untuk posisi kursor. */
-        if (e->tipe == PG_PERISTIWA_TETIK_TURUN &&
-            e->tetik_tombol == PG_TETIK_KIRI) {
+        if (e->tipe == PG_AKSI_TETIKUS_TEKAN &&
+            e->tetik_tombol == PG_TETIKUS_KIRI) {
                 int pos;
                 if (!pg_widget_punya_fokus(w))
                         pg_widget_fokus(w);
@@ -598,8 +617,8 @@ static pg_bool pg_isian_peristiwa_v(pg_widget_t *w,
         }
 
         /* TETIK_NAIK: end drag selection. */
-        if (e->tipe == PG_PERISTIWA_TETIK_NAIK &&
-            e->tetik_tombol == PG_TETIK_KIRI) {
+        if (e->tipe == PG_AKSI_TETIKUS_LEPAS &&
+            e->tetik_tombol == PG_TETIKUS_KIRI) {
                 if (!pg_widget_punya_fokus(w) && !it->menyeret)
                         return PG_SALAH;
                 it->menyeret = PG_SALAH;
@@ -610,7 +629,7 @@ static pg_bool pg_isian_peristiwa_v(pg_widget_t *w,
         }
 
         /* GERAK: drag selection — extend selection saat mouse held. */
-        if (e->tipe == PG_PERISTIWA_TETIK_GERAK &&
+        if (e->tipe == PG_AKSI_TETIKUS_GERAK &&
             it->menyeret && it->sel_mulai >= 0) {
                 int pos = kursor_dari_klik(it, e->tetik_pos.x - it->padding);
                 it->sel_akhir = pos;
@@ -619,7 +638,7 @@ static pg_bool pg_isian_peristiwa_v(pg_widget_t *w,
                 return PG_BENAR;
         }
 
-        if (e->tipe != PG_PERISTIWA_TOMBOL_TURUN) return PG_SALAH;
+        if (e->tipe != PG_AKSI_TOMBOL_TURUN) return PG_SALAH;
         if (!pg_widget_punya_fokus(w)) return PG_SALAH;
 
         /* Setiap keypress me-reset blink supaya cursor langsung
@@ -918,6 +937,7 @@ pg_isian_teks_t *pg_buat_isian_teks(const char *awal,
         pg_widget_init(&it->base, PG_WIDGET_ISIAN_TEK,
                        &pg_isian_vtable);
         pg_widget_milik(&it->base, PG_BENAR);
+        it->base.latar = PG_TRANSPARAN; /* opaque supaya outline AA utuh */
         it->font = font;
         it->fg = PG_TRANSPARAN;       /* pakai tema */
         it->latar = PG_TRANSPARAN;    /* pakai tema */
@@ -1181,6 +1201,33 @@ void pg_isian_teks_setel_padding(pg_isian_teks_t *it, int padding)
         it->padding = padding;
         pg_isian_update_min(it);
         pg_widget_kotor(&it->base);
+}
+
+/* ---- Aktif / Nonaktif ---- */
+void pg_isian_teks_setel_aktif(pg_isian_teks_t *it, pg_bool aktif)
+{
+        if (!it) return;
+        if (aktif) {
+                pg_widget_aktifkan(&it->base);
+        } else {
+                pg_widget_nonaktifkan(&it->base);
+                /* Lepaskan fokus bila sedang fokus. */
+                if (it->base.fokus) pg_widget_blur(&it->base);
+                /* Reset hover state supaya tidak tertinggal. */
+                it->hover = PG_SALAH;
+                /* Reset drag state. */
+                it->menyeret = PG_SALAH;
+                if (it->sel_mulai >= 0) {
+                        it->sel_mulai = -1;
+                        it->sel_akhir = -1;
+                }
+        }
+        pg_widget_kotor(&it->base);
+}
+
+pg_bool pg_isian_teks_aktif(pg_isian_teks_t *it)
+{
+        return it ? it->base.aktif : PG_SALAH;
 }
 
 /* ---- Warna custom ---- */

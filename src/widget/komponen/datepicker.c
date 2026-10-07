@@ -3,7 +3,7 @@
 #include "pigura/permukaan.h"
 #include "pigura/gambar.h"
 #include "pigura/font.h"
-#include "pigura/peristiwa.h"
+#include "pigura/aksi.h"
 #include "pigura/widget.h"
 #include <stdlib.h>
 #include <string.h>
@@ -52,9 +52,9 @@ static void catat_v(pg_widget_t *w, pg_permukaan_t *s) {
 	  }
 	}
 }
-static pg_bool peristiwa_v(pg_widget_t *w, const pg_peristiwa_t *e) {
+static pg_bool peristiwa_v(pg_widget_t *w, const pg_aksi_t *e) {
 	pg_datepicker_t *dp=d(w);
-	if(e->tipe==PG_PERISTIWA_TETIK_TURUN && e->tetik_tombol==PG_TETIK_KIRI) {
+	if(e->tipe==PG_AKSI_TETIKUS_TEKAN && e->tetik_tombol==PG_TETIKUS_KIRI) {
 		int sw=w->kotak.w, rh=pg_font_tinggi(dp->font)+2, cw=sw/7;
 		int dim=hari_dlm_bulan(dp->tahun,dp->bulan);
 		int dow=1, row, col, day;

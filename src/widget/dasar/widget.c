@@ -115,49 +115,79 @@ static pg_bool pg_widget_dapat_fokus(const pg_widget_t *w)
         return PG_BENAR;
 }
 
-/* Cari widget berikutnya dalam anak induk yang dapat fokus,
- * mulai dari indeks setelah w. Wrap-around bila sampai ujung. */
-static pg_widget_t *pg_widget_fokus_berikut_di_induk(pg_widget_t *w)
+/* Cari root dari tree widget (widget tanpa induk). */
+static pg_widget_t *pg_widget_root(pg_widget_t *w)
 {
-        pg_widget_t *induk;
-        int i, k;
-        if (!w) return NULL;
-        induk = w->induk;
-        if (!induk || induk->n_anak <= 0) return NULL;
-        k = -1;
-        for (i = 0; i < induk->n_anak; i++) {
-                if (induk->anak[i] == w) { k = i; break; }
-        }
-        if (k < 0) return NULL;
-        for (i = 1; i <= induk->n_anak; i++) {
-                pg_widget_t *kandidat = induk->anak[
-                        (k + i) % induk->n_anak];
-                if (pg_widget_dapat_fokus(kandidat))
-                        return kandidat;
-        }
-        return NULL;
+        while (w && w->induk) w = w->induk;
+        return w;
 }
 
-/* Cari widget sebelumnya dalam anak induk yang dapat fokus. */
+/* DFS pre-order: kumpulkan semua widget yang dapat fokus ke array
+ * `out` (maks `kap`). Return jumlah widget yang dikumpulkan.
+ * Urutan DFS pre-order = urutan Tab natural (dalam-dalam dulu,
+ * sibling berikutnya setelah subtree habis). */
+static int pg_widget_kumpulkan_fokus(pg_widget_t *root,
+                                      pg_widget_t **out, int kap)
+{
+        int n = 0;
+        int i;
+        if (!root || kap <= 0) return 0;
+        /* Pre-order: this first, then children. */
+        if (pg_widget_dapat_fokus(root) && n < kap) {
+                out[n++] = root;
+        }
+        for (i = 0; i < root->n_anak && n < kap; i++) {
+                int tambah = pg_widget_kumpulkan_fokus(
+                        root->anak[i], out + n, kap - n);
+                n += tambah;
+                if (n >= kap) break;
+        }
+        return n;
+}
+
+/* Cari widget berikutnya dalam tree yang dapat fokus, mulai dari
+ * widget saat ini. Wrap-around bila sampai ujung tree.
+ * Strategi: kumpulkan semua focusable widget via DFS pre-order,
+ * lalu cari posisi current; ambil next (wrap ke 0 bila di ujung). */
+static pg_widget_t *pg_widget_fokus_berikut_di_induk(pg_widget_t *w)
+{
+        pg_widget_t *root;
+        pg_widget_t *daftar[256];
+        int n, i, pos;
+        if (!w) return NULL;
+        root = pg_widget_root(w);
+        if (!root) return NULL;
+        n = pg_widget_kumpulkan_fokus(root, daftar, 256);
+        if (n == 0) return NULL;
+        pos = -1;
+        for (i = 0; i < n; i++) {
+                if (daftar[i] == w) { pos = i; break; }
+        }
+        /* Bila current tidak ada di daftar (misal kontainer tidak
+         * dapat fokus), default ke 0. */
+        if (pos < 0) return daftar[0];
+        return daftar[(pos + 1) % n];
+}
+
+/* Cari widget sebelumnya dalam tree yang dapat fokus.
+ * Sama dengan berikut, tapi mundur. */
 static pg_widget_t *pg_widget_fokus_sebelum_di_induk(pg_widget_t *w)
 {
-        pg_widget_t *induk;
-        int i, k, idx;
+        pg_widget_t *root;
+        pg_widget_t *daftar[256];
+        int n, i, pos;
         if (!w) return NULL;
-        induk = w->induk;
-        if (!induk || induk->n_anak <= 0) return NULL;
-        k = -1;
-        for (i = 0; i < induk->n_anak; i++) {
-                if (induk->anak[i] == w) { k = i; break; }
+        root = pg_widget_root(w);
+        if (!root) return NULL;
+        n = pg_widget_kumpulkan_fokus(root, daftar, 256);
+        if (n == 0) return NULL;
+        pos = -1;
+        for (i = 0; i < n; i++) {
+                if (daftar[i] == w) { pos = i; break; }
         }
-        if (k < 0) return NULL;
-        for (i = 1; i <= induk->n_anak; i++) {
-                idx = k - i;
-                while (idx < 0) idx += induk->n_anak;
-                if (pg_widget_dapat_fokus(induk->anak[idx]))
-                        return induk->anak[idx];
-        }
-        return NULL;
+        if (pos < 0) return daftar[n - 1];
+        if (pos == 0) return daftar[n - 1];
+        return daftar[pos - 1];
 }
 
 /* ---------------------------------------------------------------- kelas */
@@ -172,10 +202,10 @@ void pg_widget_init(pg_widget_t *w, pg_widget_tipe_t tipe,
         w->terlihat = PG_BENAR;
         w->aktif = PG_BENAR;
         w->kotor = PG_BENAR;
-        w->latar = PG_WARNA_PANEL;  /* default opaque — hindari double blend */
+        w->latar = PG_TRANSPARAN;  /* default transparan — latar cerdas */
         w->milik = PG_SALAH;
         w->klik_terakhir_ms = 0;
-        w->klik_tombol_terakhir = PG_TETIK_KOSONG;
+        w->klik_tombol_terakhir = PG_TETIKUS_KOSONG;
         w->sedang_seret = PG_SALAH;
         w->fokus = PG_SALAH;
         /* Catatan: tidak ada registry global. Widget disinkronkan
@@ -448,12 +478,13 @@ void pg_widget_catat(pg_widget_t *w, pg_permukaan_t *dest)
         }
         if (!w->permukaan) return;
         if (w->kotor) {
-                /* Bila latar transparan (alpha < 255), isi dengan
-                 * transparan penuh supaya font/primitif yang di-render
-                 * akan di-alpha-blend dengan benar saat blit ke parent.
-                 * Bila latar opaque, isi dengan latar (cepat). */
+                /* Bila latar transparan (alpha < 255), bersihkan
+                 * permukaan ke 0x00000000 supaya font/primitif
+                 * yang di-render akan di-alpha-blend dengan benar
+                 * saat blit ke parent. Bila latar opaque, isi
+                 * dengan latar (cepat). */
                 if (PG_A(w->latar) < 255)
-                        pg_isi_permukaan(w->permukaan, PG_TRANSPARAN);
+                        pg_bersihkan_permukaan(w->permukaan);
                 else
                         pg_isi_permukaan(w->permukaan, w->latar);
                 if (w->vtable && w->vtable->catat)
@@ -497,10 +528,10 @@ static pg_bool pg_widget_berisi_v(pg_widget_t *w, pg_titik_t p)
         return pg_widget_berisi(w, p);
 }
 
-pg_bool pg_widget_tangani_peristiwa(pg_widget_t *w,
-                                     const pg_peristiwa_t *e)
+pg_bool pg_widget_tangani_aksi(pg_widget_t *w,
+                                     const pg_aksi_t *e)
 {
-        pg_peristiwa_t te;
+        pg_aksi_t te;
         pg_bool di_dalam;
         pg_bool dispatch;
         int dx, dy;
@@ -510,7 +541,7 @@ pg_bool pg_widget_tangani_peristiwa(pg_widget_t *w,
 
         /* Routing event mouse berdasarkan posisi & capture state. */
         switch (e->tipe) {
-        case PG_PERISTIWA_TETIK_TURUN:
+        case PG_AKSI_TETIKUS_TEKAN:
                 /* Hanya widget di bawah kursor yang dapat TURUN,
                  * dan jadi capture.
                  *
@@ -529,7 +560,7 @@ pg_bool pg_widget_tangani_peristiwa(pg_widget_t *w,
                 dispatch = PG_BENAR;
                 break;
 
-        case PG_PERISTIWA_TETIK_NAIK:
+        case PG_AKSI_TETIKUS_LEPAS:
                 /* Hanya widget yang sedang di-capture yang dapat NAIK,
                  * lalu clear capture.
                  *
@@ -556,11 +587,15 @@ pg_bool pg_widget_tangani_peristiwa(pg_widget_t *w,
                 }
                 break;
 
-        case PG_PERISTIWA_TETIK_GERAK:
-                /* Jika ada capture, hanya itu yang dapat GERAK.
-                 * Sama seperti NAIK: bila w adalah ancestor dari
-                 * g_capture, dispatch supaya event mengalir ke
-                 * child. */
+        case PG_AKSI_TETIKUS_GERAK:
+                /* Untuk GERAK: selalu dispatch ke widget, TANPA cek
+                 * berisi_v. Widget sendiri yang cek di vtable->aksi
+                 * apakah mouse di dalam atau luar, dan update hover
+                 * state sesuai. Ini memungkinkan widget reset hover
+                 * saat mouse keluar dari area-nya.
+                 *
+                 * Pengecualian: bila ada capture (mouse ditahan
+                 * oleh widget lain), hanya capture yang dapat GERAK. */
                 if (g_capture) {
                         if (g_capture == w) {
                                 dispatch = PG_BENAR;
@@ -570,13 +605,11 @@ pg_bool pg_widget_tangani_peristiwa(pg_widget_t *w,
                                 return PG_SALAH;
                         }
                 } else {
-                        if (!pg_widget_berisi_v(w, e->tetik_pos))
-                                return PG_SALAH;
                         dispatch = PG_BENAR;
                 }
                 break;
 
-        case PG_PERISTIWA_TETIK_RODA:
+        case PG_AKSI_TETIKUS_GULIR:
                 if (!pg_widget_berisi_v(w, e->tetik_pos))
                         return PG_SALAH;
                 dispatch = PG_BENAR;
@@ -595,7 +628,7 @@ pg_bool pg_widget_tangani_peristiwa(pg_widget_t *w,
         /* TAB: pindah fokus ke widget berikutnya dalam chain. Shift+TAB
          * mundur ke sebelumnya. Hanya widget yang sedang fokus yang
          * konsumsi TAB; widget lain abaikan. */
-        if (e->tipe == PG_PERISTIWA_TOMBOL_TURUN &&
+        if (e->tipe == PG_AKSI_TOMBOL_TURUN &&
             e->tombol == PG_TOMBOL_TAB && w->fokus) {
                 if (e->modifier & PG_MOD_SHIFT)
                         pg_widget_fokus_sebelumnya(w);
@@ -607,7 +640,7 @@ pg_bool pg_widget_tangani_peristiwa(pg_widget_t *w,
         /* PINTASAN (keyboard shortcut): cek semua pintasan terdaftar.
          * Hanya dipicu bila widget punya fokus. Cocok bila key sama
          * DAN mod sama persis (bitmask penuh). */
-        if (e->tipe == PG_PERISTIWA_TOMBOL_TURUN && w->fokus &&
+        if (e->tipe == PG_AKSI_TOMBOL_TURUN && w->fokus &&
             w->n_pintasan > 0) {
                 int pi;
                 for (pi = 0; pi < w->n_pintasan; pi++) {
@@ -622,9 +655,9 @@ pg_bool pg_widget_tangani_peristiwa(pg_widget_t *w,
 
         /* DOBEL KLIK: TETIK_TURUN kiri dalam 300ms dengan tombol
          * yang sama dengan klik sebelumnya. */
-        if (e->tipe == PG_PERISTIWA_TETIK_TURUN &&
-            e->tetik_tombol == PG_TETIK_KIRI) {
-                if (w->klik_tombol_terakhir == PG_TETIK_KIRI &&
+        if (e->tipe == PG_AKSI_TETIKUS_TEKAN &&
+            e->tetik_tombol == PG_TETIKUS_KIRI) {
+                if (w->klik_tombol_terakhir == PG_TETIKUS_KIRI &&
                     e->waktu_ms >= w->klik_terakhir_ms &&
                     (e->waktu_ms - w->klik_terakhir_ms)
                       < (pg_u32)PG_WIDGET_DOBEL_KLIK_MS) {
@@ -640,7 +673,7 @@ pg_bool pg_widget_tangani_peristiwa(pg_widget_t *w,
         }
 
         /* SERET: gerakan mouse dengan capture aktif. */
-        if (e->tipe == PG_PERISTIWA_TETIK_GERAK) {
+        if (e->tipe == PG_AKSI_TETIKUS_GERAK) {
                 if (g_capture == w && !w->sedang_seret) {
                         /* Cek apakah gerakan > 3 piksel dari posisi
                          * klik awal (jarak Euclidean kuadrat > 9). */
@@ -665,7 +698,7 @@ pg_bool pg_widget_tangani_peristiwa(pg_widget_t *w,
         }
 
         /* SERET SELESAI: TETIK_NAIK setelah drag aktif. */
-        if (e->tipe == PG_PERISTIWA_TETIK_NAIK && w->sedang_seret) {
+        if (e->tipe == PG_AKSI_TETIKUS_LEPAS && w->sedang_seret) {
                 if (w->saat_seret_selesai)
                         w->saat_seret_selesai(w,
                                 e->tetik_pos.x,
@@ -684,8 +717,8 @@ pg_bool pg_widget_tangani_peristiwa(pg_widget_t *w,
          * kontainer seperti pg_kotak). Ini supaya klik kanan pada
          * child yang punya saat_klik_kanan tetap terpicu meski
          * dispatch lewat parent. */
-        if (e->tipe == PG_PERISTIWA_TETIK_TURUN &&
-            e->tetik_tombol == PG_TETIK_KANAN) {
+        if (e->tipe == PG_AKSI_TETIKUS_TEKAN &&
+            e->tetik_tombol == PG_TETIKUS_KANAN) {
                 if (w->saat_klik_kanan) {
                         w->saat_klik_kanan(w,
                                 e->tetik_pos.x,
@@ -696,13 +729,13 @@ pg_bool pg_widget_tangani_peristiwa(pg_widget_t *w,
                 /* Tidak ada callback — lanjut ke vtable dispatch. */
         }
 
-        if (!w->vtable || !w->vtable->peristiwa) return PG_SALAH;
+        if (!w->vtable || !w->vtable->aksi) return PG_SALAH;
 
         /* Konversi koordinat ke lokal widget (relatif ke kotak.x/y). */
         te = *e;
         te.tetik_pos.x -= w->kotak.x;
         te.tetik_pos.y -= w->kotak.y;
-        return w->vtable->peristiwa(w, &te);
+        return w->vtable->aksi(w, &te);
 }
 
 void pg_widget_kotor(pg_widget_t *w)

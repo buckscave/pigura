@@ -14,7 +14,7 @@
 #include "pigura/permukaan.h"
 #include "pigura/gambar.h"
 #include "pigura/font.h"
-#include "pigura/peristiwa.h"
+#include "pigura/aksi.h"
 #include "pigura/widget.h"
 #include "pigura/galat.h"
 
@@ -178,7 +178,7 @@ static void pg_p_layout_anak(pg_panel_t *p)
 /* ===== Vtable ===== */
 
 static void pg_p_catat_v(pg_widget_t *w, pg_permukaan_t *s);
-static pg_bool pg_p_peristiwa_v(pg_widget_t *w, const pg_peristiwa_t *e);
+static pg_bool pg_p_peristiwa_v(pg_widget_t *w, const pg_aksi_t *e);
 static void pg_p_ubah_ukuran_v(pg_widget_t *w, int w_, int h);
 static void pg_p_hancur_v(pg_widget_t *w);
 static void pg_p_bebas_v(pg_widget_t *w);
@@ -411,11 +411,11 @@ render_body:
 
 /* ===== Event handler ===== */
 
-static pg_bool pg_p_peristiwa_v(pg_widget_t *w, const pg_peristiwa_t *e)
+static pg_bool pg_p_peristiwa_v(pg_widget_t *w, const pg_aksi_t *e)
 {
         pg_panel_t *p = pg_p_dari(w);
         int mx, my;  /* posisi mouse LOKAL (relatif ke panel, 0..w, 0..h).
-                      pg_widget_tangani_peristiwa sudah konversi dari
+                      pg_widget_tangani_aksi sudah konversi dari
                       absolute ke lokal sebelum panggil vtable ini. */
         int panel_x, panel_y;  /* posisi panel di layar (absolute). */
         if (!p || !p->base.terlihat) return PG_SALAH;
@@ -426,7 +426,7 @@ static pg_bool pg_p_peristiwa_v(pg_widget_t *w, const pg_peristiwa_t *e)
 
         /* 1. Drag sedang aktif. */
         if (p->menyeret) {
-                if (e->tipe == PG_PERISTIWA_TETIK_GERAK) {
+                if (e->tipe == PG_AKSI_TETIKUS_GERAK) {
                         /* Konversi mx,my (lokal) ke absolute: panel_x +
                          * mx. Posisi panel baru = mouse_absolute - offset
                          * drag. Offset drag disimpan saat klik awal
@@ -441,7 +441,7 @@ static pg_bool pg_p_peristiwa_v(pg_widget_t *w, const pg_peristiwa_t *e)
                                         p->cb_ctx);
                         return PG_BENAR;
                 }
-                if (e->tipe == PG_PERISTIWA_TETIK_NAIK) {
+                if (e->tipe == PG_AKSI_TETIKUS_LEPAS) {
                         int abs_mx = panel_x + mx;
                         int abs_my = panel_y + my;
                         p->menyeret = PG_SALAH;
@@ -457,7 +457,7 @@ static pg_bool pg_p_peristiwa_v(pg_widget_t *w, const pg_peristiwa_t *e)
 
         /* 1b. Resize sedang aktif (jika ada). */
         if (p->resize_menyeret) {
-                if (e->tipe == PG_PERISTIWA_TETIK_GERAK) {
+                if (e->tipe == PG_AKSI_TETIKUS_GERAK) {
                         int abs_mx = panel_x + mx;
                         int abs_my = panel_y + my;
                         int new_w = abs_mx - panel_x + p->resize_ofs_w;
@@ -467,7 +467,7 @@ static pg_bool pg_p_peristiwa_v(pg_widget_t *w, const pg_peristiwa_t *e)
                         pg_panel_setel_ukuran(p, new_w, new_h);
                         return PG_BENAR;
                 }
-                if (e->tipe == PG_PERISTIWA_TETIK_NAIK) {
+                if (e->tipe == PG_AKSI_TETIKUS_LEPAS) {
                         p->resize_menyeret = PG_SALAH;
                         return PG_BENAR;
                 }
@@ -475,8 +475,8 @@ static pg_bool pg_p_peristiwa_v(pg_widget_t *w, const pg_peristiwa_t *e)
         }
 
         /* 2. Tombol header (FULL/THIN mode). Pakai koordinat lokal. */
-        if (e->tipe == PG_PERISTIWA_TETIK_TURUN &&
-            e->tetik_tombol == PG_TETIK_KIRI) {
+        if (e->tipe == PG_AKSI_TETIKUS_TEKAN &&
+            e->tetik_tombol == PG_TETIKUS_KIRI) {
                 pg_panel_btn_t btn = pg_p_btn_hit(p, mx, my);
                 if (btn != PG_PANEL_BTN_NONE) {
                         p->ditekan_btn = btn;
@@ -485,8 +485,8 @@ static pg_bool pg_p_peristiwa_v(pg_widget_t *w, const pg_peristiwa_t *e)
                 }
         }
 
-        if (e->tipe == PG_PERISTIWA_TETIK_NAIK &&
-            e->tetik_tombol == PG_TETIK_KIRI) {
+        if (e->tipe == PG_AKSI_TETIKUS_LEPAS &&
+            e->tetik_tombol == PG_TETIKUS_KIRI) {
                 pg_panel_btn_t btn = pg_p_btn_hit(p, mx, my);
                 if (p->ditekan_btn != PG_PANEL_BTN_NONE &&
                     btn == p->ditekan_btn) {
@@ -514,15 +514,15 @@ static pg_bool pg_p_peristiwa_v(pg_widget_t *w, const pg_peristiwa_t *e)
         }
 
         /* Hover tracking tombol. */
-        if (e->tipe == PG_PERISTIWA_TETIK_GERAK &&
+        if (e->tipe == PG_AKSI_TETIKUS_GERAK &&
             p->header_mode != PG_PANEL_HEADER_GRIP) {
                 p->hover_btn = pg_p_btn_hit(p, mx, my);
         }
 
         /* 3. Mulai drag via header. Pakai koordinat lokal untuk
          *    hit-test, simpan offset (lokal, relatif ke panel). */
-        if (e->tipe == PG_PERISTIWA_TETIK_TURUN &&
-            e->tetik_tombol == PG_TETIK_KIRI) {
+        if (e->tipe == PG_AKSI_TETIKUS_TEKAN &&
+            e->tetik_tombol == PG_TETIKUS_KIRI) {
                 int hh = pg_p_header_h(p);
                 int in_header = 0;
                 if (p->header_mode == PG_PANEL_HEADER_GRIP) {
@@ -566,10 +566,10 @@ static pg_bool pg_p_peristiwa_v(pg_widget_t *w, const pg_peristiwa_t *e)
          *    panel, perlu konversi ke lokal child: subtract
          *    anak->kotak.x. */
         if (!p->collapsed && p->anak) {
-                pg_peristiwa_t e2 = *e;
+                pg_aksi_t e2 = *e;
                 e2.tetik_pos.x = mx - p->anak->kotak.x;
                 e2.tetik_pos.y = my - p->anak->kotak.y;
-                if (pg_widget_tangani_peristiwa(p->anak, &e2))
+                if (pg_widget_tangani_aksi(p->anak, &e2))
                         return PG_BENAR;
         }
 
@@ -791,10 +791,10 @@ void pg_panel_catat(pg_panel_t *p, pg_permukaan_t *dest)
         pg_widget_catat(&p->base, dest);
 }
 
-pg_bool pg_panel_tangani(pg_panel_t *p, const pg_peristiwa_t *e)
+pg_bool pg_panel_tangani(pg_panel_t *p, const pg_aksi_t *e)
 {
         if (!p || !e) return PG_SALAH;
-        return pg_widget_tangani_peristiwa(&p->base, e);
+        return pg_widget_tangani_aksi(&p->base, e);
 }
 
 pg_widget_t *pg_panel_widget(pg_panel_t *p)

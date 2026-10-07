@@ -25,7 +25,7 @@
 #include "pigura/permukaan.h"
 #include "pigura/gambar.h"
 #include "pigura/font.h"
-#include "pigura/peristiwa.h"
+#include "pigura/aksi.h"
 #include "pigura/widget.h"
 
 #include <stdlib.h>
@@ -155,24 +155,24 @@ static void pg_dm_catat_v(pg_widget_t *w, pg_permukaan_t *s)
         }
 }
 
-/* Forward tombol ke child. Bypass pg_widget_tangani_peristiwa
- * sebab koordinat sudah lokal-dialog; pg_widget_tangani_peristiwa
+/* Forward tombol ke child. Bypass pg_widget_tangani_aksi
+ * sebab koordinat sudah lokal-dialog; pg_widget_tangani_aksi
  * akan cek berisi pakai kotak tombol (posisi lokal-dialog) — perlu
  * kirim koordinat lokal-dialog TANPA translasi manual. Vtable
  * tombol sendiri tidak pakai tetik_pos untuk state, jadi aman.
  * Mengembalikan BENAR bila tombol mengonsumsi event. */
 static pg_bool pg_dm_ke_tombol(pg_dialog_modal_t *dm,
-                                const pg_peristiwa_t *e)
+                                const pg_aksi_t *e)
 {
         pg_dm_tombol_t *tb;
         for (tb = dm->tombol_head; tb; tb = tb->berikutnya) {
                 pg_widget_t *bw = pg_tombol_widget(tb->tombol);
                 if (pg_widget_berisi(bw, e->tetik_pos)) {
-                        pg_peristiwa_t e2 = *e;
+                        pg_aksi_t e2 = *e;
                         e2.tetik_pos.x -= bw->kotak.x;
                         e2.tetik_pos.y -= bw->kotak.y;
-                        if (bw->vtable && bw->vtable->peristiwa &&
-                            bw->vtable->peristiwa(bw, &e2))
+                        if (bw->vtable && bw->vtable->aksi &&
+                            bw->vtable->aksi(bw, &e2))
                                 return PG_BENAR;
                 }
         }
@@ -180,7 +180,7 @@ static pg_bool pg_dm_ke_tombol(pg_dialog_modal_t *dm,
 }
 
 static pg_bool pg_dm_peristiwa_v(pg_widget_t *w,
-                                  const pg_peristiwa_t *e)
+                                  const pg_aksi_t *e)
 {
         pg_dialog_modal_t *dm = pg_dm_dari(w);
         int                sw, close_x, close_y;
@@ -188,13 +188,13 @@ static pg_bool pg_dm_peristiwa_v(pg_widget_t *w,
         close_x = sw - PG_DM_CLOSE_W - 3;
         close_y = 3;
         /* ESC: tutup. */
-        if (e->tipe == PG_PERISTIWA_TOMBOL_TURUN &&
+        if (e->tipe == PG_AKSI_TOMBOL_TURUN &&
             e->tombol == PG_TOMBOL_ESCAPE) {
                 pg_dialog_modal_tutup(dm);
                 return PG_BENAR;
         }
-        if (e->tipe == PG_PERISTIWA_TETIK_TURUN &&
-            e->tetik_tombol == PG_TETIK_KIRI) {
+        if (e->tipe == PG_AKSI_TETIKUS_TEKAN &&
+            e->tetik_tombol == PG_TETIKUS_KIRI) {
                 int x = e->tetik_pos.x, y = e->tetik_pos.y;
                 /* Tombol close? */
                 if (x >= close_x && x < close_x + PG_DM_CLOSE_W &&
@@ -210,15 +210,15 @@ static pg_bool pg_dm_peristiwa_v(pg_widget_t *w,
                 if (y < PG_DM_TITLE_H) return PG_BENAR;
                 /* Body: teruskan ke anak. */
                 if (dm->anak) {
-                        pg_peristiwa_t e2 = *e;
+                        pg_aksi_t e2 = *e;
                         e2.tetik_pos.y -= PG_DM_TITLE_H;
-                        return pg_widget_tangani_peristiwa(
+                        return pg_widget_tangani_aksi(
                                 dm->anak, &e2);
                 }
                 return PG_SALAH;
         }
-        if (e->tipe == PG_PERISTIWA_TETIK_NAIK &&
-            e->tetik_tombol == PG_TETIK_KIRI) {
+        if (e->tipe == PG_AKSI_TETIKUS_LEPAS &&
+            e->tetik_tombol == PG_TETIKUS_KIRI) {
                 int x = e->tetik_pos.x, y = e->tetik_pos.y;
                 if (dm->ditekan_close) {
                         dm->ditekan_close = PG_SALAH;
@@ -233,9 +233,9 @@ static pg_bool pg_dm_peristiwa_v(pg_widget_t *w,
                 if (pg_dm_ke_tombol(dm, e))
                         return PG_BENAR;
                 if (dm->anak) {
-                        pg_peristiwa_t e2 = *e;
+                        pg_aksi_t e2 = *e;
                         e2.tetik_pos.y -= PG_DM_TITLE_H;
-                        return pg_widget_tangani_peristiwa(
+                        return pg_widget_tangani_aksi(
                                 dm->anak, &e2);
                 }
                 return PG_SALAH;
@@ -245,9 +245,9 @@ static pg_bool pg_dm_peristiwa_v(pg_widget_t *w,
         if (pg_dm_ke_tombol(dm, e))
                 return PG_BENAR;
         if (dm->anak) {
-                pg_peristiwa_t e2 = *e;
+                pg_aksi_t e2 = *e;
                 e2.tetik_pos.y -= PG_DM_TITLE_H;
-                return pg_widget_tangani_peristiwa(dm->anak, &e2);
+                return pg_widget_tangani_aksi(dm->anak, &e2);
         }
         return PG_SALAH;
 }
@@ -474,36 +474,36 @@ void pg_dialog_modal_catat(pg_dialog_modal_t *dm,
 }
 
 pg_bool pg_dialog_modal_tangani(pg_dialog_modal_t *dm,
-    const pg_peristiwa_t *e)
+    const pg_aksi_t *e)
 {
-        pg_peristiwa_t te;
+        pg_aksi_t te;
         if (!dm || !e) return PG_SALAH;
         if (!dm->aktif) return PG_SALAH;
         /* Block input: bila event mouse di luar dialog box, consume
          * tanpa teruskan (return BENAR untuk menelan). */
-        if (e->tipe == PG_PERISTIWA_TETIK_TURUN ||
-            e->tipe == PG_PERISTIWA_TETIK_NAIK ||
-            e->tipe == PG_PERISTIWA_TETIK_GERAK ||
-            e->tipe == PG_PERISTIWA_TETIK_RODA) {
+        if (e->tipe == PG_AKSI_TETIKUS_TEKAN ||
+            e->tipe == PG_AKSI_TETIKUS_LEPAS ||
+            e->tipe == PG_AKSI_TETIKUS_GERAK ||
+            e->tipe == PG_AKSI_TETIKUS_GULIR) {
                 if (!pg_widget_berisi(&dm->base, e->tetik_pos)) {
                         /* Di luar dialog: block input. */
                         return PG_BENAR;
                 }
         }
         /* Dispatch langsung ke vtable dialog, BYPASS capture logic
-         * pg_widget_tangani_peristiwa. Sebab: pg_widget_tangani_peristiwa
+         * pg_widget_tangani_aksi. Sebab: pg_widget_tangani_aksi
          * memakai g_capture statik untuk TETIK_NAIK — capture-nya
          * ter-set ke tombol child saat TETIK_TURUN, sehingga NAIK di
          * level dialog base ditolak. Dengan dispatch langsung ke
          * vtable, pg_dm_peristiwa_v yang iterasi tombol child sendiri
-         * yang memanggil pg_widget_tangani_peristiwa(bw, e) — di
+         * yang memanggil pg_widget_tangani_aksi(bw, e) — di
          * level button, g_capture cocok dengan bw, klik callback
          * terpicu. Modal aktif selalu consume event. */
         te = *e;
         te.tetik_pos.x -= dm->base.kotak.x;
         te.tetik_pos.y -= dm->base.kotak.y;
-        if (dm->base.vtable && dm->base.vtable->peristiwa)
-                dm->base.vtable->peristiwa(&dm->base, &te);
+        if (dm->base.vtable && dm->base.vtable->aksi)
+                dm->base.vtable->aksi(&dm->base, &te);
         return PG_BENAR;
 }
 

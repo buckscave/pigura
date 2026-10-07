@@ -16,7 +16,7 @@
 #include "pigura/splitter.h"
 #include "pigura/permukaan.h"
 #include "pigura/gambar.h"
-#include "pigura/peristiwa.h"
+#include "pigura/aksi.h"
 #include "pigura/widget.h"
 
 #include <stdlib.h>
@@ -138,12 +138,12 @@ static void pg_splitter_seret_selesai(pg_widget_t *w, int x, int y,
 }
 
 /* vtable peristiwa: hover tracking saja. Drag sudah ditangani
- * otomatis oleh pg_widget_tangani_peristiwa via saat_seret_*. */
+ * otomatis oleh pg_widget_tangani_aksi via saat_seret_*. */
 static pg_bool pg_splitter_peristiwa_v(pg_widget_t *w,
-                                        const pg_peristiwa_t *e)
+                                        const pg_aksi_t *e)
 {
 	pg_splitter_t *sp = pg_splitter_dari(w);
-	if (e->tipe == PG_PERISTIWA_TETIK_GERAK) {
+	if (e->tipe == PG_AKSI_TETIKUS_GERAK) {
 		if (!sp->hover) {
 			sp->hover = PG_BENAR;
 			pg_widget_kotor(w);

@@ -2,7 +2,7 @@
 #include "pigura/permukaan.h"
 #include "pigura/gambar.h"
 #include "pigura/font.h"
-#include "pigura/peristiwa.h"
+#include "pigura/aksi.h"
 #include "pigura/widget.h"
 #include <stdlib.h>
 struct pg_colorpicker {
@@ -37,9 +37,9 @@ static void catat_v(pg_widget_t *w, pg_permukaan_t *s) {
 	  pg_gambar_kotak_aa(s,pg_buat_kotak(sx*cw+1,sy*ch+1,cw-2,ch-2),PG_HITAM);
 	}
 }
-static pg_bool peristiwa_v(pg_widget_t *w, const pg_peristiwa_t *e) {
+static pg_bool peristiwa_v(pg_widget_t *w, const pg_aksi_t *e) {
 	pg_colorpicker_t *cp=d(w); int sw=w->kotak.w, sh=w->kotak.h;
-	if(e->tipe==PG_PERISTIWA_TETIK_TURUN && e->tetik_tombol==PG_TETIK_KIRI) {
+	if(e->tipe==PG_AKSI_TETIKUS_TEKAN && e->tetik_tombol==PG_TETIKUS_KIRI) {
 		int cw=sw/8, ch=sh/4;
 		int sx=e->tetik_pos.x/cw, sy=e->tetik_pos.y/ch;
 		if(sx>=0&&sx<8&&sy>=0&&sy<4) {

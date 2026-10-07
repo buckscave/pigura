@@ -10,7 +10,7 @@
  * lalu CGContextDrawImage ke graphics port NSView (coord NSView
  * bottom-left → flip vertical).
  *
- * pg_layar_peristiwa_berikutnya(): ambil NSEvent berikutnya via
+ * pg_layar_aksi_berikutnya(): ambil NSEvent berikutnya via
  * [NSApp nextEventMatchingMask:untilDate:inMode:dequeue:] dan
  * terjemahkan type/keyCode/locationInWindow/modifierFlags.
  *
@@ -521,14 +521,14 @@ pg_galat pg_layar_tunggu_vsync(pg_layar_t *l)
 	return PG_GALAT_TANPA;
 }
 
-pg_galat pg_layar_pompa_peristiwa(pg_layar_t *l)
+pg_galat pg_layar_pompa_aksi(pg_layar_t *l)
 {
 	if (!l) PG_KEMBALI_GALAT(PG_GALAT_ARGUMEN);
-	/* Drain pendek — pull 16 peristiwa, dispatch via peristiwa_berikutnya. */
+	/* Drain pendek — pull 16 aksi, dispatch via peristiwa_berikutnya. */
 	int n;
-	pg_peristiwa_t ev;
+	pg_aksi_t ev;
 	for (n = 0; n < 16; n++) {
-		if (!pg_layar_peristiwa_berikutnya(l, &ev)) break;
+		if (!pg_layar_aksi_berikutnya(l, &ev)) break;
 	}
 	return PG_OK;
 }
@@ -545,7 +545,7 @@ unsigned long pg_layar_jendela_id(pg_layar_t *l)
 	return (unsigned long)(unsigned long long)(uintptr_t)l->window;
 }
 
-pg_bool pg_layar_punya_peristiwa(pg_layar_t *l)
+pg_bool pg_layar_punya_aksi(pg_layar_t *l)
 {
 	if (!l) return PG_SALAH;
 	if (l->keluar) return PG_BENAR;
@@ -560,8 +560,8 @@ pg_bool pg_layar_punya_peristiwa(pg_layar_t *l)
 	return ev ? PG_BENAR : PG_SALAH;
 }
 
-pg_bool pg_layar_peristiwa_berikutnya(pg_layar_t *l,
-                                        pg_peristiwa_t *out)
+pg_bool pg_layar_aksi_berikutnya(pg_layar_t *l,
+                                        pg_aksi_t *out)
 {
 	id ev;
 	int etype;
@@ -572,7 +572,7 @@ pg_bool pg_layar_peristiwa_berikutnya(pg_layar_t *l,
 
 	if (l->keluar) {
 		memset(out, 0, sizeof(*out));
-		out->tipe = PG_PERISTIWA_KELUAR;
+		out->tipe = PG_AKSI_KELUAR;
 		out->waktu_ms = pg_mac_sekarang_ms();
 		l->keluar = PG_SALAH;
 		return PG_BENAR;
@@ -594,7 +594,7 @@ pg_bool pg_layar_peristiwa_berikutnya(pg_layar_t *l,
 
 	switch (etype) {
 	case PG_NSEvtKeyDown:
-		out->tipe = PG_PERISTIWA_TOMBOL_TURUN;
+		out->tipe = PG_AKSI_TOMBOL_TURUN;
 		kc = (unsigned short)((unsigned short(*)(id, SEL))
 			objc_msgSend)(ev, pg_sel("keyCode"));
 		out->tombol = pg_mac_kode_ke_tombol(kc);
@@ -608,7 +608,7 @@ pg_bool pg_layar_peristiwa_berikutnya(pg_layar_t *l,
 		}
 		return PG_BENAR;
 	case PG_NSEvtKeyUp:
-		out->tipe = PG_PERISTIWA_TOMBOL_NAIK;
+		out->tipe = PG_AKSI_TOMBOL_NAIK;
 		kc = (unsigned short)((unsigned short(*)(id, SEL))
 			objc_msgSend)(ev, pg_sel("keyCode"));
 		out->tombol = pg_mac_kode_ke_tombol(kc);
@@ -619,48 +619,48 @@ pg_bool pg_layar_peristiwa_berikutnya(pg_layar_t *l,
 		 * yang berubah state. Sederhana: skip untuk v0.1. */
 		return PG_SALAH;
 	case PG_NSEvtLeftMouseDown:
-		out->tipe = PG_PERISTIWA_TETIK_TURUN;
-		out->tetik_tombol = PG_TETIK_KIRI;
+		out->tipe = PG_AKSI_TETIKUS_TEKAN;
+		out->tetik_tombol = PG_TETIKUS_KIRI;
 		out->tetik_pos = pg_mac_lokasi_ke_titik(ev, l->view);
 		return PG_BENAR;
 	case PG_NSEvtLeftMouseUp:
-		out->tipe = PG_PERISTIWA_TETIK_NAIK;
-		out->tetik_tombol = PG_TETIK_KIRI;
+		out->tipe = PG_AKSI_TETIKUS_LEPAS;
+		out->tetik_tombol = PG_TETIKUS_KIRI;
 		out->tetik_pos = pg_mac_lokasi_ke_titik(ev, l->view);
 		return PG_BENAR;
 	case PG_NSEvtRightMouseDown:
-		out->tipe = PG_PERISTIWA_TETIK_TURUN;
-		out->tetik_tombol = PG_TETIK_KANAN;
+		out->tipe = PG_AKSI_TETIKUS_TEKAN;
+		out->tetik_tombol = PG_TETIKUS_KANAN;
 		out->tetik_pos = pg_mac_lokasi_ke_titik(ev, l->view);
 		return PG_BENAR;
 	case PG_NSEvtRightMouseUp:
-		out->tipe = PG_PERISTIWA_TETIK_NAIK;
-		out->tetik_tombol = PG_TETIK_KANAN;
+		out->tipe = PG_AKSI_TETIKUS_LEPAS;
+		out->tetik_tombol = PG_TETIKUS_KANAN;
 		out->tetik_pos = pg_mac_lokasi_ke_titik(ev, l->view);
 		return PG_BENAR;
 	case PG_NSEvtOtherMouseDown:
-		out->tipe = PG_PERISTIWA_TETIK_TURUN;
+		out->tipe = PG_AKSI_TETIKUS_TEKAN;
 		btn = (int)((long(*)(id, SEL))objc_msgSend)(ev,
 			pg_sel("buttonNumber"));
-		out->tetik_tombol = (btn == 2) ? PG_TETIK_TENGAH :
-			PG_TETIK_KOSONG;
+		out->tetik_tombol = (btn == 2) ? PG_TETIKUS_TENGAH :
+			PG_TETIKUS_KOSONG;
 		out->tetik_pos = pg_mac_lokasi_ke_titik(ev, l->view);
 		return PG_BENAR;
 	case PG_NSEvtOtherMouseUp:
-		out->tipe = PG_PERISTIWA_TETIK_NAIK;
+		out->tipe = PG_AKSI_TETIKUS_LEPAS;
 		btn = (int)((long(*)(id, SEL))objc_msgSend)(ev,
 			pg_sel("buttonNumber"));
-		out->tetik_tombol = (btn == 2) ? PG_TETIK_TENGAH :
-			PG_TETIK_KOSONG;
+		out->tetik_tombol = (btn == 2) ? PG_TETIKUS_TENGAH :
+			PG_TETIKUS_KOSONG;
 		out->tetik_pos = pg_mac_lokasi_ke_titik(ev, l->view);
 		return PG_BENAR;
 	case PG_NSEvtMouseMoved:
 	case PG_NSEvtLeftMouseDrag:
-		out->tipe = PG_PERISTIWA_TETIK_GERAK;
+		out->tipe = PG_AKSI_TETIKUS_GERAK;
 		out->tetik_pos = pg_mac_lokasi_ke_titik(ev, l->view);
 		return PG_BENAR;
 	case PG_NSEvtScrollWheel:
-		out->tipe = PG_PERISTIWA_TETIK_RODA;
+		out->tipe = PG_AKSI_TETIKUS_GULIR;
 		out->roda_dy = (((double(*)(id, SEL))objc_msgSend)(
 			ev, pg_sel("scrollingDeltaY")) > 0.0) ?
 			1 : -1;

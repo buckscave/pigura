@@ -11,7 +11,7 @@
 #include "pigura/daftar.h"
 #include "pigura/permukaan.h"
 #include "pigura/font.h"
-#include "pigura/peristiwa.h"
+#include "pigura/aksi.h"
 #include "pigura/widget.h"
 
 #include <stdlib.h>
@@ -97,12 +97,12 @@ static void pg_daftar_catat_v(pg_widget_t *w, pg_permukaan_t *s)
 }
 
 static pg_bool pg_daftar_peristiwa_v(pg_widget_t *w,
-				     const pg_peristiwa_t *e)
+				     const pg_aksi_t *e)
 {
 	pg_daftar_t *d = pg_daftar_dari(w);
 	int row_h, idx, maks_gulir;
 	row_h = pg_daftar_row_h(d);
-	if (e->tipe == PG_PERISTIWA_TETIK_RODA) {
+	if (e->tipe == PG_AKSI_TETIKUS_GULIR) {
 		maks_gulir = d->n_item * row_h - w->kotak.h;
 		if (maks_gulir < 0) maks_gulir = 0;
 		d->gulir += e->roda_dy * row_h;
@@ -111,8 +111,8 @@ static pg_bool pg_daftar_peristiwa_v(pg_widget_t *w,
 		pg_widget_kotor(w);
 		return PG_BENAR;
 	}
-	if (e->tipe == PG_PERISTIWA_TETIK_TURUN &&
-	    e->tetik_tombol == PG_TETIK_KIRI) {
+	if (e->tipe == PG_AKSI_TETIKUS_TEKAN &&
+	    e->tetik_tombol == PG_TETIKUS_KIRI) {
 		if (d->n_item <= 0) return PG_BENAR;
 		idx = (e->tetik_pos.y + d->gulir) / row_h;
 		if (idx < 0) idx = 0;

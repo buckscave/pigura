@@ -10,7 +10,7 @@
 #include "pigura/menubar.h"
 #include "pigura/permukaan.h"
 #include "pigura/font.h"
-#include "pigura/peristiwa.h"
+#include "pigura/aksi.h"
 #include "pigura/widget.h"
 
 #include <stdlib.h>
@@ -210,8 +210,8 @@ static void pg_menubar_catat_popup_v(pg_widget_t *w,
 /* vtable: hit-test - bila ada menu terbuka, area dropdown
  * dianggap bagian widget supaya klik di popup terdispatch.
  * Note: kotak widget di sini adalah lokal-induk (bukan absolut)
- * karena e->tetik_pos yang diterima vtable->peristiwa sudah
- * ditranslasikan ke frame induk oleh pg_widget_tangani_peristiwa. */
+ * karena e->tetik_pos yang diterima vtable->aksi sudah
+ * ditranslasikan ke frame induk oleh pg_widget_tangani_aksi. */
 static pg_bool pg_menubar_berisi_v(pg_widget_t *w, pg_titik_t p)
 {
         pg_menubar_t *mb = pg_menubar_dari(w);
@@ -245,7 +245,7 @@ static void pg_mb_tutup(pg_menubar_t *mb)
 }
 
 static pg_bool pg_menubar_peristiwa_v(pg_widget_t *w,
-                                     const pg_peristiwa_t *e)
+                                     const pg_aksi_t *e)
 {
         pg_menubar_t *mb = pg_menubar_dari(w);
         int title_h, i;
@@ -258,7 +258,7 @@ static pg_bool pg_menubar_peristiwa_v(pg_widget_t *w,
          * Hitung indeks item dari e->tetik_pos.y, set hover_item,
          * kotor widget supaya popup tergambar ulang. */
         if (mb->buka_menu >= 0 &&
-            e->tipe == PG_PERISTIWA_TETIK_GERAK) {
+            e->tipe == PG_AKSI_TETIKUS_GERAK) {
                 pg_menu_t *m = mb->menu[mb->buka_menu];
                 int max_w, item_h, idx;
                 item_h = title_h;
@@ -280,7 +280,7 @@ static pg_bool pg_menubar_peristiwa_v(pg_widget_t *w,
         /* Hover tracking title bar (menu belum terbuka).
          * Track menu yang di-hover untuk highlight visual. */
         if (mb->buka_menu < 0 &&
-            e->tipe == PG_PERISTIWA_TETIK_GERAK) {
+            e->tipe == PG_AKSI_TETIKUS_GERAK) {
                 int new_hover = -1;
                 if (e->tetik_pos.y < bar_h) {
                         for (i = 0; i < mb->n_menu; i++) {
@@ -302,8 +302,8 @@ static pg_bool pg_menubar_peristiwa_v(pg_widget_t *w,
                 return PG_BENAR;
         }
 
-        if (e->tipe != PG_PERISTIWA_TETIK_TURUN) return PG_SALAH;
-        if (e->tetik_tombol != PG_TETIK_KIRI) return PG_SALAH;
+        if (e->tipe != PG_AKSI_TETIKUS_TEKAN) return PG_SALAH;
+        if (e->tetik_tombol != PG_TETIKUS_KIRI) return PG_SALAH;
         /* Klik di title bar? */
         if (e->tetik_pos.y < bar_h) {
                 for (i = 0; i < mb->n_menu; i++) {

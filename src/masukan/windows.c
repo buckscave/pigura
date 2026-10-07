@@ -5,10 +5,10 @@
  * Win32 yang dibuka pg_layar. Tidak membuka perangkat RawInput HID
  * sendiri — cukup memetakan WM_KEYDOWN/UP, WM_LBUTTONDOWN/UP,
  * WM_MOUSEMOVE, WM_MOUSEWHEEL yang sudah diterjemahkan backend layar
- * ke pg_peristiwa_t.
+ * ke pg_aksi_t.
  *
  * Pola sama dengan masukan/x11.c: pg_masukan_tarik() memanggil
- * pg_layar_peristiwa_berikutnya() untuk menarik peristiwa yang sudah
+ * pg_layar_aksi_berikutnya() untuk menarik peristiwa yang sudah
  * diterjemahkan. Tidak ada thread terpisah — perulangan utama yang
  * memompa.
  *
@@ -33,12 +33,12 @@
 struct pg_masukan {
 	pg_masukan_config_t cfg;
 	pg_kunci_t         *kunci;
-	pg_peristiwa_t      antrian[PG_MASUKAN_ANTRIAN];
+	pg_aksi_t      antrian[PG_MASUKAN_ANTRIAN];
 	int                 kepala, ekor, jumlah;
 	pg_layar_t         *layar;
 };
 
-static void pg_masukan_dorong(pg_masukan_t *in, const pg_peristiwa_t *e)
+static void pg_masukan_dorong(pg_masukan_t *in, const pg_aksi_t *e)
 {
 	pg_kunci_kunci(in->kunci);
 	if (in->jumlah < PG_MASUKAN_ANTRIAN) {
@@ -85,23 +85,23 @@ pg_galat pg_tutup_masukan(pg_masukan_t *in)
 	return PG_OK;
 }
 
-pg_galat pg_masukan_emit(pg_masukan_t *in, const pg_peristiwa_t *e)
+pg_galat pg_masukan_emit(pg_masukan_t *in, const pg_aksi_t *e)
 {
 	if (!in || !e) PG_KEMBALI_GALAT(PG_GALAT_ARGUMEN);
 	pg_masukan_dorong(in, e);
 	return PG_OK;
 }
 
-int pg_masukan_tarik(pg_masukan_t *in, pg_peristiwa_t *buf, int maks)
+int pg_masukan_tarik(pg_masukan_t *in, pg_aksi_t *buf, int maks)
 {
 	int n = 0;
-	pg_peristiwa_t ev;
+	pg_aksi_t ev;
 
 	if (!in || !buf || maks <= 0) return 0;
 
 	/* Pompa peristiwa Win32 dari pg_layar ke antrian internal. */
 	if (in->layar) {
-		while (pg_layar_peristiwa_berikutnya(in->layar, &ev)) {
+		while (pg_layar_aksi_berikutnya(in->layar, &ev)) {
 			pg_masukan_dorong(in, &ev);
 			if (in->jumlah >= PG_MASUKAN_ANTRIAN) break;
 		}

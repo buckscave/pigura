@@ -12,7 +12,7 @@
 #include "pigura/dropdown.h"
 #include "pigura/permukaan.h"
 #include "pigura/font.h"
-#include "pigura/peristiwa.h"
+#include "pigura/aksi.h"
 #include "pigura/widget.h"
 
 #include <stdlib.h>
@@ -189,8 +189,8 @@ static void pg_dropdown_catat_popup_v(pg_widget_t *w,
 /* vtable: hit-test - bila popup buka, area popup dianggap
  * bagian widget supaya klik di popup terdispatch.
  * Note: kotak widget di sini adalah lokal-induk (bukan absolut)
- * karena e->tetik_pos yang diterima vtable->peristiwa sudah
- * ditranslasikan ke frame induk oleh pg_widget_tangani_peristiwa. */
+ * karena e->tetik_pos yang diterima vtable->aksi sudah
+ * ditranslasikan ke frame induk oleh pg_widget_tangani_aksi. */
 static pg_bool pg_dropdown_berisi_v(pg_widget_t *w, pg_titik_t p)
 {
         pg_dropdown_t *d = pg_dropdown_dari(w);
@@ -210,7 +210,7 @@ static pg_bool pg_dropdown_berisi_v(pg_widget_t *w, pg_titik_t p)
 }
 
 static pg_bool pg_dropdown_peristiwa_v(pg_widget_t *w,
-                                     const pg_peristiwa_t *e)
+                                     const pg_aksi_t *e)
 {
         pg_dropdown_t *d = pg_dropdown_dari(w);
         int bh, rh;
@@ -220,7 +220,7 @@ static pg_bool pg_dropdown_peristiwa_v(pg_widget_t *w,
         /* GERAK: hover tracking. Sama seperti menubar — selalu
          * handle GERAK jika popup terbuka, tidak bergantung pada
          * g_capture. */
-        if (e->tipe == PG_PERISTIWA_TETIK_GERAK) {
+        if (e->tipe == PG_AKSI_TETIKUS_GERAK) {
                 if (d->buka && e->tetik_pos.y >= bh) {
                         int idx = (e->tetik_pos.y - bh) / rh;
                         /* Cek x range juga (seperti menubar). */
@@ -243,7 +243,7 @@ static pg_bool pg_dropdown_peristiwa_v(pg_widget_t *w,
         }
 
         /* NAIK: tutup popup bila terbuka (klik di luar). */
-        if (e->tipe == PG_PERISTIWA_TETIK_NAIK) {
+        if (e->tipe == PG_AKSI_TETIKUS_LEPAS) {
                 if (d->buka) {
                         /* Tidak tutup di NAIK — biarkan TURUN
                          * yang handle pilih/tutup. */
@@ -251,8 +251,8 @@ static pg_bool pg_dropdown_peristiwa_v(pg_widget_t *w,
                 return PG_SALAH;
         }
 
-        if (e->tipe != PG_PERISTIWA_TETIK_TURUN) return PG_SALAH;
-        if (e->tetik_tombol != PG_TETIK_KIRI) return PG_SALAH;
+        if (e->tipe != PG_AKSI_TETIKUS_TEKAN) return PG_SALAH;
+        if (e->tetik_tombol != PG_TETIKUS_KIRI) return PG_SALAH;
 
         /* Klik di button (atas)? Buka popup. */
         if (e->tetik_pos.y < bh) {

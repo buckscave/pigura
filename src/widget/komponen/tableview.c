@@ -2,7 +2,7 @@
 #include "pigura/permukaan.h"
 #include "pigura/gambar.h"
 #include "pigura/font.h"
-#include "pigura/peristiwa.h"
+#include "pigura/aksi.h"
 #include "pigura/widget.h"
 #include <stdlib.h>
 #include <string.h>
@@ -49,16 +49,16 @@ static void catat_v(pg_widget_t *w, pg_permukaan_t *s) {
 		}
 	}
 }
-static pg_bool peristiwa_v(pg_widget_t *w, const pg_peristiwa_t *e) {
+static pg_bool peristiwa_v(pg_widget_t *w, const pg_aksi_t *e) {
 	pg_tableview_t *tv=d(w); int rh=row_h(tv);
-	if(e->tipe==PG_PERISTIWA_TETIK_TURUN && e->tetik_tombol==PG_TETIK_KIRI) {
+	if(e->tipe==PG_AKSI_TETIKUS_TEKAN && e->tetik_tombol==PG_TETIKUS_KIRI) {
 		int row=(e->tetik_pos.y-rh)/rh;
 		int x=e->tetik_pos.x, col=0, cx=0, i;
 		for(i=0;i<tv->n_cols;i++) { if(x>=cx&&x<cx+tv->cols[i].lebar){col=i;break;} cx+=tv->cols[i].lebar; }
 		if(row>=0&&row<tv->n_rows) { tv->sel_row=row; tv->sel_col=col; pg_widget_kotor(w); if(tv->cb)tv->cb(tv,row,col,tv->ctx); }
 		return PG_BENAR;
 	}
-	if(e->tipe==PG_PERISTIWA_TETIK_GERAK) {
+	if(e->tipe==PG_AKSI_TETIKUS_GERAK) {
 		int row=(e->tetik_pos.y-rh)/rh;
 		if(row>=0&&row<tv->n_rows) { if(row!=tv->hover_row){tv->hover_row=row;pg_widget_kotor(w);} }
 		return PG_BENAR;

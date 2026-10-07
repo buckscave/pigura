@@ -2,7 +2,7 @@
 #include "pigura/permukaan.h"
 #include "pigura/gambar.h"
 #include "pigura/font.h"
-#include "pigura/peristiwa.h"
+#include "pigura/aksi.h"
 #include "pigura/widget.h"
 #include <stdlib.h>
 #include <string.h>
@@ -54,9 +54,9 @@ static void catat_v(pg_widget_t *w, pg_permukaan_t *s) {
 		y+=ih;
 	}
 }
-static pg_bool peristiwa_v(pg_widget_t *w, const pg_peristiwa_t *e) {
+static pg_bool peristiwa_v(pg_widget_t *w, const pg_aksi_t *e) {
 	pg_treeview_t *tv=d(w); int ih=node_h(tv);
-	if(e->tipe==PG_PERISTIWA_TETIK_TURUN && e->tetik_tombol==PG_TETIK_KIRI) {
+	if(e->tipe==PG_AKSI_TETIKUS_TEKAN && e->tetik_tombol==PG_TETIKUS_KIRI) {
 		int idx=e->tetik_pos.y/ih, i, count=0;
 		for(i=0;i<tv->n_nodes;i++) {
 			int p=tv->nodes[i].parent, vis=1;
@@ -74,7 +74,7 @@ static pg_bool peristiwa_v(pg_widget_t *w, const pg_peristiwa_t *e) {
 		}
 		return PG_BENAR;
 	}
-	if(e->tipe==PG_PERISTIWA_TETIK_GERAK) {
+	if(e->tipe==PG_AKSI_TETIKUS_GERAK) {
 		int idx=e->tetik_pos.y/ih, i, count=0, new_hover=-1;
 		for(i=0;i<tv->n_nodes;i++) {
 			int p=tv->nodes[i].parent, vis=1;
@@ -86,7 +86,7 @@ static pg_bool peristiwa_v(pg_widget_t *w, const pg_peristiwa_t *e) {
 		if(new_hover!=tv->hover_idx){tv->hover_idx=new_hover;pg_widget_kotor(w);}
 		return PG_BENAR;
 	}
-	if(e->tipe==PG_PERISTIWA_TETIK_RODA) { tv->gulir_y+=e->roda_dy*ih; pg_widget_kotor(w); return PG_BENAR; }
+	if(e->tipe==PG_AKSI_TETIKUS_GULIR) { tv->gulir_y+=e->roda_dy*ih; pg_widget_kotor(w); return PG_BENAR; }
 	return PG_SALAH;
 }
 static void hancur_v(pg_widget_t *w) { pg_treeview_t *tv=d(w); int i; for(i=0;i<tv->n_nodes;i++) if(tv->nodes[i].label)free(tv->nodes[i].label); }

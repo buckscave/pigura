@@ -14,7 +14,7 @@
 #include "pigura/permukaan.h"
 #include "pigura/gambar.h"
 #include "pigura/font.h"
-#include "pigura/peristiwa.h"
+#include "pigura/aksi.h"
 #include "pigura/widget.h"
 
 #include <stdlib.h>
@@ -152,13 +152,13 @@ static void pg_tb_catat_v(pg_widget_t *w, pg_permukaan_t *s)
 
 /* vtable peristiwa: teruskan ke tombol anak (reverse order).
  *
- * Bypass pg_widget_tangani_peristiwa untuk child tombol sebab
+ * Bypass pg_widget_tangani_aksi untuk child tombol sebab
  * g_capture statik di widget.c konflik (capture toolbar vs tombol
  * anak). Pakai vtable tombol langsung + flag ditekan internal
  * tombol melacak state tekan-lepas. Koordinat diterjemahkan ke
  * lokal tombol sebelum panggil vtable. */
 static pg_bool pg_tb_peristiwa_v(pg_widget_t *w,
-                                  const pg_peristiwa_t *e)
+                                  const pg_aksi_t *e)
 {
         pg_toolbar_t *tb = pg_tb_dari(w);
         int i;
@@ -169,12 +169,12 @@ static pg_bool pg_tb_peristiwa_v(pg_widget_t *w,
                                 it->tombol);
                         if (PG_TITIK_DI_KOTAK(e->tetik_pos,
                                 bw->kotak)) {
-                                pg_peristiwa_t e2 = *e;
+                                pg_aksi_t e2 = *e;
                                 e2.tetik_pos.x -= bw->kotak.x;
                                 e2.tetik_pos.y -= bw->kotak.y;
                                 if (bw->vtable &&
-                                    bw->vtable->peristiwa &&
-                                    bw->vtable->peristiwa(bw, &e2))
+                                    bw->vtable->aksi &&
+                                    bw->vtable->aksi(bw, &e2))
                                         return PG_BENAR;
                         }
                 }

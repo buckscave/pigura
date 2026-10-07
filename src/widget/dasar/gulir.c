@@ -17,7 +17,8 @@
  * ---------------------------------------------------------------------------------------------- */
 #include "pigura/gulir.h"
 #include "pigura/permukaan.h"
-#include "pigura/peristiwa.h"
+#include "pigura/gambar.h"
+#include "pigura/aksi.h"
 #include "pigura/widget.h"
 
 #include <stdlib.h>
@@ -40,6 +41,9 @@ struct pg_gulir {
         pg_bool      menyeret_h;
         int          seret_ofs_v;
         int          seret_ofs_h;
+        /* Hover state untuk visual feedback thumb. */
+        pg_bool      hover_v;   /* mouse di atas thumb vertikal */
+        pg_bool      hover_h;   /* mouse di atas thumb horizontal */
 };
 
 static pg_gulir_t *pg_gulir_dari(pg_widget_t *w)
@@ -132,7 +136,7 @@ static void pg_gulir_catat_v(pg_widget_t *w, pg_permukaan_t *s)
         /* Latar (seluruh permukaan gulir). */
         pg_isi_permukaan(s, g->latar);
 
-        /* Render anak via pg_widget_catat (smart latar + alpha blend).
+        /* Render anak via pg_widget_catat (latar cerdas + alpha blend).
          * pg_widget_catat akan render child ke permukaan child sendiri
          * (ukuran anak->kotak), lalu blit ke dest (permukaan sementara).
          *
@@ -178,32 +182,54 @@ static void pg_gulir_catat_v(pg_widget_t *w, pg_permukaan_t *s)
                 }
         }
 
-        /* Scrollbar vertikal. */
+        /* Scrollbar vertikal.
+         * Track: PANEL (#E6E6E6) — sama dengan latar widget lain.
+         * Thumb: ABU_TERANG (#C0C0C0) idle, #969696 hover, #707070 tekan.
+         * Radius thumb 3 supaya rounded (Cairo-quality via shared SDF). */
         if (need_vbar) {
                 int bar_x = sw - PG_GULIR_BAR;
                 int thumb_h, thumb_y;
+                pg_warna_t thumb_warna;
                 pg_gulir_thumb_v(g, vp_h, &thumb_h, &thumb_y);
+                /* Track. */
                 pg_isi_permukaan_kotak(s,
                         pg_buat_kotak(bar_x, 0, PG_GULIR_BAR, vp_h),
-                        PG_ABU_GELAP);
-                pg_isi_permukaan_kotak(s,
+                        PG_WARNA_PANEL);
+                /* Thumb color based on state. */
+                if (g->menyeret_v)
+                        thumb_warna = PG_RGB(0x70, 0x70, 0x70);
+                else if (g->hover_v)
+                        thumb_warna = PG_WARNA_HOVER_OUTLINE; /* #969696 */
+                else
+                        thumb_warna = PG_ABU_TERANG;          /* #C0C0C0 */
+                /* Thumb dengan rounded rect AA (radius 3). */
+                pg_gambar_kotak_tumpul_isi_garis_aa(s,
                         pg_buat_kotak(bar_x + 2, thumb_y,
                                        PG_GULIR_BAR - 4, thumb_h),
-                        PG_ABU_TERANG);
+                        3, thumb_warna, thumb_warna);
         }
 
         /* Scrollbar horizontal. */
         if (need_hbar) {
                 int bar_y = sh - PG_GULIR_BAR;
                 int thumb_w, thumb_x;
+                pg_warna_t thumb_warna;
                 pg_gulir_thumb_h(g, vp_w, &thumb_w, &thumb_x);
+                /* Track. */
                 pg_isi_permukaan_kotak(s,
                         pg_buat_kotak(0, bar_y, vp_w, PG_GULIR_BAR),
-                        PG_ABU_GELAP);
-                pg_isi_permukaan_kotak(s,
+                        PG_WARNA_PANEL);
+                /* Thumb color based on state. */
+                if (g->menyeret_h)
+                        thumb_warna = PG_RGB(0x70, 0x70, 0x70);
+                else if (g->hover_h)
+                        thumb_warna = PG_WARNA_HOVER_OUTLINE;
+                else
+                        thumb_warna = PG_ABU_TERANG;
+                pg_gambar_kotak_tumpul_isi_garis_aa(s,
                         pg_buat_kotak(thumb_x, bar_y + 2,
                                        thumb_w, PG_GULIR_BAR - 4),
-                        PG_ABU_TERANG);
+                        3, thumb_warna, thumb_warna);
         }
 
         /* Pojok kanan-bawah bila keduanya butuh scrollbar. */
@@ -212,12 +238,12 @@ static void pg_gulir_catat_v(pg_widget_t *w, pg_permukaan_t *s)
                         pg_buat_kotak(sw - PG_GULIR_BAR,
                                        sh - PG_GULIR_BAR,
                                        PG_GULIR_BAR, PG_GULIR_BAR),
-                        PG_ABU_GELAP);
+                        PG_WARNA_PANEL);
         }
 }
 
 static pg_bool pg_gulir_peristiwa_v(pg_widget_t *w,
-                                     const pg_peristiwa_t *e)
+                                     const pg_aksi_t *e)
 {
         pg_gulir_t *g = pg_gulir_dari(w);
         int sw, sh, vp_w, vp_h;
@@ -234,7 +260,7 @@ static pg_bool pg_gulir_peristiwa_v(pg_widget_t *w,
         if (maks_x < 0) maks_x = 0;
 
         /* Roda mouse: gulir vertikal. */
-        if (e->tipe == PG_PERISTIWA_TETIK_RODA) {
+        if (e->tipe == PG_AKSI_TETIKUS_GULIR) {
                 int step = PG_GULIR_RODA_LONCATAN;
                 int baru = g->gulir_y - e->roda_dy * step;
                 if (baru < 0) baru = 0;
@@ -246,9 +272,38 @@ static pg_bool pg_gulir_peristiwa_v(pg_widget_t *w,
                 return PG_BENAR;
         }
 
+        /* GERAK (tanpa klik): update hover state thumb. */
+        if (e->tipe == PG_AKSI_TETIKUS_GERAK &&
+            !g->menyeret_v && !g->menyeret_h) {
+                int mx = e->tetik_pos.x;
+                int my = e->tetik_pos.y;
+                pg_bool new_hover_v = PG_SALAH;
+                pg_bool new_hover_h = PG_SALAH;
+                if (need_vbar && mx >= sw - PG_GULIR_BAR && my < vp_h) {
+                        int thumb_h, thumb_y;
+                        pg_gulir_thumb_v(g, vp_h, &thumb_h, &thumb_y);
+                        if (my >= thumb_y && my < thumb_y + thumb_h)
+                                new_hover_v = PG_BENAR;
+                }
+                if (need_hbar && my >= sh - PG_GULIR_BAR && mx < vp_w) {
+                        int thumb_w, thumb_x;
+                        pg_gulir_thumb_h(g, vp_w, &thumb_w, &thumb_x);
+                        if (mx >= thumb_x && mx < thumb_x + thumb_w)
+                                new_hover_h = PG_BENAR;
+                }
+                if (g->hover_v != new_hover_v ||
+                    g->hover_h != new_hover_h) {
+                        g->hover_v = new_hover_v;
+                        g->hover_h = new_hover_h;
+                        pg_widget_kotor(w);
+                }
+                /* Jangan consume — biarkan event lanjut ke anak via
+                 * bottom fallthrough. */
+        }
+
         /* Klik kiri: cek scrollbar atau teruskan ke anak. */
-        if (e->tipe == PG_PERISTIWA_TETIK_TURUN &&
-            e->tetik_tombol == PG_TETIK_KIRI) {
+        if (e->tipe == PG_AKSI_TETIKUS_TEKAN &&
+            e->tetik_tombol == PG_TETIKUS_KIRI) {
                 int mx = e->tetik_pos.x;
                 int my = e->tetik_pos.y;
                 /* Thumb vertikal? */
@@ -290,7 +345,7 @@ static pg_bool pg_gulir_peristiwa_v(pg_widget_t *w,
         }
 
         /* Drag thumb vertikal sedang aktif. */
-        if (e->tipe == PG_PERISTIWA_TETIK_GERAK && g->menyeret_v) {
+        if (e->tipe == PG_AKSI_TETIKUS_GERAK && g->menyeret_v) {
                 int thumb_h, thumb_y, denom;
                 int baru = 0;
                 pg_gulir_thumb_v(g, vp_h, &thumb_h, &thumb_y);
@@ -308,7 +363,7 @@ static pg_bool pg_gulir_peristiwa_v(pg_widget_t *w,
         }
 
         /* Drag thumb horizontal sedang aktif. */
-        if (e->tipe == PG_PERISTIWA_TETIK_GERAK && g->menyeret_h) {
+        if (e->tipe == PG_AKSI_TETIKUS_GERAK && g->menyeret_h) {
                 int thumb_w, thumb_x, denom;
                 int baru = 0;
                 pg_gulir_thumb_h(g, vp_w, &thumb_w, &thumb_x);
@@ -326,20 +381,24 @@ static pg_bool pg_gulir_peristiwa_v(pg_widget_t *w,
         }
 
         /* Lepas klik: akhiri drag. */
-        if (e->tipe == PG_PERISTIWA_TETIK_NAIK &&
+        if (e->tipe == PG_AKSI_TETIKUS_LEPAS &&
             (g->menyeret_v || g->menyeret_h)) {
                 g->menyeret_v = PG_SALAH;
                 g->menyeret_h = PG_SALAH;
+                /* Reset hover juga supaya thumb kembali ke warna idle
+                 * (mouse mungkin sudah di luar thumb saat lepas). */
+                g->hover_v = PG_SALAH;
+                g->hover_h = PG_SALAH;
                 pg_widget_kotor(w);
                 return PG_BENAR;
         }
 
         /* Klik di viewport: teruskan ke anak dengan offset digulir. */
         if (g->anak) {
-                pg_peristiwa_t e2 = *e;
+                pg_aksi_t e2 = *e;
                 e2.tetik_pos.x += g->gulir_x;
                 e2.tetik_pos.y += g->gulir_y;
-                return pg_widget_tangani_peristiwa(g->anak, &e2);
+                return pg_widget_tangani_aksi(g->anak, &e2);
         }
         return PG_SALAH;
 }

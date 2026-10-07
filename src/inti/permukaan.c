@@ -124,12 +124,44 @@ void pg_isi_permukaan(pg_permukaan_t *s, pg_warna_t c)
 {
         int y;
         if (!s) return;
+        /* Kalau c = transparan penuh (A==0):
+         * - Owned permukaan (offscreen icon): clear ke 0 (memset)
+         * - Wrapped permukaan (X11 backbuffer): skip, jangan timpa
+         *   parent dengan 0. */
+        if (PG_A(c) == 0) {
+                if (s->punya) {
+                        int y2;
+                        for (y2 = 0; y2 < s->tinggi; y2++) {
+                                pg_warna_t *row = (pg_warna_t *)
+                                        ((char *)s->piksel +
+                                         (size_t)y2 * s->langkah);
+                                memset(row, 0,
+                                       (size_t)s->lebar * sizeof(pg_warna_t));
+                        }
+                        s->kotor = pg_buat_kotak(0, 0, s->lebar, s->tinggi);
+                }
+                return;
+        }
         for (y = 0; y < s->tinggi; y++) {
                 pg_warna_t *row = (pg_warna_t *)((char *)s->piksel +
                                   (size_t)y * s->langkah);
                 int x;
-                for (x = 0; x < s->lebar; x++)
-                        row[x] = c;
+                if (PG_A(c) == 255) {
+                        for (x = 0; x < s->lebar; x++)
+                                row[x] = c;
+                } else {
+                        /* Semi-transparan: blend dengan existing pixel */
+                        int ia = 255 - PG_A(c);
+                        int r = PG_R(c), g = PG_G(c), b = PG_B(c), a = PG_A(c);
+                        for (x = 0; x < s->lebar; x++) {
+                                pg_warna_t bg = row[x];
+                                int nr = (r*a + PG_R(bg)*ia)/255;
+                                int ng = (g*a + PG_G(bg)*ia)/255;
+                                int nb = (b*a + PG_B(bg)*ia)/255;
+                                int na = a + (PG_A(bg)*ia)/255;
+                                row[x] = PG_RGBA(nr,ng,nb,na);
+                        }
+                }
         }
         s->kotor = pg_buat_kotak(0, 0, s->lebar, s->tinggi);
 }
@@ -138,14 +170,28 @@ void pg_isi_permukaan_kotak(pg_permukaan_t *s, pg_kotak_t r, pg_warna_t c)
 {
         int y;
         if (!s) return;
+        if (PG_A(c) == 0) return;
         r = pg_potong_ke_permukaan(s, r);
         if (PG_KOTAK_KOSONG(r)) return;
         for (y = r.y; y < r.y + r.h; y++) {
                 pg_warna_t *row = (pg_warna_t *)((char *)s->piksel +
                                   (size_t)y * s->langkah);
                 int x;
-                for (x = r.x; x < r.x + r.w; x++)
-                        row[x] = c;
+                if (PG_A(c) == 255) {
+                        for (x = r.x; x < r.x + r.w; x++)
+                                row[x] = c;
+                } else {
+                        int ia = 255 - PG_A(c);
+                        int r2 = PG_R(c), g2 = PG_G(c), b2 = PG_B(c), a2 = PG_A(c);
+                        for (x = r.x; x < r.x + r.w; x++) {
+                                pg_warna_t bg = row[x];
+                                int nr = (r2*a2 + PG_R(bg)*ia)/255;
+                                int ng = (g2*a2 + PG_G(bg)*ia)/255;
+                                int nb = (b2*a2 + PG_B(bg)*ia)/255;
+                                int na = a2 + (PG_A(bg)*ia)/255;
+                                row[x] = PG_RGBA(nr,ng,nb,na);
+                        }
+                }
         }
         pg_permukaan_kotor(s, r);
 }
@@ -168,6 +214,23 @@ pg_warna_t pg_ambil_piksel_permukaan(const pg_permukaan_t *s, int x, int y)
         p = (const pg_warna_t *)((const char *)s->piksel +
              (size_t)y * s->langkah);
         return p[x];
+}
+
+/* Bersihkan permukaan ke transparan penuh (0x00000000).
+ * Berbeda dari pg_isi_permukaan(PG_TRANSPARAN) yang skip
+ * bila A==0 — fungsi ini selalu set pixel ke 0. */
+void pg_bersihkan_permukaan(pg_permukaan_t *s)
+{
+        int y;
+        if (!s || !s->piksel) return;
+        for (y = 0; y < s->tinggi; y++) {
+                pg_warna_t *row = (pg_warna_t *)((char *)s->piksel +
+                                  (size_t)y * s->langkah);
+                int x;
+                for (x = 0; x < s->lebar; x++)
+                        row[x] = 0;
+        }
+        s->kotor = pg_buat_kotak(0, 0, s->lebar, s->tinggi);
 }
 
 void pg_garis_h_permukaan(pg_permukaan_t *s, int x0, int x1, int y,
@@ -255,7 +318,8 @@ void pg_blit_potong_permukaan(pg_permukaan_t *dst, int dx, int dy,
                                 int r = (PG_R(sc) * sa + PG_R(dc) * ia) / 255;
                                 int g = (PG_G(sc) * sa + PG_G(dc) * ia) / 255;
                                 int b = (PG_B(sc) * sa + PG_B(dc) * ia) / 255;
-                                drow[dr.x + x] = PG_RGB(r, g, b);
+                                int a = sa + (PG_A(dc) * ia) / 255;
+                                drow[dr.x + x] = PG_RGBA(r, g, b, a);
                         }
                 }
         }
@@ -298,7 +362,8 @@ void pg_blit_alpha_permukaan(pg_permukaan_t *dst, int dx, int dy,
                                 int r = (PG_R(sc) * sa + PG_R(dc) * ia) / 255;
                                 int g = (PG_G(sc) * sa + PG_G(dc) * ia) / 255;
                                 int b = (PG_B(sc) * sa + PG_B(dc) * ia) / 255;
-                                drow[dr.x + x] = PG_RGB(r, g, b);
+                                int a = sa + (PG_A(dc) * ia) / 255;
+                                drow[dr.x + x] = PG_RGBA(r, g, b, a);
                         }
                 }
         }
@@ -326,8 +391,23 @@ void pg_blit_sub_permukaan(pg_permukaan_t *dst, int dx, int dy,
                 const pg_warna_t *srow = (const pg_warna_t *)
                                   ((const char *)src->piksel +
                                   (size_t)(sr.y + y) * src->langkah);
-                memcpy(&drow[dr.x], &srow[sr.x],
-                       (size_t)dr.w * sizeof(pg_warna_t));
+                int x;
+                for (x = 0; x < dr.w; x++) {
+                        pg_warna_t sc = srow[sr.x + x];
+                        int sa = PG_A(sc);
+                        if (sa == 0) continue;  /* transparan: skip */
+                        if (sa == 255) {
+                                drow[dr.x + x] = sc;
+                        } else {
+                                pg_warna_t dc = drow[dr.x + x];
+                                int ia = 255 - sa;
+                                int r = (PG_R(sc)*sa + PG_R(dc)*ia)/255;
+                                int g = (PG_G(sc)*sa + PG_G(dc)*ia)/255;
+                                int b = (PG_B(sc)*sa + PG_B(dc)*ia)/255;
+                                int a = sa + (PG_A(dc)*ia)/255;
+                                drow[dr.x + x] = PG_RGBA(r,g,b,a);
+                        }
+                }
         }
         pg_permukaan_kotor(dst, dr);
 }

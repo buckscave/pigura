@@ -354,31 +354,48 @@ pg_galat pg_layar_presentasi(pg_layar_t *l)
                  * bisa langsung copy. */
                 if (r_mask == 0xFF0000 && g_mask == 0x00FF00 &&
                     b_mask == 0x0000FF) {
-                        /* Strip alpha ke 255 (opaque) sebelum kirim ke X11.
-                         * Alpha < 255 akan di-interpret oleh composite
-                         * manager X11 sebagai transparansi → blend dengan
-                         * desktop, bukan background kita. */
+                        /* Final surface sudah opaque (semua widget render
+                         * di atas latar). Jangan premultiply — copy RGB
+                         * langsung, force alpha=255.
+                         * Untuk pixel alpha=0 (pojok rounded transparan):
+                         * ganti ke warna panel supaya tidak jadi hitam
+                         * di X11. */
                         for (y = 0; y < l->tinggi; y++) {
                                 pg_u32 *drow = (pg_u32 *)(dst + y * bpl);
                                 pg_warna_t *srow = src + y * l->lebar;
                                 int x;
                                 for (x = 0; x < l->lebar; x++) {
-                                        drow[x] = srow[x] | 0xFF000000UL;
+                                        pg_warna_t c = srow[x];
+                                        if (PG_A(c) == 0) {
+                                                /* Transparan: pakai panel */
+                                                drow[x] = 0xFFE6E6E6UL;
+                                        } else {
+                                                /* Opaque/semi: copy RGB,
+                                                 * force alpha=255 */
+                                                drow[x] = c | 0xFF000000UL;
+                                        }
                                 }
                         }
                 } else {
-                        /* Konversi pixel per pixel untuk format lain. */
                         int x;
                         for (y = 0; y < l->tinggi; y++) {
                                 pg_u32 *drow = (pg_u32 *)(dst + y * bpl);
                                 pg_warna_t *srow = src + y * l->lebar;
                                 for (x = 0; x < l->lebar; x++) {
                                         pg_warna_t c = srow[x];
+                                        int r, g, b;
+                                        if (PG_A(c) == 0) {
+                                                r = 0xE6; g = 0xE6; b = 0xE6;
+                                        } else {
+                                                r = PG_R(c);
+                                                g = PG_G(c);
+                                                b = PG_B(c);
+                                        }
                                         drow[x] =
-                                          ((pg_u32)PG_R(c) << r_shift) |
-                                          ((pg_u32)PG_G(c) << g_shift) |
-                                          ((pg_u32)PG_B(c) << b_shift) |
-                                          (0xFF000000UL); /* force opaque */
+                                          ((pg_u32)r << r_shift) |
+                                          ((pg_u32)g << g_shift) |
+                                          ((pg_u32)b << b_shift) |
+                                          (0xFF000000UL);
                                 }
                         }
                 }
@@ -391,9 +408,17 @@ pg_galat pg_layar_presentasi(pg_layar_t *l)
                         pg_warna_t *srow = src + y * l->lebar;
                         for (x = 0; x < l->lebar; x++) {
                                 pg_warna_t c = srow[x];
-                                drow[x*3]   = (char)PG_B(c);
-                                drow[x*3+1] = (char)PG_G(c);
-                                drow[x*3+2] = (char)PG_R(c);
+                                int r, g, b;
+                                if (PG_A(c) == 0) {
+                                        r = 0xE6; g = 0xE6; b = 0xE6;
+                                } else {
+                                        r = PG_R(c);
+                                        g = PG_G(c);
+                                        b = PG_B(c);
+                                }
+                                drow[x*3]   = (char)b;
+                                drow[x*3+1] = (char)g;
+                                drow[x*3+2] = (char)r;
                         }
                 }
         } else {
@@ -434,7 +459,7 @@ pg_galat pg_layar_tunggu_vsync(pg_layar_t *l)
         return PG_GALAT_TANPA;
 }
 
-pg_galat pg_layar_pompa_peristiwa(pg_layar_t *l)
+pg_galat pg_layar_pompa_aksi(pg_layar_t *l)
 {
         /* Pompa peristiwa X11 — di sini hanya drain queue tanpa
          * konsumsi; backend masukan akan baca melalui XNextEvent. */
@@ -455,7 +480,7 @@ unsigned long pg_layar_jendela_id(pg_layar_t *l)
         return (unsigned long)l->win;
 }
 
-pg_bool pg_layar_punya_peristiwa(pg_layar_t *l)
+pg_bool pg_layar_punya_aksi(pg_layar_t *l)
 {
         if (!l || !l->disp) return PG_SALAH;
         return XPending(l->disp) > 0 ? PG_BENAR : PG_SALAH;
@@ -533,7 +558,7 @@ static pg_u32 pg_x11_sekarang_ms(void)
         return (pg_u32)(ts.tv_sec * 1000u + ts.tv_nsec / 1000000u);
 }
 
-pg_bool pg_layar_peristiwa_berikutnya(pg_layar_t *l, pg_peristiwa_t *out)
+pg_bool pg_layar_aksi_berikutnya(pg_layar_t *l, pg_aksi_t *out)
 {
         XEvent ev;
         if (!l || !l->disp || !out) return PG_SALAH;
@@ -550,7 +575,7 @@ pg_bool pg_layar_peristiwa_berikutnya(pg_layar_t *l, pg_peristiwa_t *out)
                 int n;
                 XComposeStatus cs;
                 n = XLookupString(&ev.xkey, buf, sizeof(buf), &ks, &cs);
-                out->tipe = PG_PERISTIWA_TOMBOL_TURUN;
+                out->tipe = PG_AKSI_TOMBOL_TURUN;
                 out->tombol = pg_x11_ksym_ke_tombol(ks);
                 out->modifier = 0;
                 if (ev.xkey.state & ShiftMask)   out->modifier |= PG_MOD_SHIFT;
@@ -564,7 +589,7 @@ pg_bool pg_layar_peristiwa_berikutnya(pg_layar_t *l, pg_peristiwa_t *out)
         case KeyRelease: {
                 KeySym ks;
                 XLookupString(&ev.xkey, NULL, 0, &ks, NULL);
-                out->tipe = PG_PERISTIWA_TOMBOL_NAIK;
+                out->tipe = PG_AKSI_TOMBOL_NAIK;
                 out->tombol = pg_x11_ksym_ke_tombol(ks);
                 out->modifier = 0;
                 if (ev.xkey.state & ShiftMask)   out->modifier |= PG_MOD_SHIFT;
@@ -573,33 +598,33 @@ pg_bool pg_layar_peristiwa_berikutnya(pg_layar_t *l, pg_peristiwa_t *out)
                 return PG_BENAR;
         }
         case ButtonPress:
-                out->tipe = PG_PERISTIWA_TETIK_TURUN;
+                out->tipe = PG_AKSI_TETIKUS_TEKAN;
                 out->tetik_pos = pg_buat_titik(ev.xbutton.x, ev.xbutton.y);
                 out->modifier = 0;
                 if (ev.xbutton.state & ShiftMask)   out->modifier |= PG_MOD_SHIFT;
                 if (ev.xbutton.state & ControlMask) out->modifier |= PG_MOD_CTRL;
                 if (ev.xbutton.state & Mod1Mask)    out->modifier |= PG_MOD_ALT;
                 switch (ev.xbutton.button) {
-                case 1: out->tetik_tombol = PG_TETIK_KIRI; break;
-                case 2: out->tetik_tombol = PG_TETIK_TENGAH; break;
-                case 3: out->tetik_tombol = PG_TETIK_KANAN; break;
-                case 4: out->tipe = PG_PERISTIWA_TETIK_RODA;
+                case 1: out->tetik_tombol = PG_TETIKUS_KIRI; break;
+                case 2: out->tetik_tombol = PG_TETIKUS_TENGAH; break;
+                case 3: out->tetik_tombol = PG_TETIKUS_KANAN; break;
+                case 4: out->tipe = PG_AKSI_TETIKUS_GULIR;
                         out->roda_dy = 1; break;
-                case 5: out->tipe = PG_PERISTIWA_TETIK_RODA;
+                case 5: out->tipe = PG_AKSI_TETIKUS_GULIR;
                         out->roda_dy = -1; break;
                 }
                 return PG_BENAR;
         case ButtonRelease:
-                out->tipe = PG_PERISTIWA_TETIK_NAIK;
+                out->tipe = PG_AKSI_TETIKUS_LEPAS;
                 out->tetik_pos = pg_buat_titik(ev.xbutton.x, ev.xbutton.y);
                 switch (ev.xbutton.button) {
-                case 1: out->tetik_tombol = PG_TETIK_KIRI; break;
-                case 2: out->tetik_tombol = PG_TETIK_TENGAH; break;
-                case 3: out->tetik_tombol = PG_TETIK_KANAN; break;
+                case 1: out->tetik_tombol = PG_TETIKUS_KIRI; break;
+                case 2: out->tetik_tombol = PG_TETIKUS_TENGAH; break;
+                case 3: out->tetik_tombol = PG_TETIKUS_KANAN; break;
                 }
                 return PG_BENAR;
         case MotionNotify:
-                out->tipe = PG_PERISTIWA_TETIK_GERAK;
+                out->tipe = PG_AKSI_TETIKUS_GERAK;
                 out->tetik_pos = pg_buat_titik(ev.xmotion.x, ev.xmotion.y);
                 return PG_BENAR;
         case ConfigureNotify:
@@ -614,14 +639,14 @@ pg_bool pg_layar_peristiwa_berikutnya(pg_layar_t *l, pg_peristiwa_t *out)
                         l->langkah = l->lebar *
                                 (int)sizeof(pg_warna_t);
                 }
-                out->tipe = PG_PERISTIWA_JENDELA;
-                out->jendela_peristiwa = PG_JENDELA_UBAH_UKURAN;
+                out->tipe = PG_AKSI_JENDELA;
+                out->jendela_aksi = PG_JENDELA_UBAH_UKURAN;
                 out->jendela_id = 0;
                 return PG_BENAR;
         case ClientMessage:
                 /* WM_DELETE_WINDOW — tombol close diklik. */
                 if ((Atom)ev.xclient.data.l[0] == l->wm_hapus) {
-                        out->tipe = PG_PERISTIWA_KELUAR;
+                        out->tipe = PG_AKSI_KELUAR;
                         return PG_BENAR;
                 }
                 return PG_SALAH;
@@ -630,8 +655,8 @@ pg_bool pg_layar_peristiwa_berikutnya(pg_layar_t *l, pg_peristiwa_t *out)
                  * dari minimize, atau sebagian jendela terbongkar).
                  * Emit event JENDELA_PERMINTAAN_GAMBAR supaya aplikasi
                  * merender ulang; jangan diabaikan. */
-                out->tipe = PG_PERISTIWA_JENDELA;
-                out->jendela_peristiwa = PG_JENDELA_PERMINTAAN_GAMBAR;
+                out->tipe = PG_AKSI_JENDELA;
+                out->jendela_aksi = PG_JENDELA_PERMINTAAN_GAMBAR;
                 out->jendela_id = 0;
                 return PG_BENAR;
         default:

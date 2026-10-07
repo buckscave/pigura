@@ -10,7 +10,7 @@
 #include "pigura/permukaan.h"
 #include "pigura/gambar.h"
 #include "pigura/font.h"
-#include "pigura/peristiwa.h"
+#include "pigura/aksi.h"
 #include "pigura/widget.h"
 
 #include <stdlib.h>
@@ -105,8 +105,8 @@ static void pg_jendela_catat_v(pg_widget_t *w, pg_permukaan_t *s)
 	}
 }
 
-static pg_bool pg_jendela_peristiwa_v(pg_widget_t *w,
-				     const pg_peristiwa_t *e)
+static pg_bool pg_jendela_aksi_v(pg_widget_t *w,
+				     const pg_aksi_t *e)
 {
 	pg_jendela_widget_t *j = pg_jendela_dari(w);
 	int sw, sh, close_x, close_y, close_h;
@@ -115,8 +115,8 @@ static pg_bool pg_jendela_peristiwa_v(pg_widget_t *w,
 	close_x = sw - PG_JENDELA_CLOSE_W - 3;
 	close_y = 3;
 	close_h = PG_JENDELA_CLOSE_H;
-	if (e->tipe == PG_PERISTIWA_TETIK_TURUN &&
-	    e->tetik_tombol == PG_TETIK_KIRI) {
+	if (e->tipe == PG_AKSI_TETIKUS_TEKAN &&
+	    e->tetik_tombol == PG_TETIKUS_KIRI) {
 		int x = e->tetik_pos.x, y = e->tetik_pos.y;
 		/* Tombol close? */
 		if (x >= close_x && x < close_x + PG_JENDELA_CLOSE_W &&
@@ -138,15 +138,15 @@ static pg_bool pg_jendela_peristiwa_v(pg_widget_t *w,
 		}
 		/* Body: teruskan ke anak. */
 		if (j->anak) {
-			pg_peristiwa_t e2 = *e;
+			pg_aksi_t e2 = *e;
 			e2.tetik_pos.y -= PG_JENDELA_TITLE_H;
-			return pg_widget_tangani_peristiwa(
+			return pg_widget_tangani_aksi(
 				j->anak, &e2);
 		}
 		return PG_SALAH;
 	}
-	if (e->tipe == PG_PERISTIWA_TETIK_NAIK &&
-	    e->tetik_tombol == PG_TETIK_KIRI) {
+	if (e->tipe == PG_AKSI_TETIKUS_LEPAS &&
+	    e->tetik_tombol == PG_TETIKUS_KIRI) {
 		if (j->menyeret) {
 			j->menyeret = PG_SALAH;
 			return PG_BENAR;
@@ -156,21 +156,21 @@ static pg_bool pg_jendela_peristiwa_v(pg_widget_t *w,
 			return PG_BENAR;
 		}
 		if (j->anak) {
-			pg_peristiwa_t e2 = *e;
+			pg_aksi_t e2 = *e;
 			e2.tetik_pos.y -= PG_JENDELA_TITLE_H;
-			return pg_widget_tangani_peristiwa(
+			return pg_widget_tangani_aksi(
 				j->anak, &e2);
 		}
 		return PG_SALAH;
 	}
-	if (e->tipe == PG_PERISTIWA_TETIK_GERAK && j->menyeret) {
+	if (e->tipe == PG_AKSI_TETIKUS_GERAK && j->menyeret) {
 		int nx, ny;
 		nx = w->kotak.x + e->tetik_pos.x - j->seret_ofs.x;
 		ny = w->kotak.y + e->tetik_pos.y - j->seret_ofs.y;
 		pg_widget_pindah(w, nx, ny);
 		return PG_BENAR;
 	}
-	if (e->tipe == PG_PERISTIWA_TETIK_GERAK && j->resize) {
+	if (e->tipe == PG_AKSI_TETIKUS_GERAK && j->resize) {
 		int nw, nh;
 		nw = e->tetik_pos.x + j->resize_ofs.x;
 		nh = e->tetik_pos.y + j->resize_ofs.y;
@@ -181,9 +181,9 @@ static pg_bool pg_jendela_peristiwa_v(pg_widget_t *w,
 	}
 	/* Peristiwa lain: teruskan ke anak bila ada. */
 	if (j->anak) {
-		pg_peristiwa_t e2 = *e;
+		pg_aksi_t e2 = *e;
 		e2.tetik_pos.y -= PG_JENDELA_TITLE_H;
-		return pg_widget_tangani_peristiwa(j->anak, &e2);
+		return pg_widget_tangani_aksi(j->anak, &e2);
 	}
 	return PG_SALAH;
 }
@@ -216,7 +216,7 @@ static void pg_jendela_bebas_v(pg_widget_t *w)
 
 static const pg_widget_vtable_t pg_jendela_vtable = {
 	pg_jendela_catat_v,
-	pg_jendela_peristiwa_v,
+	pg_jendela_aksi_v,
 	pg_jendela_ubah_ukuran_v,
 	pg_jendela_hancur_v,
 	NULL,

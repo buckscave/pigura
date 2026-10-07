@@ -2,7 +2,7 @@
 #include "pigura/permukaan.h"
 #include "pigura/gambar.h"
 #include "pigura/font.h"
-#include "pigura/peristiwa.h"
+#include "pigura/aksi.h"
 #include "pigura/widget.h"
 #include <stdlib.h>
 #include <string.h>
@@ -32,16 +32,16 @@ static void catat_v(pg_widget_t *w, pg_permukaan_t *s) {
 				(i==cm->sel_idx)?cm->sel_fg:cm->fg);
 	}
 }
-static pg_bool peristiwa_v(pg_widget_t *w, const pg_peristiwa_t *e) {
+static pg_bool peristiwa_v(pg_widget_t *w, const pg_aksi_t *e) {
 	pg_contextmenu_t *cm=d(w); int ih=item_h(cm);
-	if(e->tipe==PG_PERISTIWA_TETIK_GERAK) {
+	if(e->tipe==PG_AKSI_TETIKUS_GERAK) {
 		int idx=e->tetik_pos.y/ih;
 		if(idx>=0&&idx<cm->n_items&&!cm->items[idx].is_sep) {
 			if(idx!=cm->hover_idx) { cm->hover_idx=idx; pg_widget_kotor(w); }
 		} else cm->hover_idx=-1;
 		return PG_BENAR;
 	}
-	if(e->tipe==PG_PERISTIWA_TETIK_TURUN && e->tetik_tombol==PG_TETIK_KIRI) {
+	if(e->tipe==PG_AKSI_TETIKUS_TEKAN && e->tetik_tombol==PG_TETIKUS_KIRI) {
 		int idx=e->tetik_pos.y/ih;
 		if(idx>=0&&idx<cm->n_items&&!cm->items[idx].is_sep) {
 			cm->sel_idx=idx;

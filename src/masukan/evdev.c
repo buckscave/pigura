@@ -5,18 +5,18 @@
  * EVIOCGBIT(0,...) (EV_KEY + KEY_ESC untuk keyboard, EV_REL atau
  * EV_ABS + BTN_LEFT untuk mouse), lalu spawn 2 thread pembaca:
  *
- *   kbd_thread   : read EV_KEY → PG_PERISTIWA_TOMBOL_*
+ *   kbd_thread   : read EV_KEY → PG_AKSI_TOMBOL_*
  *   mouse_thread : read EV_REL + EV_KEY + EV_ABS
- *                  → PG_PERISTIWA_TETIK_* (GERAK / TURUN / NAIK /
+ *                  → PG_AKSI_TETIK_* (GERAK / TURUN / NAIK /
  *                  RODA)
  *
  * Posisi mouse (absolut atau relatif) di-track atomik di struct
  * pg_masukan_t; tiap gerakan roda / gerak / klik ditarik saat ini
- * untuk membentuk pg_peristiwa_t. Modifier (Shift/Ctrl/Alt/Meta)
+ * untuk membentuk pg_aksi_t. Modifier (Shift/Ctrl/Alt/Meta)
  * juga di-track atomik.
  *
  * pg_masukan_tarik() hanya menarik dari antrian internal yang diisi
- * thread — tidak memanggil pg_layar_peristiwa_berikutnya() karena
+ * thread — tidak memanggil pg_layar_aksi_berikutnya() karena
  * linuxfb tidak punya antrian windowing.
  *
  * Hanya dikompilasi di __linux__. Dijaga oleh #ifdef di seluruh file.
@@ -47,7 +47,7 @@
 struct pg_masukan {
 	pg_masukan_config_t cfg;
 	pg_kunci_t         *kunci;
-	pg_peristiwa_t      antrian[PG_MASUKAN_ANTRIAN];
+	pg_aksi_t      antrian[PG_MASUKAN_ANTRIAN];
 	int                 kepala, ekor, jumlah;
 	pg_layar_t         *layar;
 
@@ -60,7 +60,7 @@ struct pg_masukan {
 	volatile pg_s32     mouse_x, mouse_y;
 };
 
-static void pg_masukan_dorong(pg_masukan_t *in, const pg_peristiwa_t *e)
+static void pg_masukan_dorong(pg_masukan_t *in, const pg_aksi_t *e)
 {
 	pg_kunci_kunci(in->kunci);
 	if (in->jumlah < PG_MASUKAN_ANTRIAN) {
@@ -314,7 +314,7 @@ static void *pg_evdev_kbd_thread(void *arg)
 		pg_evdev_update_modifier(in, ev.code, ev.value);
 
 		{
-			pg_peristiwa_t pe;
+			pg_aksi_t pe;
 			int t = pg_evdev_kode_ke_tombol(ev.code);
 			if (t == PG_TOMBOL_KOSONG) continue;
 			if (ev.value != 0 && ev.value != 1) continue;
@@ -322,8 +322,8 @@ static void *pg_evdev_kbd_thread(void *arg)
 			memset(&pe, 0, sizeof(pe));
 			pe.waktu_ms = pg_evdev_sekarang_ms();
 			pe.tipe = ev.value == 1 ?
-				PG_PERISTIWA_TOMBOL_TURUN :
-				PG_PERISTIWA_TOMBOL_NAIK;
+				PG_AKSI_TOMBOL_TURUN :
+				PG_AKSI_TOMBOL_NAIK;
 			pe.tombol = t;
 			pe.modifier = pg_evdev_modifier(in);
 			if (t >= 32 && t <= 126 && ev.value == 1)
@@ -358,7 +358,7 @@ static void *pg_evdev_mouse_thread(void *arg)
 			continue;
 
 		if (ev.type == EV_REL) {
-			pg_peristiwa_t pe;
+			pg_aksi_t pe;
 			if (ev.code == REL_X) {
 				int nx = pg_atom_muat(&in->mouse_x) +
 					ev.value;
@@ -370,7 +370,7 @@ static void *pg_evdev_mouse_thread(void *arg)
 			} else if (ev.code == REL_WHEEL) {
 				memset(&pe, 0, sizeof(pe));
 				pe.waktu_ms = pg_evdev_sekarang_ms();
-				pe.tipe = PG_PERISTIWA_TETIK_RODA;
+				pe.tipe = PG_AKSI_TETIKUS_GULIR;
 				pe.roda_dy = ev.value > 0 ? 1 : -1;
 				pe.tetik_pos = pg_buat_titik(
 					pg_atom_muat(&in->mouse_x),
@@ -382,13 +382,13 @@ static void *pg_evdev_mouse_thread(void *arg)
 			}
 			memset(&pe, 0, sizeof(pe));
 			pe.waktu_ms = pg_evdev_sekarang_ms();
-			pe.tipe = PG_PERISTIWA_TETIK_GERAK;
+			pe.tipe = PG_AKSI_TETIKUS_GERAK;
 			pe.tetik_pos = pg_buat_titik(
 				pg_atom_muat(&in->mouse_x),
 				pg_atom_muat(&in->mouse_y));
 			pg_masukan_dorong(in, &pe);
 		} else if (ev.type == EV_ABS) {
-			pg_peristiwa_t pe;
+			pg_aksi_t pe;
 			if (ev.code == ABS_X)
 				pg_atom_simpan(&in->mouse_x, ev.value);
 			else if (ev.code == ABS_Y)
@@ -396,27 +396,27 @@ static void *pg_evdev_mouse_thread(void *arg)
 			else continue;
 			memset(&pe, 0, sizeof(pe));
 			pe.waktu_ms = pg_evdev_sekarang_ms();
-			pe.tipe = PG_PERISTIWA_TETIK_GERAK;
+			pe.tipe = PG_AKSI_TETIKUS_GERAK;
 			pe.tetik_pos = pg_buat_titik(
 				pg_atom_muat(&in->mouse_x),
 				pg_atom_muat(&in->mouse_y));
 			pg_masukan_dorong(in, &pe);
 		} else if (ev.type == EV_KEY) {
-			pg_peristiwa_t pe;
+			pg_aksi_t pe;
 			int btn = 0;
 
 			switch (ev.code) {
-			case BTN_LEFT:   btn = PG_TETIK_KIRI; break;
-			case BTN_RIGHT:  btn = PG_TETIK_KANAN; break;
-			case BTN_MIDDLE: btn = PG_TETIK_TENGAH; break;
+			case BTN_LEFT:   btn = PG_TETIKUS_KIRI; break;
+			case BTN_RIGHT:  btn = PG_TETIKUS_KANAN; break;
+			case BTN_MIDDLE: btn = PG_TETIKUS_TENGAH; break;
 			default: continue;
 			}
 			if (ev.value != 0 && ev.value != 1) continue;
 			memset(&pe, 0, sizeof(pe));
 			pe.waktu_ms = pg_evdev_sekarang_ms();
 			pe.tipe = ev.value == 1 ?
-				PG_PERISTIWA_TETIK_TURUN :
-				PG_PERISTIWA_TETIK_NAIK;
+				PG_AKSI_TETIKUS_TEKAN :
+				PG_AKSI_TETIKUS_LEPAS;
 			pe.tetik_tombol = btn;
 			pe.tetik_pos = pg_buat_titik(
 				pg_atom_muat(&in->mouse_x),
@@ -512,14 +512,14 @@ pg_galat pg_tutup_masukan(pg_masukan_t *in)
 	return PG_OK;
 }
 
-pg_galat pg_masukan_emit(pg_masukan_t *in, const pg_peristiwa_t *e)
+pg_galat pg_masukan_emit(pg_masukan_t *in, const pg_aksi_t *e)
 {
 	if (!in || !e) PG_KEMBALI_GALAT(PG_GALAT_ARGUMEN);
 	pg_masukan_dorong(in, e);
 	return PG_OK;
 }
 
-int pg_masukan_tarik(pg_masukan_t *in, pg_peristiwa_t *buf, int maks)
+int pg_masukan_tarik(pg_masukan_t *in, pg_aksi_t *buf, int maks)
 {
 	int n = 0;
 

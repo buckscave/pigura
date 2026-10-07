@@ -12,8 +12,8 @@
  * shift+mask sesuai vinfo red/green/blue.offset.
  *
  * Input tidak ditangani file ini — dipompa oleh masukan/evdev.c yang
- * membuka /dev/input/event* sendiri. pg_layar_peristiwa_berikutnya()
- * selalu mengembalikan PG_SALAH; pg_layar_punya_peristiwa() PG_SALAH.
+ * membuka /dev/input/event* sendiri. pg_layar_aksi_berikutnya()
+ * selalu mengembalikan PG_SALAH; pg_layar_punya_aksi() PG_SALAH.
  *
  * Hanya dikompilasi di __linux__. Dijaga oleh #ifdef di seluruh file.
  * ---------------------------------------------------------------------------------------------- */
@@ -286,7 +286,7 @@ pg_galat pg_layar_tunggu_vsync(pg_layar_t *l)
         return PG_GALAT_TANPA;
 }
 
-pg_galat pg_layar_pompa_peristiwa(pg_layar_t *l)
+pg_galat pg_layar_pompa_aksi(pg_layar_t *l)
 {
         /* Tidak ada antrian peristiwa di fb — input dari evdev. */
         if (!l) PG_KEMBALI_GALAT(PG_GALAT_ARGUMEN);
@@ -307,14 +307,14 @@ unsigned long pg_layar_jendela_id(pg_layar_t *l)
         return (unsigned long)l->fd;
 }
 
-pg_bool pg_layar_punya_peristiwa(pg_layar_t *l)
+pg_bool pg_layar_punya_aksi(pg_layar_t *l)
 {
         (void)l;
         return PG_SALAH;
 }
 
-pg_bool pg_layar_peristiwa_berikutnya(pg_layar_t *l,
-                                        pg_peristiwa_t *out)
+pg_bool pg_layar_aksi_berikutnya(pg_layar_t *l,
+                                        pg_aksi_t *out)
 {
         if (out) {
                 memset(out, 0, sizeof(*out));

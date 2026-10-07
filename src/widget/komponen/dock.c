@@ -20,7 +20,7 @@
 #include "pigura/permukaan.h"
 #include "pigura/gambar.h"
 #include "pigura/font.h"
-#include "pigura/peristiwa.h"
+#include "pigura/aksi.h"
 #include "pigura/widget.h"
 #include "pigura/galat.h"
 #include <stdlib.h>
@@ -692,13 +692,13 @@ void pg_dock_catat_hint(pg_dock_t *d, pg_permukaan_t *dest,
 
 /* ===== Event handler ===== */
 
-pg_bool pg_dock_tangani(pg_dock_t *d, const pg_peristiwa_t *e)
+pg_bool pg_dock_tangani(pg_dock_t *d, const pg_aksi_t *e)
 {
         if (!d) return PG_SALAH;
 
         /* 1. Splitter drag aktif. */
         if (d->split_drag_idx >= 0 && d->ukuran_panels) {
-                if (e->tipe == PG_PERISTIWA_TETIK_GERAK) {
+                if (e->tipe == PG_AKSI_TETIKUS_GERAK) {
                         int cur = pg_dock_vertikal(d) ?
                                 e->tetik_pos.y : e->tetik_pos.x;
                         int delta = cur - d->split_drag_start;
@@ -736,7 +736,7 @@ pg_bool pg_dock_tangani(pg_dock_t *d, const pg_peristiwa_t *e)
                         pg_dock_tata(d);
                         return PG_BENAR;
                 }
-                if (e->tipe == PG_PERISTIWA_TETIK_NAIK) {
+                if (e->tipe == PG_AKSI_TETIKUS_LEPAS) {
                         d->split_drag_idx = -1;
                         return PG_BENAR;
                 }
@@ -744,8 +744,8 @@ pg_bool pg_dock_tangani(pg_dock_t *d, const pg_peristiwa_t *e)
         }
 
         /* 2. Klik di splitter. */
-        if (e->tipe == PG_PERISTIWA_TETIK_TURUN &&
-            e->tetik_tombol == PG_TETIK_KIRI) {
+        if (e->tipe == PG_AKSI_TETIKUS_TEKAN &&
+            e->tetik_tombol == PG_TETIKUS_KIRI) {
                 int idx = pg_dock_splitter_hit(d,
                         e->tetik_pos.x, e->tetik_pos.y);
                 if (idx >= 0) {

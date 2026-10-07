@@ -20,7 +20,7 @@
 #include "pigura/permukaan.h"
 #include "pigura/gambar.h"
 #include "pigura/font.h"
-#include "pigura/peristiwa.h"
+#include "pigura/aksi.h"
 #include "pigura/widget.h"
 #include "pigura/timer.h"
 
@@ -178,13 +178,13 @@ void pg_tooltip_setel_delay(unsigned ms)
 	g_tt_delay = ms;
 }
 
-void pg_tooltip_tangani(const pg_peristiwa_t *e)
+void pg_tooltip_tangani(const pg_aksi_t *e)
 {
 	pg_widget_t *hover_sekarang;
 	if (!e || !g_tt_inited) return;
-	if (e->tipe != PG_PERISTIWA_TETIK_GERAK &&
-	    e->tipe != PG_PERISTIWA_TETIK_TURUN &&
-	    e->tipe != PG_PERISTIWA_TETIK_NAIK)
+	if (e->tipe != PG_AKSI_TETIKUS_GERAK &&
+	    e->tipe != PG_AKSI_TETIKUS_TEKAN &&
+	    e->tipe != PG_AKSI_TETIKUS_LEPAS)
 		return;
 	hover_sekarang = pg_tt_widget_di(e->tetik_pos);
 	if (hover_sekarang != g_tt_hover) {

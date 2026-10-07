@@ -241,52 +241,17 @@ pg_galat pg_font_gambar_teks(const pg_font_t *font,
                               pg_permukaan_t *s, int x, int y,
                               pg_warna_t c)
 {
-        const char *p;
-        int cx = x;
-        int prev_gid = -1;  /* untuk kerning (TTF only) */
-        if (!font || !teks || !s) PG_KEMBALI_GALAT(PG_GALAT_ARGUMEN);
-        for (p = teks; *p; p++) {
-                pg_glyph_t g;
-                int gid;
-                if (*p == '\n') {
-                        cx = x;
-                        y += pg_font_tinggi_baris(font);
-                        prev_gid = -1;
-                        continue;
-                }
-                /* Untuk TTF, kerning antar glyph bertetangga
-                 * ditambahkan ke cursor sebelum render. */
-                if (font->jenis == PG_FONT_JENIS_TTF) {
-                        gid = pg_ttf_glyph_id((pg_font_ttf_t *)font->impl,
-                                              (pg_u32)(unsigned char)*p);
-                        if (prev_gid >= 0) {
-                                cx += pg_ttf_kerning_px(
-                                        (pg_font_ttf_t *)font->impl,
-                                        prev_gid, gid, font->ukuran_px);
-                        }
-                } else {
-                        gid = -1;
-                }
-                pg_font_glyph(font, (pg_u32)(unsigned char)*p, &g);
-                pg_font_gambar(font, (pg_u32)(unsigned char)*p, s,
-                                cx, y, c);
-                cx += g.advance;
-                prev_gid = gid;
-        }
-        return PG_OK;
+        /* Delegate ke versi UTF-8 supaya Unicode multi-byte (huruf
+         * Jepang, simbol Material Icons, dll) ter-render benar.
+         * Sebelumnya fungsi ini iterasi byte-per-byte dan treat tiap
+         * byte sebagai codepoint — bug untuk UTF-8 multi-byte. */
+        return pg_font_gambar_teks_utf8(font, teks, s, x, y, c);
 }
 
 int pg_font_lebar_teks(const pg_font_t *font, const char *teks)
 {
-        const char *p;
-        int total = 0;
-        if (!font || !teks) return 0;
-        if (font->jenis == PG_FONT_JENIS_BITMAP) {
-                for (p = teks; *p; p++) total += 8;
-                return total;
-        }
-        return pg_ttf_lebar_teks((pg_font_ttf_t *)font->impl, teks,
-                                  font->ukuran_px);
+        /* Delegate ke versi UTF-8 supaya lebar teks Unicode akurat. */
+        return pg_font_lebar_teks_utf8(font, teks);
 }
 
 pg_galat pg_font_gambar_teks_utf8(const pg_font_t *font,

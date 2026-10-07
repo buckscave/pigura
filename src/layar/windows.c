@@ -6,9 +6,9 @@
  * top-down. Tiap pg_layar_presentasi() men-BlBlt back buffer ke layar
  * jendela dan memompa pesan non-input via PeekMessageA.
  *
- * pg_layar_peristiwa_berikutnya() memompa satu pesan input dari antrian
+ * pg_layar_aksi_berikutnya() memompa satu pesan input dari antrian
  * (range 0x0100..0xFFFF — keyboard & mouse) dan menerjemahkannya ke
- * pg_peristiwa_t. Pesan non-input (WM_PAINT, WM_CLOSE, WM_DESTROY,
+ * pg_aksi_t. Pesan non-input (WM_PAINT, WM_CLOSE, WM_DESTROY,
  * WM_QUIT) sudah dipompa oleh pg_layar_presentasi().
  *
  * Back buffer DIB 32-bit BI_RGB top-down memiliki layout memori
@@ -145,8 +145,8 @@ static pg_titik_t pg_win_lparam_ke_titik(LPARAM lp)
 	return pg_buat_titik(x, y);
 }
 
-/* Terjemahkan satu MSG Win32 ke pg_peristiwa_t. */
-static pg_bool pg_win_msg_ke_peristiwa(const MSG *m, pg_peristiwa_t *out)
+/* Terjemahkan satu MSG Win32 ke pg_aksi_t. */
+static pg_bool pg_win_msg_ke_peristiwa(const MSG *m, pg_aksi_t *out)
 {
 	short delta;
 
@@ -156,57 +156,57 @@ static pg_bool pg_win_msg_ke_peristiwa(const MSG *m, pg_peristiwa_t *out)
 	switch (m->message) {
 	case WM_KEYDOWN:
 	case WM_SYSKEYDOWN:
-		out->tipe = PG_PERISTIWA_TOMBOL_TURUN;
+		out->tipe = PG_AKSI_TOMBOL_TURUN;
 		out->tombol = pg_win_vk_ke_tombol((int)m->wParam);
 		out->modifier = pg_win_modifier();
 		return PG_BENAR;
 	case WM_KEYUP:
 	case WM_SYSKEYUP:
-		out->tipe = PG_PERISTIWA_TOMBOL_NAIK;
+		out->tipe = PG_AKSI_TOMBOL_NAIK;
 		out->tombol = pg_win_vk_ke_tombol((int)m->wParam);
 		out->modifier = pg_win_modifier();
 		return PG_BENAR;
 	case WM_LBUTTONDOWN:
-		out->tipe = PG_PERISTIWA_TETIK_TURUN;
-		out->tetik_tombol = PG_TETIK_KIRI;
+		out->tipe = PG_AKSI_TETIKUS_TEKAN;
+		out->tetik_tombol = PG_TETIKUS_KIRI;
 		out->tetik_pos = pg_win_lparam_ke_titik(m->lParam);
 		return PG_BENAR;
 	case WM_LBUTTONUP:
-		out->tipe = PG_PERISTIWA_TETIK_NAIK;
-		out->tetik_tombol = PG_TETIK_KIRI;
+		out->tipe = PG_AKSI_TETIKUS_LEPAS;
+		out->tetik_tombol = PG_TETIKUS_KIRI;
 		out->tetik_pos = pg_win_lparam_ke_titik(m->lParam);
 		return PG_BENAR;
 	case WM_RBUTTONDOWN:
-		out->tipe = PG_PERISTIWA_TETIK_TURUN;
-		out->tetik_tombol = PG_TETIK_KANAN;
+		out->tipe = PG_AKSI_TETIKUS_TEKAN;
+		out->tetik_tombol = PG_TETIKUS_KANAN;
 		out->tetik_pos = pg_win_lparam_ke_titik(m->lParam);
 		return PG_BENAR;
 	case WM_RBUTTONUP:
-		out->tipe = PG_PERISTIWA_TETIK_NAIK;
-		out->tetik_tombol = PG_TETIK_KANAN;
+		out->tipe = PG_AKSI_TETIKUS_LEPAS;
+		out->tetik_tombol = PG_TETIKUS_KANAN;
 		out->tetik_pos = pg_win_lparam_ke_titik(m->lParam);
 		return PG_BENAR;
 	case WM_MBUTTONDOWN:
-		out->tipe = PG_PERISTIWA_TETIK_TURUN;
-		out->tetik_tombol = PG_TETIK_TENGAH;
+		out->tipe = PG_AKSI_TETIKUS_TEKAN;
+		out->tetik_tombol = PG_TETIKUS_TENGAH;
 		out->tetik_pos = pg_win_lparam_ke_titik(m->lParam);
 		return PG_BENAR;
 	case WM_MBUTTONUP:
-		out->tipe = PG_PERISTIWA_TETIK_NAIK;
-		out->tetik_tombol = PG_TETIK_TENGAH;
+		out->tipe = PG_AKSI_TETIKUS_LEPAS;
+		out->tetik_tombol = PG_TETIKUS_TENGAH;
 		out->tetik_pos = pg_win_lparam_ke_titik(m->lParam);
 		return PG_BENAR;
 	case WM_MOUSEMOVE:
-		out->tipe = PG_PERISTIWA_TETIK_GERAK;
+		out->tipe = PG_AKSI_TETIKUS_GERAK;
 		out->tetik_pos = pg_win_lparam_ke_titik(m->lParam);
 		return PG_BENAR;
 	case WM_MOUSEWHEEL:
 		delta = (short)HIWORD(m->wParam);
-		out->tipe = PG_PERISTIWA_TETIK_RODA;
+		out->tipe = PG_AKSI_TETIKUS_GULIR;
 		out->roda_dy = delta > 0 ? 1 : -1;
 		return PG_BENAR;
 	case WM_CLOSE:
-		out->tipe = PG_PERISTIWA_KELUAR;
+		out->tipe = PG_AKSI_KELUAR;
 		return PG_BENAR;
 	default:
 		return PG_SALAH;
@@ -375,7 +375,7 @@ pg_galat pg_layar_presentasi(pg_layar_t *l)
 
 	/* Pompa pesan non-input (0..0xFF: WM_PAINT, WM_CLOSE,
 	 * WM_DESTROY, WM_QUIT, WM_SIZE, …). Input dipompa oleh
-	 * pg_layar_peristiwa_berikutnya(). */
+	 * pg_layar_aksi_berikutnya(). */
 	while (PeekMessageA(&msg, NULL, 0,
 			     PG_LAYAR_FILTER_INPUT_MIN - 1, PM_REMOVE)) {
 		if (msg.message == WM_QUIT) {
@@ -395,7 +395,7 @@ pg_galat pg_layar_tunggu_vsync(pg_layar_t *l)
 	return PG_GALAT_TANPA;
 }
 
-pg_galat pg_layar_pompa_peristiwa(pg_layar_t *l)
+pg_galat pg_layar_pompa_aksi(pg_layar_t *l)
 {
 	MSG msg;
 	if (!l) PG_KEMBALI_GALAT(PG_GALAT_ARGUMEN);
@@ -422,7 +422,7 @@ unsigned long pg_layar_jendela_id(pg_layar_t *l)
 	return (unsigned long)l->hwnd;
 }
 
-pg_bool pg_layar_punya_peristiwa(pg_layar_t *l)
+pg_bool pg_layar_punya_aksi(pg_layar_t *l)
 {
 	MSG msg;
 	if (!l) return PG_SALAH;
@@ -432,7 +432,7 @@ pg_bool pg_layar_punya_peristiwa(pg_layar_t *l)
 		PG_BENAR : PG_SALAH;
 }
 
-pg_bool pg_layar_peristiwa_berikutnya(pg_layar_t *l, pg_peristiwa_t *out)
+pg_bool pg_layar_aksi_berikutnya(pg_layar_t *l, pg_aksi_t *out)
 {
 	MSG msg;
 
@@ -442,7 +442,7 @@ pg_bool pg_layar_peristiwa_berikutnya(pg_layar_t *l, pg_peristiwa_t *out)
 	 * peristiwa KELUAR. */
 	if (l->keluar) {
 		memset(out, 0, sizeof(*out));
-		out->tipe = PG_PERISTIWA_KELUAR;
+		out->tipe = PG_AKSI_KELUAR;
 		out->waktu_ms = pg_win_sekarang_ms();
 		l->keluar = PG_SALAH;
 		return PG_BENAR;

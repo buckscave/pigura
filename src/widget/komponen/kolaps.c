@@ -16,7 +16,7 @@
 #include "pigura/permukaan.h"
 #include "pigura/gambar.h"
 #include "pigura/font.h"
-#include "pigura/peristiwa.h"
+#include "pigura/aksi.h"
 #include "pigura/widget.h"
 
 #include <stdlib.h>
@@ -132,13 +132,13 @@ static void pg_kolaps_catat_v(pg_widget_t *w, pg_permukaan_t *s)
 }
 
 static pg_bool pg_kolaps_peristiwa_v(pg_widget_t *w,
-                                       const pg_peristiwa_t *e)
+                                       const pg_aksi_t *e)
 {
         pg_kolaps_t *k = pg_kolaps_dari(w);
         int          tombol_x = 2;
         int          tombol_y = (k->title_h - 16) / 2;
         int          tombol_w = 16, tombol_h = 16;
-        if (e->tipe == PG_PERISTIWA_TETIK_GERAK) {
+        if (e->tipe == PG_AKSI_TETIKUS_GERAK) {
                 int x = e->tetik_pos.x, y = e->tetik_pos.y;
                 pg_bool hover = (x >= tombol_x &&
                         x < tombol_x + tombol_w &&
@@ -150,8 +150,8 @@ static pg_bool pg_kolaps_peristiwa_v(pg_widget_t *w,
                 }
                 return PG_BENAR;
         }
-        if (e->tipe == PG_PERISTIWA_TETIK_TURUN &&
-            e->tetik_tombol == PG_TETIK_KIRI) {
+        if (e->tipe == PG_AKSI_TETIKUS_TEKAN &&
+            e->tetik_tombol == PG_TETIKUS_KIRI) {
                 int x = e->tetik_pos.x, y = e->tetik_pos.y;
                 if (x >= tombol_x && x < tombol_x + tombol_w &&
                     y >= tombol_y && y < tombol_y + tombol_h) {
@@ -166,15 +166,15 @@ static pg_bool pg_kolaps_peristiwa_v(pg_widget_t *w,
                 }
                 /* Body: teruskan ke child. */
                 if (!k->kolaps && k->anak) {
-                        pg_peristiwa_t e2 = *e;
+                        pg_aksi_t e2 = *e;
                         e2.tetik_pos.y -= k->title_h;
-                        return pg_widget_tangani_peristiwa(
+                        return pg_widget_tangani_aksi(
                                 k->anak, &e2);
                 }
                 return PG_SALAH;
         }
-        if (e->tipe == PG_PERISTIWA_TETIK_NAIK &&
-            e->tetik_tombol == PG_TETIK_KIRI) {
+        if (e->tipe == PG_AKSI_TETIKUS_LEPAS &&
+            e->tetik_tombol == PG_TETIKUS_KIRI) {
                 int x = e->tetik_pos.x, y = e->tetik_pos.y;
                 if (k->ditekan_tombol) {
                         k->ditekan_tombol = PG_SALAH;
@@ -186,18 +186,18 @@ static pg_bool pg_kolaps_peristiwa_v(pg_widget_t *w,
                         return PG_BENAR;
                 }
                 if (!k->kolaps && k->anak) {
-                        pg_peristiwa_t e2 = *e;
+                        pg_aksi_t e2 = *e;
                         e2.tetik_pos.y -= k->title_h;
-                        return pg_widget_tangani_peristiwa(
+                        return pg_widget_tangani_aksi(
                                 k->anak, &e2);
                 }
                 return PG_SALAH;
         }
         /* Peristiwa lain: teruskan ke child bila expand. */
         if (!k->kolaps && k->anak) {
-                pg_peristiwa_t e2 = *e;
+                pg_aksi_t e2 = *e;
                 e2.tetik_pos.y -= k->title_h;
-                return pg_widget_tangani_peristiwa(k->anak, &e2);
+                return pg_widget_tangani_aksi(k->anak, &e2);
         }
         return PG_SALAH;
 }

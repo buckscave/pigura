@@ -67,7 +67,11 @@ static void pg_setel_piksel_aa(pg_permukaan_t *s, int x, int y,
         if (alpha <= 0) return;
         p = (pg_warna_t *)((char *)pg_permukaan_piksel_mut(s) +
                             (size_t)y * langkah);
-        if (alpha >= 255) {
+        /* Jangan timpa langsung bila: fg semi-transparan, atau
+         * bg masih transparan (alpha < 255). Kalau langsung
+         * timpa, edge AA tidak ada gradasi di permukaan
+         * transparan → jagged saat di-blit ke parent. */
+        if (alpha >= 255 && PG_A(c) >= 255 && PG_A(p[x]) >= 255) {
                 p[x] = c;
         } else {
                 p[x] = pg_blend_coverage(p[x], c, alpha);
@@ -136,8 +140,8 @@ void pg_gambar_garis_aa(pg_permukaan_t *s,
         ypxl1 = (int)floorf(yend);
         fpart = yend - floorf(yend);
         {
-                int a0 = (int)((1.0f - fpart) * xgap * 255.0f);
-                int a1 = (int)(fpart * xgap * 255.0f);
+                int a0 = (int)(sqrtf((1.0f - fpart) * xgap) * 255.0f);
+                int a1 = (int)(sqrtf(fpart * xgap) * 255.0f);
                 if (steep) {
                         /* Unswap: kolom=ypxl1, baris=xpxl1. */
                         pg_setel_piksel_aa(s, ypxl1,     xpxl1, a0, c);
@@ -157,8 +161,8 @@ void pg_gambar_garis_aa(pg_permukaan_t *s,
         ypxl2 = (int)floorf(yend);
         fpart = yend - floorf(yend);
         {
-                int a0 = (int)((1.0f - fpart) * xgap * 255.0f);
-                int a1 = (int)(fpart * xgap * 255.0f);
+                int a0 = (int)(sqrtf((1.0f - fpart) * xgap) * 255.0f);
+                int a1 = (int)(sqrtf(fpart * xgap) * 255.0f);
                 if (steep) {
                         pg_setel_piksel_aa(s, ypxl2,     xpxl2, a0, c);
                         pg_setel_piksel_aa(s, ypxl2 + 1, xpxl2, a1, c);
@@ -172,8 +176,8 @@ void pg_gambar_garis_aa(pg_permukaan_t *s,
         for (x = xpxl1 + 1; x < xpxl2; x++) {
                 int yi = (int)floorf(intery);
                 float fp = intery - floorf(intery);
-                int a0 = (int)((1.0f - fp) * 255.0f);
-                int a1 = (int)(fp * 255.0f);
+                int a0 = (int)(sqrtf(1.0f - fp) * 255.0f);
+                int a1 = (int)(sqrtf(fp) * 255.0f);
                 if (steep) {
                         /* Unswap: kolom=yi, baris=x. */
                         pg_setel_piksel_aa(s, yi,     x, a0, c);
@@ -260,18 +264,16 @@ void pg_gambar_garis_aa_tebal(pg_permukaan_t *s,
 
 void pg_gambar_kotak_aa(pg_permukaan_t *s, pg_kotak_t r, pg_warna_t c)
 {
+        /* Gambar 4 garis solid 1px. Tidak pakai Wu line karena
+         * Wu di titik integer kasih alpha ujung ~127, dan tiap
+         * sudut digambar 2x (intersection) -> alpha dobel ->
+         * kelihatan seperti bevel di pojok. Pakai garis solid
+         * supaya outline utuh, tidak ada gradasi di sudut. */
         if (!s || PG_KOTAK_KOSONG(r)) return;
-        pg_gambar_garis_aa(s, pg_to_fixed(r.x), pg_to_fixed(r.y),
-                            pg_to_fixed(r.x + r.w), pg_to_fixed(r.y), c);
-        pg_gambar_garis_aa(s, pg_to_fixed(r.x + r.w), pg_to_fixed(r.y),
-                            pg_to_fixed(r.x + r.w),
-                            pg_to_fixed(r.y + r.h), c);
-        pg_gambar_garis_aa(s, pg_to_fixed(r.x + r.w),
-                            pg_to_fixed(r.y + r.h),
-                            pg_to_fixed(r.x), pg_to_fixed(r.y + r.h), c);
-        pg_gambar_garis_aa(s, pg_to_fixed(r.x),
-                            pg_to_fixed(r.y + r.h),
-                            pg_to_fixed(r.x), pg_to_fixed(r.y), c);
+        pg_garis_h_permukaan(s, r.x, r.x+r.w, r.y, c);
+        pg_garis_h_permukaan(s, r.x, r.x+r.w, r.y+r.h-1, c);
+        pg_garis_v_permukaan(s, r.x, r.y, r.y+r.h, c);
+        pg_garis_v_permukaan(s, r.x+r.w-1, r.y, r.y+r.h, c);
 }
 
 /* ===================================================================
@@ -295,17 +297,29 @@ void pg_gambar_lingkaran_isi_aa(pg_permukaan_t *s,
         pg_gambar_ellipse_isi_aa(s, cx, cy, radius, radius, isi);
 }
 
-/* Lingkaran/ellipse AA: supersampling 4x4 + gamma correction.
+/* Lingkaran/ellipse AA: supersampling adaptif + sqrt gamma.
  *
- * SS=4 (16 sample) sudah cukup untuk 1080p. 8x8 = 64 sample itu
- * overkill (2.5M iterasi untuk radius 200).
+ * SS adaptif:
+ *   - rx atau ry < 20 (radio kecil, contoh: dot di widget radio)
+ *     pakai 8x8 = 64 sample → AA halus di arc sempit.
+ *   - Besar pakai 4x4 = 16 sample (cukup, lebih cepat).
  *
- * Gamma: coverage linear → alpha sRGB. Mata + framebuffer pakai
- * sRGB, jadi alpha = sqrt(coverage) approximates powf(c, 1/2.2).
- * Tanpa ini, tepi kelihatan "bold" / terlalu gelap.
+ * Coverage per sub-piksel:
+ *   - Hitung d = fx²·inv_rx² + fy²·inv_ry² (normalized squared
+ *     distance ke pusat; d=1 = boundary).
+ *   - dist = |d - 1| untuk outline (kedua sisi boundary),
+ *     atau max(0, d-1) untuk fill (hanya sisi luar).
+ *   - Local gradient |∇d| ≈ 2·sqrt((fx/rx²)² + (fy/ry²)²).
+ *   - e = edge_band · |∇d| → konversi 1px band ke d-space.
+ *   - cov = clamp(1 - dist/e, 0, 1).
  *
- * Band: TIDAK pakai band 1.125 (itu = 12.5px untuk rx=100!).
- * Supersampling saja yang tentukan edge — 1px alami.
+ * Gamma:
+ *   - coverage = Σcov / (SS·SS) (linear, 0..1)
+ *   - alpha = sqrt(coverage) · 255  → gamma sRGB supaya tidak bold
+ *
+ * Band: edge_band = 1.0 piksel (constant). Tidak pakai 0.2 (terlalu
+ * tipis → staircase untuk r<10). Tidak pakai 1/rx+1/ry (itu ekuivalen
+ * dengan edge_band=0.5 setengah-gradient — terlalu tipis juga).
  */
 static void pg_gambar_ellipse_aa_int(pg_permukaan_t *s,
                                        int cx, int cy,
@@ -313,80 +327,64 @@ static void pg_gambar_ellipse_aa_int(pg_permukaan_t *s,
                                        pg_warna_t c,
                                        pg_bool isi)
 {
-        const int SS = 4;
+        const int SS = (rx < 20 || ry < 20) ? 8 : 4;
+        const float edge_band = 1.0f;
         int x, y;
         float inv_rx2, inv_ry2;
-        float edge;
         if (!s || rx <= 0 || ry <= 0) return;
         inv_rx2 = 1.0f / ((float)rx * (float)rx);
         inv_ry2 = 1.0f / ((float)ry * (float)ry);
-        /* Lebar edge di normalized space: ~1px di boundary.
-         * fwidth(d) ≈ 1/rx + 1/ry. */
-        edge = 1.0f / (float)rx + 1.0f / (float)ry;
-        if (edge < 0.001f) edge = 0.001f;
 
         for (y = -ry - 1; y <= ry + 1; y++) {
                 for (x = -rx - 1; x <= rx + 1; x++) {
-
-                        if (!isi) {
-                                /* OUTLINE: pakai distance field, bukan
-                                 * supersampling. Distance field itu
-                                 * sendiri sudah AA — 1 - |d-1|/edge
-                                 * memberi coverage 0..1 yang halus.
-                                 * Supersampling outline malah bikin
-                                 * tebal (16 subpixel * 16 = clamp 1.0). */
-                                float fx, fy, d, dist, cov;
-                                int alpha;
-                                fx = (float)x + 0.5f;
-                                fy = (float)y + 0.5f;
-                                d = fx * fx * inv_rx2 +
-                                    fy * fy * inv_ry2;
-                                dist = fabsf(d - 1.0f);
-                                cov = 1.0f - dist / edge;
-                                if (cov <= 0.0f) continue;
-                                if (cov > 1.0f) cov = 1.0f;
-                                alpha = (int)(sqrtf(cov) * 255.0f + 0.5f);
-                                if (alpha > 255) alpha = 255;
-                                pg_setel_piksel_aa(s, cx + x,
-                                    cy + y, alpha, c);
-                                continue;
-                        }
-
-                        /* FILL: supersampling 4x4. */
-                        {
-                                int total = 0;
-                                int sub_x, sub_y;
-                                for (sub_y = 0; sub_y < SS; sub_y++) {
-                                        for (sub_x = 0; sub_x < SS;
-                                             sub_x++) {
-                                                float fx = (float)x +
-                                                        (sub_x + 0.5f) /
-                                                        (float)SS;
-                                                float fy = (float)y +
-                                                        (sub_y + 0.5f) /
-                                                        (float)SS;
-                                                float d = fx * fx *
-                                                          inv_rx2 +
-                                                          fy * fy *
-                                                          inv_ry2;
-                                                if (d <= 1.0f)
-                                                        total++;
+                        int total_cov = 0;
+                        int sub_x, sub_y;
+                        for (sub_y = 0; sub_y < SS; sub_y++) {
+                                for (sub_x = 0; sub_x < SS; sub_x++) {
+                                        float fx = (float)x +
+                                                ((float)sub_x + 0.5f) /
+                                                (float)SS;
+                                        float fy = (float)y +
+                                                ((float)sub_y + 0.5f) /
+                                                (float)SS;
+                                        float d = fx * fx * inv_rx2 +
+                                                  fy * fy * inv_ry2;
+                                        float dist;
+                                        float gx, gy, grad, e, cov;
+                                        if (isi) {
+                                                /* FILL: hanya sisi luar
+                                                 * yang fade. Dalam = cov 1. */
+                                                dist = (d > 1.0f) ?
+                                                        (d - 1.0f) : 0.0f;
+                                        } else {
+                                                /* OUTLINE: kedua sisi
+                                                 * boundary fade. */
+                                                dist = fabsf(d - 1.0f);
                                         }
+                                        /* Local gradient |∇d| di pixel
+                                         * space. ∂d/∂fx = 2·fx/rx²,
+                                         * jadi |∇d| = 2·sqrt(gx²+gy²). */
+                                        gx = fx * inv_rx2;
+                                        gy = fy * inv_ry2;
+                                        grad = 2.0f * sqrtf(gx * gx +
+                                                            gy * gy);
+                                        e = edge_band * grad;
+                                        if (e < 0.001f) e = 0.001f;
+                                        cov = 1.0f - dist / e;
+                                        if (cov < 0.0f) cov = 0.0f;
+                                        if (cov > 1.0f) cov = 1.0f;
+                                        total_cov += (int)(cov * 256.0f);
                                 }
-                                if (total > 0) {
-                                        float coverage = (float)total /
-                                                (float)(SS * SS);
-                                        float alpha_f;
-                                        int alpha;
-                                        if (coverage > 1.0f)
-                                                coverage = 1.0f;
-                                        alpha_f = sqrtf(coverage);
-                                        alpha = (int)(alpha_f * 255.0f +
-                                                       0.5f);
-                                        if (alpha > 255) alpha = 255;
-                                        pg_setel_piksel_aa(s,
-                                            cx + x, cy + y,
-                                            alpha, c);
+                        }
+                        if (total_cov > 0) {
+                                float coverage = (float)total_cov /
+                                        (float)(SS * SS * 256);
+                                float alpha_f = sqrtf(coverage);
+                                int alpha = (int)(alpha_f * 255.0f + 0.5f);
+                                if (alpha > 255) alpha = 255;
+                                if (alpha > 0) {
+                                        pg_setel_piksel_aa(s, cx + x,
+                                            cy + y, alpha, c);
                                 }
                         }
                 }
@@ -526,11 +524,13 @@ static float pg_round_rect_distance(float fx, float fy,
 {
         float dx_l, dx_r, dy_t, dy_b;
         float d_edge;
-        /* Jarak ke 4 tepi kotak (positif bila di luar). */
-        dx_l = -fx;            /* <0 bila fx > 0 (di dalam dari kiri) */
-        dx_r = fx - (w - 1);   /* >0 bila fx > w-1 (di luar kanan) */
+        /* Jarak ke 4 tepi kotak (positif bila di luar).
+         * Pakai w/h bukan w-1/h-1 supaya box tidak kekecilan
+         * 1px di kanan-bawah, dan arc tidak geser. */
+        dx_l = -fx;
+        dx_r = fx - (float)w;
         dy_t = -fy;
-        dy_b = fy - (h - 1);
+        dy_b = fy - (float)h;
         /* Cek region pojok (4 region). Bila di region pojok, hitung
          * jarak ke arc pojok. */
         if (fx < rad && fy < rad) {
@@ -540,21 +540,21 @@ static float pg_round_rect_distance(float fx, float fy,
                 return sqrtf(dx * dx + dy * dy) - (float)rad;
         }
         if (fx >= (float)(w - rad) && fy < rad) {
-                /* TR: pusat arc di (w-rad-1, rad) */
-                float dx = fx - (float)(w - rad - 1);
+                /* TR: pusat arc di (w-rad, rad) */
+                float dx = fx - (float)(w - rad);
                 float dy = fy - (float)rad;
                 return sqrtf(dx * dx + dy * dy) - (float)rad;
         }
         if (fx >= (float)(w - rad) && fy >= (float)(h - rad)) {
-                /* BR: pusat arc di (w-rad-1, h-rad-1) */
-                float dx = fx - (float)(w - rad - 1);
-                float dy = fy - (float)(h - rad - 1);
+                /* BR: pusat arc di (w-rad, h-rad) */
+                float dx = fx - (float)(w - rad);
+                float dy = fy - (float)(h - rad);
                 return sqrtf(dx * dx + dy * dy) - (float)rad;
         }
         if (fx < rad && fy >= (float)(h - rad)) {
-                /* BL: pusat arc di (rad, h-rad-1) */
+                /* BL: pusat arc di (rad, h-rad) */
                 float dx = fx - (float)rad;
-                float dy = fy - (float)(h - rad - 1);
+                float dy = fy - (float)(h - rad);
                 return sqrtf(dx * dx + dy * dy) - (float)rad;
         }
         /* Tengah (di luar region pojok): signed distance = max dari
@@ -588,9 +588,10 @@ void pg_gambar_kotak_tumpul_aa(pg_permukaan_t *s, pg_kotak_t r,
                 pg_gambar_kotak_aa(s, r, c);
                 return;
         }
-        /* Edge width ~1 piksel (sama seperti ellipse outline). */
-        edge = 1.0f;
-        /* Bounding box + 1 piksel margin untuk AA edge. */
+        /* Edge width 0.5 supaya outline 1px tajam utuh.
+         * edge=1.0 + sqrtf bikin outline 2px + gamma terlalu lembut.
+         * edge=0.5 + linear (tanpa sqrtf) = 1px tajam. */
+        edge = 0.5f;
         for (y = -1; y <= h; y++) {
                 for (x = -1; x <= w; x++) {
                         float fx, fy, d, dist, cov;
@@ -603,7 +604,7 @@ void pg_gambar_kotak_tumpul_aa(pg_permukaan_t *s, pg_kotak_t r,
                         cov = 1.0f - dist / edge;
                         if (cov <= 0.0f) continue;
                         if (cov > 1.0f) cov = 1.0f;
-                        alpha = (int)(sqrtf(cov) * 255.0f + 0.5f);
+                        alpha = (int)(cov * 255.0f + 0.5f);
                         if (alpha > 255) alpha = 255;
                         lx = x0 + x;
                         ly = y0 + y;
@@ -666,6 +667,191 @@ void pg_gambar_kotak_tumpul_isi_aa(pg_permukaan_t *s, pg_kotak_t r,
                                 ly = y0 + y;
                                 pg_setel_piksel_aa(s, lx, ly,
                                                     alpha, isi);
+                        }
+                }
+        }
+}
+
+/* ------------------------------------------------------------------
+ * Single-pass fill + outline dengan 4x4 supersampling + sqrt gamma
+ * ------------------------------------------------------------------
+ * Strategi (mirip Cairo):
+ *
+ *   Untuk setiap piksel output, sample 16 sub-posisi (4x4 grid).
+ *   Untuk tiap sub:
+ *     - Hitung d_out (jarak ke outer rounded rect).
+ *     - Bila d_out > 0 → sub di luar silhouette → skip (alpha=0).
+ *     - Bila d_out <= 0 → sub di dalam:
+ *         - Hitung d_in (jarak ke inner rounded rect, offset 1,1).
+ *         - Pilih warna: isi (d_in <= 0) atau garis (d_in > 0).
+ *         - Akumulasi RGB ke sum_r/g/b.
+ *
+ *   Setelah loop 16 sub:
+ *     - coverage = hitung / 16  (0..1)
+ *     - alpha = sqrtf(coverage)  → gamma sRGB
+ *     - rgb = sum_rgb / hitung   → rata-rata warna "inside" sub
+ *     - Blend ke piksel existing dengan alpha tersebut.
+ *
+ * Keuntungan:
+ *   - Edge silhouette halus: 16 level coverage + gamma.
+ *   - Inner edge (isi→garis) ikut halus karena sub di border arc
+ *     dapat campuran isi+garis tergantung jumlah sub yang masuk
+ *     masing-masing region.
+ *   - Tidak double-AA: 1 pass, 1 warna per piksel.
+ *
+ * Performa: O(w*h*16). Untuk widget 50x50 = 40k SDF eval; 200x200 =
+ * 640k. Masih cepat untuk widget UI.
+ * ------------------------------------------------------------------ */
+
+/* Helper SDF inner (rounded rect di offset (1,1), ukuran (w-2,h-2),
+ * radius (rad-1)). Sama algoritma dengan pg_round_rect_distance
+ * tapi dengan parameter inner. */
+static float pg_round_rect_inner_sdf(float fx, float fy,
+                                      int w, int h, int rad)
+{
+        float ifx = fx - 1.0f;
+        float ify = fy - 1.0f;
+        int iw = w - 2;
+        int ih = h - 2;
+        int irad = rad - 1;
+        float dx_l, dx_r, dy_t, dy_b;
+        float d_edge;
+        if (iw <= 0 || ih <= 0) return -1e9f;  /* seluruh dalam */
+        if (irad < 0) irad = 0;
+        if (irad > iw / 2) irad = iw / 2;
+        if (irad > ih / 2) irad = ih / 2;
+        dx_l = -ifx;
+        dx_r = ifx - (float)iw;
+        dy_t = -ify;
+        dy_b = ify - (float)ih;
+        if (ifx < irad && ify < irad) {
+                float dx = ifx - (float)irad;
+                float dy = ify - (float)irad;
+                return sqrtf(dx * dx + dy * dy) - (float)irad;
+        }
+        if (ifx >= (float)(iw - irad) && ify < irad) {
+                float dx = ifx - (float)(iw - irad);
+                float dy = ify - (float)irad;
+                return sqrtf(dx * dx + dy * dy) - (float)irad;
+        }
+        if (ifx >= (float)(iw - irad) && ify >= (float)(ih - irad)) {
+                float dx = ifx - (float)(iw - irad);
+                float dy = ify - (float)(ih - irad);
+                return sqrtf(dx * dx + dy * dy) - (float)irad;
+        }
+        if (ifx < irad && ify >= (float)(ih - irad)) {
+                float dx = ifx - (float)irad;
+                float dy = ify - (float)(ih - irad);
+                return sqrtf(dx * dx + dy * dy) - (float)irad;
+        }
+        d_edge = dx_l;
+        if (dx_r > d_edge) d_edge = dx_r;
+        if (dy_t > d_edge) d_edge = dy_t;
+        if (dy_b > d_edge) d_edge = dy_b;
+        return d_edge;
+}
+
+void pg_gambar_kotak_tumpul_isi_garis_aa(pg_permukaan_t *s,
+                                           pg_kotak_t r,
+                                           int radius,
+                                           pg_warna_t isi,
+                                           pg_warna_t garis)
+{
+        /* SS adaptif: radius kecil (<20) pakai 8x8 = 64 sub-piksel.
+         * Untuk radius 4-6, arc cuma ~25-37px → 4x4 (16 sample)
+         * hanya tangkap 4 level coverage → kasar. 8x8 → 16 level → halus.
+         * Untuk radius besar, 4x4 sudah cukup dan lebih cepat.
+         * Sama seperti ellipse: r<20 → SS=8, else SS=4. */
+        const int SS = (radius < 20) ? 8 : 4;
+        int x0, y0, x1, y1;
+        int w, h, rad;
+        int x, y;
+        if (!s) return;
+        x0 = r.x;  y0 = r.y;
+        x1 = r.x + r.w;  y1 = r.y + r.h;
+        if (x1 <= x0 || y1 <= y0) return;
+        w = x1 - x0;  h = y1 - y0;
+        rad = radius;
+        if (rad < 0) rad = 0;
+        if (rad > w / 2) rad = w / 2;
+        if (rad > h / 2) rad = h / 2;
+
+        /* Radius 0: fallback ke solid fill + 4 garis solid.
+         * Pakai path ini karena SS tidak menambah kualitas untuk
+         * rect tajam (silhouette = straight line, 1px AA sudah
+         * cukup dari supersampling natural di piksel boundary).
+         * Tapi karena solid fill + solid lines = stabil dan utuh,
+         * kita pakai untuk radius 0. */
+        if (rad == 0) {
+                pg_isi_permukaan_kotak(s, r, isi);
+                pg_garis_h_permukaan(s, r.x, r.x + w, r.y, garis);
+                pg_garis_h_permukaan(s, r.x, r.x + w, r.y + h - 1, garis);
+                pg_garis_v_permukaan(s, r.x, r.y, r.y + h, garis);
+                pg_garis_v_permukaan(s, r.x + w - 1, r.y, r.y + h, garis);
+                return;
+        }
+
+        /* Single pass 4x4 SS untuk tiap piksel.
+         * Loop dari -1..w+1 dan -1..h+1 untuk capture edge AA yang
+         * mungkin sedikit di luar kotak (untuk smooth blend). */
+        for (y = -1; y <= h; y++) {
+                for (x = -1; x <= w; x++) {
+                        int sx, sy;
+                        int hitung = 0;
+                        int sum_r = 0, sum_g = 0, sum_b = 0;
+                        int lx, ly;
+                        for (sy = 0; sy < SS; sy++) {
+                                for (sx = 0; sx < SS; sx++) {
+                                        float fx = (float)x +
+                                                ((float)sx + 0.5f) /
+                                                (float)SS;
+                                        float fy = (float)y +
+                                                ((float)sy + 0.5f) /
+                                                (float)SS;
+                                        float d_out = pg_round_rect_distance(
+                                                fx, fy, w, h, rad);
+                                        if (d_out > 0.0f)
+                                                continue;  /* outside */
+                                        /* Inside outer */
+                                        hitung++;
+                                        {
+                                                float d_in =
+                                                        pg_round_rect_inner_sdf(
+                                                                fx, fy,
+                                                                w, h, rad);
+                                                if (d_in <= 0.0f) {
+                                                        sum_r += PG_R(isi);
+                                                        sum_g += PG_G(isi);
+                                                        sum_b += PG_B(isi);
+                                                } else {
+                                                        sum_r += PG_R(garis);
+                                                        sum_g += PG_G(garis);
+                                                        sum_b += PG_B(garis);
+                                                }
+                                        }
+                                }
+                        }
+                        if (hitung == 0)
+                                continue;  /* semua sub di luar */
+                        {
+                                float coverage = (float)hitung /
+                                        (float)(SS * SS);
+                                float alpha_f = sqrtf(coverage);
+                                int alpha;
+                                if (alpha_f > 1.0f) alpha_f = 1.0f;
+                                alpha = (int)(alpha_f * 255.0f + 0.5f);
+                                if (alpha > 255) alpha = 255;
+                                if (alpha <= 0) continue;
+                                {
+                                        int rr = sum_r / hitung;
+                                        int gg = sum_g / hitung;
+                                        int bb = sum_b / hitung;
+                                        lx = x0 + x;
+                                        ly = y0 + y;
+                                        pg_setel_piksel_aa(s, lx, ly,
+                                                            alpha,
+                                                            PG_RGB(rr, gg, bb));
+                                }
                         }
                 }
         }

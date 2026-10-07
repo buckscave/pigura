@@ -1506,28 +1506,44 @@ pg_galat pg_ttf_gambar(const pg_font_ttf_t *t, pg_u32 kode,
                         if (dx < 0 || dx >= lebar_s) continue;
                         alpha = cache->bitmap[py * cache->lebar + px];
                         if (alpha == 0) continue;
-                        /* Composite alpha: coverage font (alpha) *
-                         * fg alpha (PG_A(c)). Sama seperti
-                         * pg_blend_coverage di gambar.c. */
+                        /* Composite coverage dengan bg.
+                         *
+                         * Penting: bila bg transparan (A==0), simpan
+                         * STRAIGHT alpha: RGB = fg, A = fa. Jangan
+                         * premultiply RGB. Nanti saat di-blit ke parent
+                         * opaque, blit akan blend sekali = benar.
+                         *
+                         * Bila bg opaque (A==255), blend biasa:
+                         * hasil opaque (A=255).
+                         *
+                         * Bila bg semi-transparan (0 < A < 255),
+                         * blend RGB + composite alpha. */
                         {
-                                int fg_a = PG_A(c);
-                                int fa = (alpha * fg_a) / 255;
+                                int fa = alpha;
                                 if (fa <= 0) continue;
                                 if (fa >= 255) {
                                         drow[dx] = c;
                                 } else {
                                         pg_warna_t bg = drow[dx];
-                                        int r, g, b, a;
-                                        int ia = 255 - fa;
-                                        r = (PG_R(c)*fa +
-                                             PG_R(bg)*ia)/255;
-                                        g = (PG_G(c)*fa +
-                                             PG_G(bg)*ia)/255;
-                                        b = (PG_B(c)*fa +
-                                             PG_B(bg)*ia)/255;
-                                        a = fa + (PG_A(bg)*ia)/255;
-                                        drow[dx] =
-                                            PG_RGBA(r,g,b,a);
+                                        if (PG_A(bg) == 0) {
+                                                /* bg transparan: simpan
+                                                 * straight, jangan blend RGB */
+                                                drow[dx] = PG_RGBA(
+                                                        PG_R(c), PG_G(c),
+                                                        PG_B(c), fa);
+                                        } else {
+                                                /* bg opaque/semi: blend */
+                                                int r, g, b, a;
+                                                int ia = 255 - fa;
+                                                r = (PG_R(c)*fa +
+                                                     PG_R(bg)*ia)/255;
+                                                g = (PG_G(c)*fa +
+                                                     PG_G(bg)*ia)/255;
+                                                b = (PG_B(c)*fa +
+                                                     PG_B(bg)*ia)/255;
+                                                a = fa + (PG_A(bg)*ia)/255;
+                                                drow[dx] = PG_RGBA(r,g,b,a);
+                                        }
                                 }
                         }
                 }
